@@ -2,7 +2,7 @@ import asyncio
 import logging
 import traceback
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import List, Optional, Set, Dict
 
 from fastapi import FastAPI, WebSocket, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +15,12 @@ import y_py as Y
 from ypy_websocket.websocket_server import WebsocketServer
 from database import get_db, AsyncSessionLocal
 from models import KnowledgeBase, Folder, Document, YDocUpdate
+
+# Try to import ExceptionGroup for better error inspection (Python 3.11+ or exceptiongroup backport)
+try:
+    from exceptiongroup import ExceptionGroup
+except ImportError:
+    ExceptionGroup = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doco")
@@ -30,7 +36,7 @@ class SQLiteStore:
                 session.add(new_update)
                 await session.commit()
         except Exception as e:
-            logger.error(f"Persistence error for room {self.room_name}: {e}")
+            logger.error(f"Persistence write error for room {self.room_name}: {e}")
 
     async def read(self) -> bytes:
         try:
@@ -42,57 +48,60 @@ class SQLiteStore:
                     return None
                 return Y.merge_updates(updates)
         except Exception as e:
-            logger.error(f"Database read error for room {self.room_name}: {e}")
+            logger.error(f"Persistence read error for room {self.room_name}: {e}")
             return None
 
 class DocoWebsocketServer(WebsocketServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._room_locks: Dict[str, asyncio.Lock] = {}
+
     async def get_room(self, name: str):
-        # The base class get_room will create and start the room if it doesn't exist
-        room = await super().get_room(name)
-        
-        # We only initialize our persistence once per room life
-        if not hasattr(room, "_initialized_doco"):
-            room._initialized_doco = True
-            logger.info(f"Initializing persistence for room: {name}")
-            store = SQLiteStore(name)
+        if name not in self._room_locks:
+            self._room_locks[name] = asyncio.Lock()
             
-            try:
-                # Load initial state
-                initial_state = await store.read()
-                if initial_state:
-                    logger.info(f"Applying initial state to room {name} ({len(initial_state)} bytes)")
-                    Y.apply_update(room.ydoc, initial_state)
+        async with self._room_locks[name]:
+            # super().get_room is async and handles room creation/starting internally
+            room = await super().get_room(name)
+            
+            if not hasattr(room, "_initialized_doco"):
+                logger.info(f"Initializing Doco persistence for room: {name}")
+                store = SQLiteStore(name)
                 
-                # Observe updates to persist them
-                def on_update(event):
-                    # We fire and forget the write task
-                    asyncio.create_task(store.write(event.update))
-                
-                room.ydoc.observe_after_transaction(on_update)
-            except Exception as e:
-                logger.error(f"Failed to initialize persistence for room {name}: {e}")
-        
-        return room
+                try:
+                    initial_state = await store.read()
+                    if initial_state:
+                        logger.info(f"Applying initial state to room {name} ({len(initial_state)} bytes)")
+                        Y.apply_update(room.ydoc, initial_state)
+                    
+                    def on_update(event):
+                        # Use call_soon to avoid blocking the transaction
+                        asyncio.create_task(store.write(event.get_update()))
+                    
+                    room.ydoc.observe_after_transaction(on_update)
+                    room._initialized_doco = True
+                except Exception as e:
+                    logger.error(f"Failed to initialize Doco persistence for room {name}: {e}")
+            
+            return room
 
 websocket_server = DocoWebsocketServer()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Doco Backend...")
+    logger.info("Doco Backend: Initializing...")
     server_task = asyncio.create_task(websocket_server.start())
     try:
         await websocket_server.started.wait()
-        logger.info("WebSocket Server Started.")
+        logger.info("Doco Backend: WebSocket Server Started.")
         yield
     finally:
-        logger.info("Shutting down Doco Backend...")
+        logger.info("Doco Backend: Shutting down...")
         server_task.cancel()
         try:
             await server_task
         except asyncio.CancelledError:
             pass
-        except Exception as e:
-            logger.error(f"Error during shutdown: {e}")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -105,12 +114,12 @@ app.add_middleware(
 )
 
 @app.middleware("http")
-async def error_handling_middleware(request: Request, call_next):
+async def exception_logging_middleware(request: Request, call_next):
     try:
         return await call_next(request)
     except Exception as e:
-        logger.error(f"Exception during {request.method} {request.url}: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": "Internal Server Error", "message": str(e)})
+        logger.error(f"HTTP Error {request.method} {request.url}: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 
 # --- Schemas ---
 
@@ -152,17 +161,15 @@ async def create_kb(kb: KBBase, db: AsyncSession = Depends(get_db)):
         db.add(db_kb)
         await db.commit()
         await db.refresh(db_kb)
-        logger.info(f"KB Created: {db_kb.name} (ID: {db_kb.id})")
         return db_kb
     except Exception as e:
         await db.rollback()
-        logger.error(f"Failed to create KB: {e}")
+        logger.error(f"API KB Create Error: {e}")
         raise HTTPException(status_code=500, detail="Database Error")
 
 @app.delete("/api/kb/{kb_id}")
 async def delete_kb(kb_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == kb_id))
-    kb = result.scalar_one_or_none()
+    kb = await db.get(KnowledgeBase, kb_id)
     if kb:
         await db.delete(kb)
         await db.commit()
@@ -183,7 +190,8 @@ async def create_folder(folder: FolderBase, db: AsyncSession = Depends(get_db)):
         return db_folder
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"API Folder Create Error: {e}")
+        raise HTTPException(status_code=500, detail="Database Error")
 
 @app.get("/api/folders/{folder_id}/docs", response_model=List[DocRead])
 async def get_docs(folder_id: int, db: AsyncSession = Depends(get_db)):
@@ -200,7 +208,8 @@ async def create_doc(doc: DocBase, db: AsyncSession = Depends(get_db)):
         return db_doc
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"API Doc Create Error: {e}")
+        raise HTTPException(status_code=500, detail="Database Error")
 
 # --- WebSocket ---
 
@@ -210,10 +219,8 @@ class FastAPIWebsocket:
 
     @property
     def path(self) -> str:
-        # Expected path format: /ws/{room_name}
-        raw_path = self._websocket.url.path
-        parts = raw_path.strip("/").split("/")
-        return parts[-1] if len(parts) > 1 else "default"
+        # ypy-websocket uses path to determine room if serve is called without room
+        return self._websocket.url.path.split("/")[-1] or "default"
 
     async def send(self, message: bytes):
         try:
@@ -230,20 +237,32 @@ class FastAPIWebsocket:
         text = msg.get("text")
         if text is not None:
             return text.encode()
-        raise ConnectionError("Unexpected message")
+        raise ConnectionError("Protocol Error")
+
+def log_exception_group(e, room_name):
+    """Recursively logs exceptions in an ExceptionGroup or similar structures."""
+    if ExceptionGroup and isinstance(e, ExceptionGroup):
+        for sub_e in e.exceptions:
+            log_exception_group(sub_e, room_name)
+    elif hasattr(e, "exceptions"): # anyio structure
+        for sub_e in e.exceptions: # type: ignore
+            log_exception_group(sub_e, room_name)
+    else:
+        logger.error(f"Sub-exception in room {room_name}: {e}", exc_info=True)
 
 @app.websocket("/ws")
 @app.websocket("/ws/{room_name}")
 async def ws_endpoint(websocket: WebSocket, room_name: str = "default"):
     await websocket.accept()
     try:
-        # This will load persistence if it's the first time the room is accessed
+        # Pre-initialize room to handle persistence safely
         await websocket_server.get_room(room_name)
         
         ws = FastAPIWebsocket(websocket)
         await websocket_server.serve(ws)
     except Exception as e:
-        logger.error(f"WebSocket session error ({room_name}): {e}")
+        logger.error(f"WebSocket session error for room {room_name}: {e}")
+        log_exception_group(e, room_name)
 
 if __name__ == "__main__":
     import uvicorn
