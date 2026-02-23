@@ -7,16 +7,17 @@ import { Markdown } from 'tiptap-markdown'
 import { SlashCommand } from './SlashCommand'
 import { MermaidBlock } from './MermaidBlock'
 import { getSuggestionItems, renderItems } from './suggestions'
-import { forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useImperativeHandle, useEffect, useMemo } from 'react'
+import * as Y from 'yjs'
+import { WebsocketProvider } from 'y-websocket'
+import Collaboration from '@tiptap/extension-collaboration'
 import html2pdf from 'html2pdf.js'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import 'highlight.js/styles/github-dark.css'
-import { Underline } from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import { Highlight } from '@tiptap/extension-highlight'
-import { Link } from '@tiptap/extension-link'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { CodeBlockComponent } from './CodeBlockComponent'
@@ -26,41 +27,82 @@ import { BlockHandle } from './BlockHandle'
 const lowlight = createLowlight(common)
 
 export const Editor = forwardRef((_props, ref) => {
+    const ydoc = useMemo(() => new Y.Doc(), [])
+    const provider = useMemo(() => {
+        return new WebsocketProvider(
+            'ws://127.0.0.1:8000/ws',
+            'default-room',
+            ydoc,
+            { connect: false }
+        )
+    }, [ydoc])
+
+    useEffect(() => {
+        (window as any).ydoc = ydoc;
+        (window as any).provider = provider;
+        const handleStatus = (event: any) => {
+            console.log(`[WebSocket] Status for room ${provider.roomname}: ${event.status}`)
+        }
+        const handleSync = (isSynced: boolean) => {
+            console.log(`[WebSocket] Synced for room ${provider.roomname}: ${isSynced}`)
+        }
+        const handleUpdate = (update: Uint8Array, origin: any) => {
+            console.log(`[Yjs] Update in room ${provider.roomname}, origin: ${origin ? 'remote' : 'local'}, size: ${update.length} bytes`)
+        }
+
+        provider.on('status', handleStatus)
+        provider.on('sync', handleSync)
+        ydoc.on('update', handleUpdate)
+
+        provider.connect()
+
+        return () => {
+            provider.disconnect()
+            provider.off('status', handleStatus)
+            provider.off('sync', handleSync)
+            ydoc.off('update', handleUpdate)
+        }
+    }, [provider, ydoc])
+
+    const extensions = useMemo(() => [
+        (StarterKit as any).configure({
+            codeBlock: false,
+            history: false, // 禁用原生 history，交由 Collaboration 管理
+        }),
+        CodeBlockLowlight.extend({
+            addNodeView() {
+                return ReactNodeViewRenderer(CodeBlockComponent as any)
+            }
+        }).configure({
+            lowlight,
+        }),
+        TextStyle,
+        Color,
+        Highlight,
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Placeholder.configure({
+            placeholder: '输入 / 唤起菜单，或直接开始写作...',
+        }),
+        TaskList,
+        TaskItem.configure({
+            nested: true,
+        }),
+        Markdown,
+        MermaidBlock,
+        SlashCommand.configure({
+            suggestion: {
+                items: getSuggestionItems,
+                render: renderItems,
+            },
+        }),
+        Collaboration.configure({
+            document: ydoc,
+            field: 'default', // 恢复为默认字段名
+        }),
+    ], [ydoc])
+
     const editor = useEditor({
-        extensions: [
-            StarterKit.configure({
-                codeBlock: false,
-            }),
-            CodeBlockLowlight.extend({
-                addNodeView() {
-                    return ReactNodeViewRenderer(CodeBlockComponent as any)
-                }
-            }).configure({
-                lowlight,
-            }),
-            Underline,
-            TextStyle,
-            Color,
-            Highlight,
-            Link.configure({ openOnClick: false }),
-            TextAlign.configure({ types: ['heading', 'paragraph'] }),
-            Placeholder.configure({
-                placeholder: '输入 / 唤起菜单，或直接开始写作...',
-            }),
-            TaskList,
-            TaskItem.configure({
-                nested: true,
-            }),
-            Markdown,
-            MermaidBlock,
-            SlashCommand.configure({
-                suggestion: {
-                    items: getSuggestionItems,
-                    render: renderItems,
-                },
-            }),
-        ],
-        content: '<h1>无标题文档</h1><p>尝试键入 / 调出菜单，选择「流程图 (Mermaid)」绘制网络结构图，或通过内置快捷键实现粗体、斜体。</p>',
+        extensions,
         editorProps: {
             attributes: {
                 class: 'focus:outline-none min-h-[500px] text-gray-800 leading-relaxed prose prose-blue sm:prose-base list-none tiptap-editor-container',
