@@ -26,16 +26,16 @@ import { BlockHandle } from './BlockHandle'
 
 const lowlight = createLowlight(common)
 
-export const Editor = forwardRef((_props, ref) => {
+export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     const ydoc = useMemo(() => new Y.Doc(), [])
     const provider = useMemo(() => {
         return new WebsocketProvider(
             'ws://127.0.0.1:8000/ws',
-            'default-room',
+            docId || 'default-room',
             ydoc,
             { connect: false }
         )
-    }, [ydoc])
+    }, [ydoc, docId])
 
     useEffect(() => {
         (window as any).ydoc = ydoc;
