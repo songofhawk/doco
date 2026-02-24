@@ -2,6 +2,7 @@
 
 基于 **Tiptap (ProseMirror) + React + Vite** 的富文本协同编辑器，支持多端实时同步（Yjs CRDT），设计为可嵌入到其他项目的独立模块。
 
+永远输出中文。
 ---
 
 ## 技术栈
@@ -102,8 +103,9 @@ const extensions = useMemo(() => [
 ], [ydoc]);
 ```
 
-> 💡 **调试技巧**：项目已将 `ydoc` 和 `provider` 挂载到 `window` 全局变量。
-> 可在控制台运行 `window.ydoc.getXmlFragment('default').toString()` 实时检查同步文档内容。
+> ⚠️ **重要**：React 18 StrictMode 下 cleanup 必须使用 `provider.disconnect()` 而非 `provider.destroy()`。
+> `destroy()` 会调用 `doc.off('update', _updateHandler)` 移除更新监听器，导致 StrictMode 双重挂载后更新无法广播到服务器。
+> `disconnect()` 只断开 WebSocket 连接，保留事件监听器，重新 `connect()` 后可正常工作。
 
 > ⚠️ **注意**：`@tiptap/extension-collaboration-cursor`（协同光标）与 Tiptap v3 不兼容。
 > Tiptap v3 的 Collaboration 使用了自己的 `y-tiptap` fork，而 CollaborationCursor 依赖原版 `y-prosemirror` 的 `ySyncPluginKey`，两者无法共存，当前项目未启用光标显示功能。
@@ -152,8 +154,38 @@ python main.py
 
 ---
 
+## 持久化机制（`DocoYStore`）
+
+后端通过自定义 `DocoYStore` 类实现 Yjs 文档持久化：
+
+```python
+# backend/main.py
+
+class DocoYStore(BaseYStore):
+    """继承 ypy-websocket 的 BaseYStore，将更新写入 SQLite。"""
+
+    async def write(self, data: bytes) -> None:
+        if len(data) <= 2:  # 过滤空更新（Yjs 空状态为 2 字节）
+            return
+        # 写入 ydoc_updates 表
+
+    async def read(self):
+        # 异步生成器，按顺序 yield (update, metadata) 元组
+
+# 房间初始化时使用内置 ystore 机制
+store = DocoYStore(room_name)
+room = YRoom(ystore=store, ready=False)  # ready=False 防止加载时触发写入
+await store.apply_updates(room.ydoc)      # 加载历史更新
+room.ready = True                          # 开始监听新更新
+```
+
+> ⚠️ **踩坑记录**：不要用 `observe_after_transaction` 自定义持久化。
+> ypy-websocket 的 `process_sync_message` 直接调用 `Y.apply_update`，触发的事务回调只有 2 字节空数据。
+> 必须使用 YRoom 内置的 `ystore` 参数，让 `_broadcast_updates` 自动调用 `ystore.write()`。
+
+---
+
 ## 已知问题 & 待办
 
 - 协同光标（其他用户光标显示）暂未支持（与 Tiptap v3 不兼容，需自行实现）
-- 当前房间名硬编码为 `default-room`，多文档时需动态传入
-- 后端为纯内存同步，重启后文档内容重置（如需持久化，可在 `YRoom` 挂载 `ypy-websocket` 的 `SQLiteYStore`）
+- ydoc_updates 表会无限增长，需定期合并快照

@@ -1,8 +1,7 @@
 import asyncio
 import logging
-import traceback
 from contextlib import asynccontextmanager
-from typing import List, Optional, Set, Dict
+from typing import List, Optional, Dict
 
 from fastapi import FastAPI, WebSocket, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import y_py as Y
 
 from ypy_websocket.websocket_server import WebsocketServer
+from ypy_websocket.ystore import BaseYStore
 from database import get_db, AsyncSessionLocal
 from models import KnowledgeBase, Folder, Document, YDocUpdate
 
@@ -25,41 +25,40 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doco")
 
-class SQLiteStore:
+class DocoYStore(BaseYStore):
+    """Custom YStore that persists to our SQLite database."""
+
     def __init__(self, room_name: str):
         self.room_name = room_name
+        self._started = None
+        self._starting = False
+        self._task_group = None
 
-    async def write(self, data: bytes):
+    async def write(self, data: bytes) -> None:
+        logger.info(f"[YStore] write called for {self.room_name}, data size: {len(data) if data else 0}")
+        if not data or len(data) <= 2:
+            logger.info(f"[YStore] Skipping small update for {self.room_name}")
+            return
         try:
             async with AsyncSessionLocal() as session:
-                new_update = YDocUpdate(doc_id=self.room_name, update=data)
-                session.add(new_update)
+                session.add(YDocUpdate(doc_id=self.room_name, update=data))
                 await session.commit()
-                logger.info(f"Persisted update for room {self.room_name} ({len(data)} bytes)")
+                logger.info(f"Persisted {len(data)} bytes for {self.room_name}")
         except Exception as e:
-            logger.error(f"Persistence write error for room {self.room_name}: {e}")
+            logger.error(f"Write error for {self.room_name}: {e}")
 
-    async def read(self) -> Optional[bytes]:
+    async def read(self):
+        """Async generator yielding (update, metadata) tuples."""
         try:
             async with AsyncSessionLocal() as session:
-                stmt = select(YDocUpdate.update).where(YDocUpdate.doc_id == self.room_name).order_by(YDocUpdate.id)
+                stmt = select(YDocUpdate.update).where(
+                    YDocUpdate.doc_id == self.room_name
+                ).order_by(YDocUpdate.id)
                 result = await session.execute(stmt)
-                updates = list(result.scalars().all())
-                if not updates:
-                    return None
-                
-                # Manual merge: y-py doesn't have merge_updates
-                temp_doc = Y.YDoc()
-                for i, update in enumerate(updates):
-                    try:
-                        Y.apply_update(temp_doc, update)
-                    except Exception as apply_err:
-                        logger.error(f"Error applying update {i} for room {self.room_name}: {apply_err}")
-                
-                return Y.encode_state_as_update(temp_doc)
+                for update in result.scalars():
+                    yield update, b""
         except Exception as e:
-            logger.error(f"Persistence read error for room {self.room_name}: {e}")
-            return None
+            logger.error(f"Read error for {self.room_name}: {e}")
 
 class DocoWebsocketServer(WebsocketServer):
     def __init__(self, *args, **kwargs):
@@ -67,65 +66,45 @@ class DocoWebsocketServer(WebsocketServer):
         self._room_locks: Dict[str, asyncio.Lock] = {}
 
     async def get_room(self, name: str):
-        # We need strict locking to prevent multiple initializations
         if name not in self._room_locks:
             self._room_locks[name] = asyncio.Lock()
-            
+
         async with self._room_locks[name]:
-            # If the room is already in self.rooms, it's fully initialized
             if name in self.rooms:
-                return self.rooms[name]
+                room = self.rooms[name]
+                logger.info(f"[Room] Existing room {name}, started: {room.started.is_set()}")
+                if not room.started.is_set():
+                    await self.start_room(room)
+                return room
 
-            logger.info(f"Creating and pre-loading room: {name}")
-            # we manually create the room to control initialization order
+            logger.info(f"[Room] Creating room: {name}")
             from ypy_websocket.yroom import YRoom
-            room = YRoom()
-            
-            # 1. Load Persistence BEFORE anything else
-            store = SQLiteStore(name)
+
+            # Use YRoom with built-in ystore for persistence
+            store = DocoYStore(name)
+            room = YRoom(ystore=store, ready=False)
+
+            # Load existing state
             try:
-                initial_state = await store.read()
-                if initial_state:
-                    logger.info(f"Applying initial state to {name} ({len(initial_state)} bytes)")
-                    Y.apply_update(room.ydoc, initial_state)
-                    
-                    # Peek at content to verify it's loaded
-                    # y-py uses get_xml_element for fragments
-                    content_peek = str(room.ydoc.get_xml_element("default"))
-                    if content_peek == "<UNDEFINED></UNDEFINED>":
-                        content_peek = str(room.ydoc.get_text("default"))
-                    
-                    logger.info(f"Room {name} loaded. Content peek: '{content_peek[:50]}...'")
-                else:
-                    logger.info(f"Room {name} is new (no persistence found)")
+                await store.apply_updates(room.ydoc)
+                state_size = len(Y.encode_state_as_update(room.ydoc))
+                logger.info(f"Room {name} loaded ({state_size} bytes)")
             except Exception as e:
-                logger.error(f"Persistence loading failure for {name}: {e}", exc_info=True)
+                logger.error(f"Load error for {name}: {e}")
 
-            # 2. Set up Observers AFTER state is loaded
-            def on_update(event):
-                try:
-                    data = event.get_update()
-                    # Debugging 2-byte issue
-                    full_state = Y.encode_state_as_update(room.ydoc)
-                    if len(data) > 2 or len(full_state) > 2:
-                        logger.info(f"Update for {name}: inc={len(data)}b, full={len(full_state)}b")
-                    
-                    if data and len(data) > 2:
-                        asyncio.create_task(store.write(data))
-                except Exception as e:
-                    logger.error(f"Error in on_update for {name}: {e}")
-            
-            room.ydoc.observe_after_transaction(on_update)
-            room._initialized_doco = True
-
-            # 3. Register the room
+            # Now mark ready to start observing new updates
+            room.ready = True
             self.rooms[name] = room
 
-            # We DO NOT call room.start() here because self.serve() will trigger it
-            # via start_room() the first time it serves this room.
+            # Start the room to enable broadcast and persistence
+            try:
+                await self.start_room(room)
+                logger.info(f"Room {name} started, task_group: {room._task_group is not None}")
+            except Exception as e:
+                logger.error(f"Failed to start room {name}: {e}", exc_info=True)
             return room
 
-websocket_server = DocoWebsocketServer()
+websocket_server = DocoWebsocketServer(auto_clean_rooms=False)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -268,16 +247,29 @@ class FastAPIWebsocket:
         except: pass
 
     async def recv(self) -> bytes:
+        logger.info("[WS] Waiting for message...")
         msg = await self._websocket.receive()
+        logger.info(f"[WS] Got message type: {msg.get('type')}")
         if msg.get("type") == "websocket.disconnect":
             raise ConnectionError("Disconnected")
         data = msg.get("bytes")
         if data is not None:
+            logger.info(f"[WS] Received {len(data)} bytes")
             return data
         text = msg.get("text")
         if text is not None:
+            logger.info(f"[WS] Received text: {len(text)} chars")
             return text.encode()
         raise ConnectionError("Protocol Error")
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> bytes:
+        try:
+            return await self.recv()
+        except ConnectionError:
+            raise StopAsyncIteration
 
 def log_exception_group(e, room_name):
     """Recursively logs exceptions in an ExceptionGroup or similar structures."""
@@ -293,15 +285,13 @@ def log_exception_group(e, room_name):
 @app.websocket("/ws/{room_name}")
 async def ws_endpoint(websocket: WebSocket, room_name: str):
     await websocket.accept()
+    logger.info(f"[WS] Client connected to room: {room_name}")
     try:
-        # Pre-initialize room to handle persistence safely
-        await websocket_server.get_room(room_name)
-        
         ws = FastAPIWebsocket(websocket)
-        # Serve needs to be called within a safe task group managed by the server
+        logger.info(f"[WS] Calling serve, server task_group: {websocket_server._task_group is not None}")
         await websocket_server.serve(ws)
+        logger.info(f"[WS] serve returned for {room_name}")
     except Exception as e:
-        # Don't log normal disconnects as errors
         if "Disconnected" in str(e) or "protocol.disconnect" in str(e):
             logger.info(f"WebSocket client disconnected from {room_name}")
         else:

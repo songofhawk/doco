@@ -27,7 +27,7 @@ import { BlockHandle } from './BlockHandle'
 const lowlight = createLowlight(common)
 
 export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
-    const ydoc = useMemo(() => new Y.Doc(), [])
+    const ydoc = useMemo(() => new Y.Doc(), [docId])
     const provider = useMemo(() => {
         return new WebsocketProvider(
             'ws://127.0.0.1:8000/ws',
@@ -38,44 +38,9 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     }, [ydoc, docId])
 
     useEffect(() => {
-        (window as any).ydoc = ydoc;
-        (window as any).provider = provider;
-        const handleStatus = (event: any) => {
-            console.log(`[WebSocket] Status for room ${provider.roomname}: ${event.status}`)
-        }
-        const handleUpdate = (update: Uint8Array, origin: any) => {
-            const originStr = origin ? (origin.constructor?.name || 'remote') : 'local'
-            console.log(`[Yjs] Update in room ${provider.roomname}, origin: ${originStr}, size: ${update.length} bytes`)
-
-            // Peek at content safely
-            const fragment = ydoc.getXmlFragment('default').toString()
-            if (fragment && fragment !== '<UNDEFINED></UNDEFINED>') {
-                console.log(`[Yjs Debug] XML Fragment length: ${fragment.length}`)
-            } else {
-                const text = ydoc.getText('default').toString()
-                if (text) {
-                    console.log(`[Yjs Debug] Text length: ${text.length}`)
-                }
-            }
-        }
-
-        const handleSync = (isSynced: boolean) => {
-            console.log(`[WebSocket] Synced for room ${provider.roomname}: ${isSynced}`)
-        }
-
-        provider.on('status', handleStatus)
-        provider.on('sync', handleSync)
-        ydoc.on('update', handleUpdate)
-
         provider.connect()
-
-        return () => {
-            provider.disconnect()
-            provider.off('status', handleStatus)
-            provider.off('sync', handleSync)
-            ydoc.off('update', handleUpdate)
-        }
-    }, [provider, ydoc])
+        return () => provider.disconnect()
+    }, [provider])
 
     const extensions = useMemo(() => [
         (StarterKit as any).configure({
@@ -110,9 +75,10 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         }),
         Collaboration.configure({
             document: ydoc,
-            field: 'default', // 恢复为默认字段名
+            field: 'default',
+            provider: provider,
         }),
-    ], [ydoc])
+    ], [ydoc, provider])
 
     const editor = useEditor({
         extensions,
@@ -121,7 +87,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
                 class: 'focus:outline-none min-h-[500px] text-gray-800 leading-relaxed prose prose-blue sm:prose-base list-none tiptap-editor-container',
             },
         },
-    })
+    }, [ydoc])
 
     useImperativeHandle(ref, () => ({
         exportMarkdown: () => {
