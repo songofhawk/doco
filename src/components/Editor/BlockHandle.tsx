@@ -18,34 +18,23 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         const updateHandlePosition = (e: MouseEvent) => {
             if (isOpen) return
 
-            const isHoveringHandle = containerRef.current?.contains(e.target as Node)
-            if (isHoveringHandle) {
-                return // 鼠标在菜单上时，保持菜单显示
-            }
+            if (containerRef.current?.contains(e.target as Node)) return
 
             const view = editor.view
             let target = e.target as HTMLElement
-            // Find the closest Prosemirror block level element
             while (target && target !== view.dom) {
-                if (target.classList && (target.classList.contains('ProseMirror') || target.hasAttribute('data-type'))) {
-                    // It's the editor itself or a custom node view
-                    break
-                }
+                if (target.classList && (target.classList.contains('ProseMirror') || target.hasAttribute('data-type'))) break
                 const style = window.getComputedStyle(target)
-                if (style.display === 'block' || style.display === 'list-item' || style.display === 'flex' || target.tagName === 'P' || target.tagName.match(/^H[1-6]$/)) {
-                    break
-                }
+                if (style.display === 'block' || style.display === 'list-item' || style.display === 'flex' || target.tagName === 'P' || target.tagName.match(/^H[1-6]$/)) break
                 target = target.parentElement as HTMLElement
             }
 
             if (target && target !== view.dom && view.dom.contains(target)) {
                 const rect = target.getBoundingClientRect()
                 const containerRect = container.getBoundingClientRect()
-
-                // 相对于具有 relative 的 tiptap-editor-container 计算坐标偏移
                 setHandlePos({
                     top: rect.top - containerRect.top,
-                    left: rect.left - containerRect.left - 48 // 往左多平移一段距离避免重叠
+                    left: rect.left - containerRect.left - 48
                 })
                 setHoveredNode(target)
             } else {
@@ -54,12 +43,14 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             }
         }
 
+        const onLeave = () => { if (!isOpen) setHandlePos({ top: -999, left: -999 }) }
+
         container.addEventListener('mousemove', updateHandlePosition)
-        container.addEventListener('mouseleave', () => !isOpen && setHandlePos({ top: -999, left: -999 }))
+        container.addEventListener('mouseleave', onLeave)
 
         return () => {
             container.removeEventListener('mousemove', updateHandlePosition)
-            container.removeEventListener('mouseleave', () => !isOpen && setHandlePos({ top: -999, left: -999 }))
+            container.removeEventListener('mouseleave', onLeave)
         }
     }, [editor, isOpen])
 
@@ -117,6 +108,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             style={{
                 top: handlePos.top,
                 left: handlePos.left,
+                paddingRight: 20,
                 opacity: handlePos.top === -999 ? 0 : 1,
                 pointerEvents: handlePos.top === -999 ? 'none' : 'auto'
             }}
