@@ -38,14 +38,14 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     }, [ydoc, docId])
 
     useEffect(() => {
-        provider.connect()
-        return () => provider.disconnect()
+        const timer = setTimeout(() => provider.connect(), 0)
+        return () => { clearTimeout(timer); provider.disconnect() }
     }, [provider])
 
     const extensions = useMemo(() => [
         (StarterKit as any).configure({
             codeBlock: false,
-            history: false, // 禁用原生 history，交由 Collaboration 管理
+            undoRedo: false, // 禁用原生 history，交由 Collaboration 管理
         }),
         CodeBlockLowlight.extend({
             addNodeView() {
