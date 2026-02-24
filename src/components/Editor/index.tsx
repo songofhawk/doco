@@ -43,11 +43,24 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         const handleStatus = (event: any) => {
             console.log(`[WebSocket] Status for room ${provider.roomname}: ${event.status}`)
         }
+        const handleUpdate = (update: Uint8Array, origin: any) => {
+            const originStr = origin ? (origin.constructor?.name || 'remote') : 'local'
+            console.log(`[Yjs] Update in room ${provider.roomname}, origin: ${originStr}, size: ${update.length} bytes`)
+
+            // Peek at content safely
+            const fragment = ydoc.getXmlFragment('default').toString()
+            if (fragment && fragment !== '<UNDEFINED></UNDEFINED>') {
+                console.log(`[Yjs Debug] XML Fragment length: ${fragment.length}`)
+            } else {
+                const text = ydoc.getText('default').toString()
+                if (text) {
+                    console.log(`[Yjs Debug] Text length: ${text.length}`)
+                }
+            }
+        }
+
         const handleSync = (isSynced: boolean) => {
             console.log(`[WebSocket] Synced for room ${provider.roomname}: ${isSynced}`)
-        }
-        const handleUpdate = (update: Uint8Array, origin: any) => {
-            console.log(`[Yjs] Update in room ${provider.roomname}, origin: ${origin ? 'remote' : 'local'}, size: ${update.length} bytes`)
         }
 
         provider.on('status', handleStatus)

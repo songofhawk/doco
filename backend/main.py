@@ -35,18 +35,28 @@ class SQLiteStore:
                 new_update = YDocUpdate(doc_id=self.room_name, update=data)
                 session.add(new_update)
                 await session.commit()
+                logger.info(f"Persisted update for room {self.room_name} ({len(data)} bytes)")
         except Exception as e:
             logger.error(f"Persistence write error for room {self.room_name}: {e}")
 
-    async def read(self) -> bytes:
+    async def read(self) -> Optional[bytes]:
         try:
             async with AsyncSessionLocal() as session:
                 stmt = select(YDocUpdate.update).where(YDocUpdate.doc_id == self.room_name).order_by(YDocUpdate.id)
                 result = await session.execute(stmt)
-                updates = result.scalars().all()
+                updates = list(result.scalars().all())
                 if not updates:
                     return None
-                return Y.merge_updates(updates)
+                
+                # Manual merge: y-py doesn't have merge_updates
+                temp_doc = Y.YDoc()
+                for i, update in enumerate(updates):
+                    try:
+                        Y.apply_update(temp_doc, update)
+                    except Exception as apply_err:
+                        logger.error(f"Error applying update {i} for room {self.room_name}: {apply_err}")
+                
+                return Y.encode_state_as_update(temp_doc)
         except Exception as e:
             logger.error(f"Persistence read error for room {self.room_name}: {e}")
             return None
@@ -57,32 +67,62 @@ class DocoWebsocketServer(WebsocketServer):
         self._room_locks: Dict[str, asyncio.Lock] = {}
 
     async def get_room(self, name: str):
+        # We need strict locking to prevent multiple initializations
         if name not in self._room_locks:
             self._room_locks[name] = asyncio.Lock()
             
         async with self._room_locks[name]:
-            # super().get_room is async and handles room creation/starting internally
-            room = await super().get_room(name)
+            # If the room is already in self.rooms, it's fully initialized
+            if name in self.rooms:
+                return self.rooms[name]
+
+            logger.info(f"Creating and pre-loading room: {name}")
+            # we manually create the room to control initialization order
+            from ypy_websocket.yroom import YRoom
+            room = YRoom()
             
-            if not hasattr(room, "_initialized_doco"):
-                logger.info(f"Initializing Doco persistence for room: {name}")
-                store = SQLiteStore(name)
-                
+            # 1. Load Persistence BEFORE anything else
+            store = SQLiteStore(name)
+            try:
+                initial_state = await store.read()
+                if initial_state:
+                    logger.info(f"Applying initial state to {name} ({len(initial_state)} bytes)")
+                    Y.apply_update(room.ydoc, initial_state)
+                    
+                    # Peek at content to verify it's loaded
+                    # y-py uses get_xml_element for fragments
+                    content_peek = str(room.ydoc.get_xml_element("default"))
+                    if content_peek == "<UNDEFINED></UNDEFINED>":
+                        content_peek = str(room.ydoc.get_text("default"))
+                    
+                    logger.info(f"Room {name} loaded. Content peek: '{content_peek[:50]}...'")
+                else:
+                    logger.info(f"Room {name} is new (no persistence found)")
+            except Exception as e:
+                logger.error(f"Persistence loading failure for {name}: {e}", exc_info=True)
+
+            # 2. Set up Observers AFTER state is loaded
+            def on_update(event):
                 try:
-                    initial_state = await store.read()
-                    if initial_state:
-                        logger.info(f"Applying initial state to room {name} ({len(initial_state)} bytes)")
-                        Y.apply_update(room.ydoc, initial_state)
+                    data = event.get_update()
+                    # Debugging 2-byte issue
+                    full_state = Y.encode_state_as_update(room.ydoc)
+                    if len(data) > 2 or len(full_state) > 2:
+                        logger.info(f"Update for {name}: inc={len(data)}b, full={len(full_state)}b")
                     
-                    def on_update(event):
-                        # Use call_soon to avoid blocking the transaction
-                        asyncio.create_task(store.write(event.get_update()))
-                    
-                    room.ydoc.observe_after_transaction(on_update)
-                    room._initialized_doco = True
+                    if data and len(data) > 2:
+                        asyncio.create_task(store.write(data))
                 except Exception as e:
-                    logger.error(f"Failed to initialize Doco persistence for room {name}: {e}")
+                    logger.error(f"Error in on_update for {name}: {e}")
             
+            room.ydoc.observe_after_transaction(on_update)
+            room._initialized_doco = True
+
+            # 3. Register the room
+            self.rooms[name] = room
+
+            # We DO NOT call room.start() here because self.serve() will trigger it
+            # via start_room() the first time it serves this room.
             return room
 
 websocket_server = DocoWebsocketServer()
@@ -250,19 +290,23 @@ def log_exception_group(e, room_name):
     else:
         logger.error(f"Sub-exception in room {room_name}: {e}", exc_info=True)
 
-@app.websocket("/ws")
 @app.websocket("/ws/{room_name}")
-async def ws_endpoint(websocket: WebSocket, room_name: str = "default"):
+async def ws_endpoint(websocket: WebSocket, room_name: str):
     await websocket.accept()
     try:
         # Pre-initialize room to handle persistence safely
         await websocket_server.get_room(room_name)
         
         ws = FastAPIWebsocket(websocket)
+        # Serve needs to be called within a safe task group managed by the server
         await websocket_server.serve(ws)
     except Exception as e:
-        logger.error(f"WebSocket session error for room {room_name}: {e}")
-        log_exception_group(e, room_name)
+        # Don't log normal disconnects as errors
+        if "Disconnected" in str(e) or "protocol.disconnect" in str(e):
+            logger.info(f"WebSocket client disconnected from {room_name}")
+        else:
+            logger.error(f"WebSocket session error for room {room_name}: {e}")
+            log_exception_group(e, room_name)
 
 if __name__ == "__main__":
     import uvicorn
