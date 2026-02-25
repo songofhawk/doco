@@ -83,6 +83,9 @@ dependencies:
   mermaid:
     specifier: ^11.12.3
     version: 11.12.3
+  plantuml-encoder:
+    specifier: ^1.4.0
+    version: 1.4.0
   react:
     specifier: ^18.3.1
     version: 18.3.1
@@ -4191,6 +4194,10 @@ packages:
       confbox: 0.1.8
       mlly: 1.8.0
       pathe: 2.0.3
+    dev: false
+
+  /plantuml-encoder@1.4.0:
+    resolution: {integrity: sha512-sxMwpDw/ySY1WB2CE3+IdMuEcWibJ72DDOsXLkSmEaSzwEUaYBT6DWgOfBiHGCux4q433X6+OEFWjlVqp7gL6g==}
     dev: false
 
   /points-on-curve@0.2.0:

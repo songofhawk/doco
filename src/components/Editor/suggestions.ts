@@ -1,7 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
-import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode } from 'lucide-react'
 
 export const getSuggestionItems = ({ query }: { query: string }) => {
     return [
@@ -88,6 +88,14 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
             icon: Network,
             command: ({ editor, range }: any) => {
                 editor.chain().focus().deleteRange(range).insertContent({ type: 'mermaidBlock' }).run()
+            },
+        },
+        {
+            title: 'UML 图 (PlantUML)',
+            description: '文本绘制 UML 图表',
+            icon: FileCode,
+            command: ({ editor, range }: any) => {
+                editor.chain().focus().deleteRange(range).insertContent({ type: 'plantUMLBlock' }).run()
             },
         }
     ].filter(item => item.title.toLowerCase().startsWith(query.toLowerCase()) || item.title.includes(query))

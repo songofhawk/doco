@@ -6,6 +6,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
 import { SlashCommand } from './SlashCommand'
 import { MermaidBlock } from './MermaidBlock'
+import { PlantUMLBlock } from './PlantUMLBlock'
 import { getSuggestionItems, renderItems } from './suggestions'
 import { forwardRef, useImperativeHandle, useEffect, useMemo } from 'react'
 import * as Y from 'yjs'
@@ -69,6 +70,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         }),
         Markdown,
         MermaidBlock,
+        PlantUMLBlock,
         SlashCommand.configure({
             suggestion: {
                 items: getSuggestionItems,
