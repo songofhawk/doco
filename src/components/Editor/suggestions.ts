@@ -1,7 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
-import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon } from 'lucide-react'
 
 export const getSuggestionItems = ({ query }: { query: string }) => {
     return [
@@ -59,6 +59,27 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
             icon: Code,
             command: ({ editor, range }: any) => {
                 editor.chain().focus().deleteRange(range).setCodeBlock().run()
+            },
+        },
+        {
+            title: '图片',
+            description: '上传或粘贴图片',
+            icon: ImageIcon,
+            command: ({ editor, range }: any) => {
+                editor.chain().focus().deleteRange(range).run()
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.accept = 'image/*'
+                input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                        editor.chain().focus().setImage({ src: reader.result as string }).run()
+                    }
+                    reader.readAsDataURL(file)
+                }
+                input.click()
             },
         },
         {

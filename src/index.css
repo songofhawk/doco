@@ -172,6 +172,21 @@ body {
     }
   }
 
+  /* Image */
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 0.75em 0;
+    cursor: default;
+    transition: box-shadow 0.2s;
+
+    &.ProseMirror-selectednode {
+      outline: 2px solid var(--color-primary-500);
+      outline-offset: 2px;
+    }
+  }
+
   /* Collaboration Cursors */
   .collaboration-cursor__caret {
     border-left: 1px solid #0d0d0d;

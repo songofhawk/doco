@@ -11,6 +11,7 @@ import { forwardRef, useImperativeHandle, useEffect, useMemo } from 'react'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import Collaboration from '@tiptap/extension-collaboration'
+import Image from '@tiptap/extension-image'
 import html2pdf from 'html2pdf.js'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
@@ -58,6 +59,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         Color,
         Highlight,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Image.configure({ inline: false, allowBase64: true }),
         Placeholder.configure({
             placeholder: '输入 / 唤起菜单，或直接开始写作...',
         }),
@@ -85,6 +87,41 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         editorProps: {
             attributes: {
                 class: 'focus:outline-none min-h-[500px] text-gray-800 leading-relaxed prose prose-blue sm:prose-base list-none tiptap-editor-container',
+            },
+            handleDrop(view, event, _slice, moved) {
+                if (moved || !event.dataTransfer?.files.length) return false
+                const file = event.dataTransfer.files[0]
+                if (!file.type.startsWith('image/')) return false
+                event.preventDefault()
+                const reader = new FileReader()
+                reader.onload = () => {
+                    const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
+                    if (!dropPos) return
+                    editor?.chain().focus().insertContentAt(dropPos.pos, {
+                        type: 'image',
+                        attrs: { src: reader.result as string },
+                    }).run()
+                }
+                reader.readAsDataURL(file)
+                return true
+            },
+            handlePaste(_view, event) {
+                const items = event.clipboardData?.items
+                if (!items) return false
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        event.preventDefault()
+                        const file = item.getAsFile()
+                        if (!file) return false
+                        const reader = new FileReader()
+                        reader.onload = () => {
+                            editor?.chain().focus().setImage({ src: reader.result as string }).run()
+                        }
+                        reader.readAsDataURL(file)
+                        return true
+                    }
+                }
+                return false
             },
         },
     }, [ydoc])

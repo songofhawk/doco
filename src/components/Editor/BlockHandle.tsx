@@ -55,11 +55,12 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             if (target && target !== view.dom && view.dom.contains(target)) {
                 const rect = target.getBoundingClientRect()
                 const containerRect = container.getBoundingClientRect()
+                const editorRect = view.dom.getBoundingClientRect()
                 const lineHeight = parseFloat(window.getComputedStyle(target).lineHeight) || rect.height
                 const firstLineCenter = rect.top + Math.min(lineHeight, rect.height) / 2
                 setHandlePos({
                     top: firstLineCenter - containerRect.top - 12,
-                    left: rect.left - containerRect.left - 56
+                    left: editorRect.left - containerRect.left - 56
                 })
                 setHoveredNode(target)
             } else {
