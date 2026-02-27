@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Editor } from '@tiptap/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -10,18 +10,27 @@ import {
 
 import type { LucideIcon } from 'lucide-react'
 
-const MenuItem = ({ icon: Icon, label, shortcut, onClick }: { icon: LucideIcon; label: string; shortcut?: string; onClick: () => void }) => (
-    <button className="flex items-center px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors w-full text-left" onClick={onClick}>
+const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: string; onClick: () => void; focused?: boolean }) => (
+    <button
+        className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+        onClick={onClick}
+        data-focused={focused || undefined}
+    >
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
         {shortcut && <span className="ml-auto text-xs text-gray-300">{shortcut}</span>}
     </button>
 )
 
-const ConvertItem = ({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) => (
-    <button className="flex items-center px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors w-full text-left" onClick={onClick}>
+const ConvertItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: string; onClick: () => void; focused?: boolean }) => (
+    <button
+        className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+        onClick={onClick}
+        data-focused={focused || undefined}
+    >
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
+        {shortcut && <span className="ml-auto text-xs text-gray-300">{shortcut}</span>}
     </button>
 )
 
@@ -137,7 +146,113 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         return $pos.before(depth)
     }
 
-    const closeMenu = () => { setIsOpen(false); setShowConvertMenu(false) }
+    const closeMenu = () => { setIsOpen(false); setShowConvertMenu(false); setFocusIndex(-1) }
+
+    // ---- 键盘导航 ----
+    const [focusIndex, setFocusIndex] = useState(-1)
+    const menuRef = useRef<HTMLDivElement>(null)
+    const convertMenuRef = useRef<HTMLDivElement>(null)
+
+    // 主菜单项定义（用于键盘导航索引）
+    const MAIN_MENU_COUNT = 10 // 转换为 + 剪切/复制/复制纯文本/复制MD + 复制块/上移/下移/插入 + 删除
+    const CONVERT_MENU_COUNT = 9
+
+    // 菜单打开时重置焦点并聚焦容器
+    useEffect(() => {
+        if (isOpen) {
+            setFocusIndex(0)
+            setTimeout(() => menuRef.current?.focus(), 0)
+        } else {
+            setFocusIndex(-1)
+        }
+    }, [isOpen])
+
+    // 子菜单打开时重置焦点并聚焦
+    useEffect(() => {
+        if (showConvertMenu) {
+            setFocusIndex(0)
+            setTimeout(() => convertMenuRef.current?.focus(), 0)
+        }
+    }, [showConvertMenu])
+
+    // 主菜单项 action 映射（与渲染顺序一致）
+    const getMainActions = useCallback(() => [
+        () => { setShowConvertMenu(true) },       // 0: 转换为
+        handleCut,                                  // 1: 剪切
+        handleCopy,                                 // 2: 复制
+        handleCopyAsText,                           // 3: 复制为纯文本
+        handleCopyAsMarkdown,                       // 4: 复制为 Markdown
+        handleDuplicate,                            // 5: 复制块
+        handleMoveUp,                               // 6: 向上移动
+        handleMoveDown,                             // 7: 向下移动
+        handleAddBelow,                             // 8: 在下方插入
+        handleDelete,                               // 9: 删除
+    ], [])
+
+    // 转换子菜单项 action 映射
+    const getConvertActions = useCallback(() => [
+        () => handleConvert('paragraph'),
+        () => handleConvert('heading', 1),
+        () => handleConvert('heading', 2),
+        () => handleConvert('heading', 3),
+        () => handleConvert('bulletList'),
+        () => handleConvert('orderedList'),
+        () => handleConvert('taskList'),
+        () => handleConvert('blockquote'),
+        () => handleConvert('codeBlock'),
+    ], [])
+
+    const handleMainKeyDown = useCallback((e: React.KeyboardEvent) => {
+        const count = MAIN_MENU_COUNT
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                setFocusIndex(i => (i + 1) % count)
+                break
+            case 'ArrowUp':
+                e.preventDefault()
+                setFocusIndex(i => (i - 1 + count) % count)
+                break
+            case 'Enter':
+            case ' ':
+                e.preventDefault()
+                if (focusIndex >= 0) getMainActions()[focusIndex]?.()
+                break
+            case 'ArrowRight':
+                if (focusIndex === 0) { e.preventDefault(); setShowConvertMenu(true) }
+                break
+            case 'Escape':
+                e.preventDefault()
+                closeMenu()
+                break
+        }
+    }, [focusIndex])
+
+    const handleConvertKeyDown = useCallback((e: React.KeyboardEvent) => {
+        const count = CONVERT_MENU_COUNT
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                setFocusIndex(i => (i + 1) % count)
+                break
+            case 'ArrowUp':
+                e.preventDefault()
+                setFocusIndex(i => (i - 1 + count) % count)
+                break
+            case 'Enter':
+            case ' ':
+                e.preventDefault()
+                if (focusIndex >= 0) getConvertActions()[focusIndex]?.()
+                break
+            case 'ArrowLeft':
+            case 'Escape':
+                e.preventDefault()
+                setShowConvertMenu(false)
+                setFocusIndex(0)
+                setTimeout(() => menuRef.current?.focus(), 0)
+                break
+        }
+    }, [focusIndex])
 
     const handleDelete = () => {
         const pos = getNodePos()
@@ -319,6 +434,9 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
 
     if (!editor) return null
 
+    const fi = showConvertMenu ? -1 : focusIndex // 主菜单焦点（子菜单打开时禁用）
+    const ci = showConvertMenu ? focusIndex : -1  // 子菜单焦点
+
     return (
         <div
             ref={containerRef}
@@ -343,13 +461,20 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                         className="bg-white rounded-lg shadow-xl border border-gray-100 p-1 flex z-50 origin-top-left outline-none text-sm"
                         sideOffset={5}
                         align="start"
+                        onOpenAutoFocus={e => e.preventDefault()}
                     >
                         {/* 主菜单 */}
-                        <div className="w-52 flex flex-col">
+                        <div
+                            ref={menuRef}
+                            className="w-52 flex flex-col outline-none"
+                            tabIndex={-1}
+                            onKeyDown={!showConvertMenu ? handleMainKeyDown : undefined}
+                        >
                             {/* 块类型转换 */}
                             <button
-                                className="flex items-center justify-between px-3 py-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors w-full text-left"
-                                onMouseEnter={() => setShowConvertMenu(true)}
+                                className={`flex items-center justify-between px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${fi === 0 ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                                onMouseEnter={() => { setShowConvertMenu(true) }}
+                                onFocus={() => setFocusIndex(0)}
                             >
                                 <span className="flex items-center">
                                     <Type className="w-4 h-4 mr-3 text-gray-400" />
@@ -361,23 +486,26 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 剪切 / 复制 / 粘贴区 */}
-                            <MenuItem icon={Scissors} label="剪切" shortcut="⌘X" onClick={handleCut} />
-                            <MenuItem icon={Copy} label="复制" shortcut="⌘C" onClick={handleCopy} />
-                            <MenuItem icon={FileText} label="复制为纯文本" onClick={handleCopyAsText} />
-                            <MenuItem icon={Code} label="复制为 Markdown" onClick={handleCopyAsMarkdown} />
+                            <MenuItem icon={Scissors} label="剪切" shortcut="⌘X" onClick={handleCut} focused={fi === 1} />
+                            <MenuItem icon={Copy} label="复制" shortcut="⌘C" onClick={handleCopy} focused={fi === 2} />
+                            <MenuItem icon={FileText} label="复制为纯文本" onClick={handleCopyAsText} focused={fi === 3} />
+                            <MenuItem icon={Code} label="复制为 Markdown" onClick={handleCopyAsMarkdown} focused={fi === 4} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 块操作区 */}
-                            <MenuItem icon={CopyPlus} label="复制块" shortcut="⌘D" onClick={handleDuplicate} />
-                            <MenuItem icon={ArrowUpToLine} label="向上移动" onClick={handleMoveUp} />
-                            <MenuItem icon={ArrowDownToLine} label="向下移动" onClick={handleMoveDown} />
-                            <MenuItem icon={Plus} label="在下方插入" onClick={handleAddBelow} />
+                            <MenuItem icon={CopyPlus} label="复制块" shortcut="⌘D" onClick={handleDuplicate} focused={fi === 5} />
+                            <MenuItem icon={ArrowUpToLine} label="向上移动" shortcut="⌥↑" onClick={handleMoveUp} focused={fi === 6} />
+                            <MenuItem icon={ArrowDownToLine} label="向下移动" shortcut="⌥↓" onClick={handleMoveDown} focused={fi === 7} />
+                            <MenuItem icon={Plus} label="在下方插入" shortcut="⌘⏎" onClick={handleAddBelow} focused={fi === 8} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 删除 */}
-                            <button className="flex items-center px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors w-full text-left" onClick={handleDelete}>
+                            <button
+                                className={`flex items-center px-3 py-1.5 text-red-600 rounded-md transition-colors w-full text-left ${fi === 9 ? 'bg-red-50' : 'hover:bg-red-50'}`}
+                                onClick={handleDelete}
+                            >
                                 <Trash2 className="w-4 h-4 mr-3 text-red-400" />
                                 删除
                                 <span className="ml-auto text-xs text-red-300">Del</span>
@@ -387,20 +515,23 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                         {/* 转换子菜单 */}
                         {showConvertMenu && (
                             <div
-                                className="w-48 flex flex-col border-l border-gray-100 pl-1"
+                                ref={convertMenuRef}
+                                className="w-48 flex flex-col border-l border-gray-100 pl-1 outline-none"
+                                tabIndex={-1}
+                                onKeyDown={handleConvertKeyDown}
                                 onMouseLeave={() => setShowConvertMenu(false)}
                             >
-                                <ConvertItem icon={Pilcrow} label="正文" onClick={() => handleConvert('paragraph')} />
-                                <ConvertItem icon={Heading1} label="一级标题" onClick={() => handleConvert('heading', 1)} />
-                                <ConvertItem icon={Heading2} label="二级标题" onClick={() => handleConvert('heading', 2)} />
-                                <ConvertItem icon={Heading3} label="三级标题" onClick={() => handleConvert('heading', 3)} />
+                                <ConvertItem icon={Pilcrow} label="正文" onClick={() => handleConvert('paragraph')} focused={ci === 0} />
+                                <ConvertItem icon={Heading1} label="一级标题" shortcut="⌘⌥1" onClick={() => handleConvert('heading', 1)} focused={ci === 1} />
+                                <ConvertItem icon={Heading2} label="二级标题" shortcut="⌘⌥2" onClick={() => handleConvert('heading', 2)} focused={ci === 2} />
+                                <ConvertItem icon={Heading3} label="三级标题" shortcut="⌘⌥3" onClick={() => handleConvert('heading', 3)} focused={ci === 3} />
                                 <div className="h-px bg-gray-100 my-1" />
-                                <ConvertItem icon={List} label="无序列表" onClick={() => handleConvert('bulletList')} />
-                                <ConvertItem icon={ListOrdered} label="有序列表" onClick={() => handleConvert('orderedList')} />
-                                <ConvertItem icon={ListChecks} label="待办列表" onClick={() => handleConvert('taskList')} />
+                                <ConvertItem icon={List} label="无序列表" onClick={() => handleConvert('bulletList')} focused={ci === 4} />
+                                <ConvertItem icon={ListOrdered} label="有序列表" onClick={() => handleConvert('orderedList')} focused={ci === 5} />
+                                <ConvertItem icon={ListChecks} label="待办列表" onClick={() => handleConvert('taskList')} focused={ci === 6} />
                                 <div className="h-px bg-gray-100 my-1" />
-                                <ConvertItem icon={Quote} label="引用" onClick={() => handleConvert('blockquote')} />
-                                <ConvertItem icon={Code} label="代码块" onClick={() => handleConvert('codeBlock')} />
+                                <ConvertItem icon={Quote} label="引用" onClick={() => handleConvert('blockquote')} focused={ci === 7} />
+                                <ConvertItem icon={Code} label="代码块" onClick={() => handleConvert('codeBlock')} focused={ci === 8} />
                             </div>
                         )}
                     </Popover.Content>

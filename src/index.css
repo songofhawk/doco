@@ -212,6 +212,11 @@ body {
     border-radius: 0.25rem;
     font-size: 0.875em;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    transition: background-color 0.15s, box-shadow 0.15s;
+    &:hover {
+      background-color: #e5e7eb;
+      box-shadow: 0 0 0 2px #dbeafe;
+    }
   }
 
   /* 链接 */
@@ -220,7 +225,12 @@ body {
     text-decoration: underline;
     text-underline-offset: 2px;
     cursor: pointer;
-    &:hover { color: var(--color-primary-500); }
+    transition: color 0.15s, box-shadow 0.15s;
+    border-radius: 0.15rem;
+    &:hover {
+      color: var(--color-primary-500);
+      box-shadow: 0 0 0 2px #dbeafe;
+    }
   }
 
   /* 分割线 */
@@ -235,6 +245,11 @@ body {
     background-color: #fef08a;
     padding: 0.1em 0.2em;
     border-radius: 0.15rem;
+    transition: background-color 0.15s, box-shadow 0.15s;
+    &:hover {
+      background-color: #fde047;
+      box-shadow: 0 0 0 2px #fef9c3;
+    }
   }
 
   /* Collaboration Cursors */

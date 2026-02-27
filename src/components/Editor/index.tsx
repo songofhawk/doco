@@ -21,16 +21,21 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import { Highlight } from '@tiptap/extension-highlight'
 import { TextAlign } from '@tiptap/extension-text-align'
+import Link from '@tiptap/extension-link'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { CodeBlockComponent } from './CodeBlockComponent'
 import { FloatingToolbar } from './BubbleMenu'
 import { BlockHandle } from './BlockHandle'
+import { KeyboardShortcuts } from './KeyboardShortcuts'
+import { InlineMarkToolbar } from './InlineMarkToolbar'
+import { LinkPopover } from './LinkPopover'
 
 const lowlight = createLowlight(common)
 
 export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     const [title, setTitle] = useState('')
     const [wordCount, setWordCount] = useState(0)
+    const [linkPopover, setLinkPopover] = useState<{ top: number; left: number; href: string } | null>(null)
     const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -81,6 +86,16 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         return () => window.removeEventListener('doc-renamed', handler)
     }, [docId])
 
+    // 监听 Cmd+K 快捷键触发的链接编辑事件
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { top, left, href } = (e as CustomEvent).detail
+            setLinkPopover({ top, left, href })
+        }
+        window.addEventListener('editor-link-edit', handler)
+        return () => window.removeEventListener('editor-link-edit', handler)
+    }, [])
+
     // 标题输入框自动高度
     const autoResizeTitle = useCallback(() => {
         const el = titleInputRef.current
@@ -103,6 +118,10 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         Color,
         Highlight,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Link.configure({
+            openOnClick: false,
+            HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+        }),
         Image.configure({ inline: false, allowBase64: true }),
         Placeholder.configure({
             placeholder: '输入 / 唤起菜单，或直接开始写作...',
@@ -125,6 +144,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             field: 'default',
             provider: provider,
         }),
+        KeyboardShortcuts,
     ], [ydoc, provider])
 
     const editor = useEditor({
@@ -226,6 +246,16 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             <div className="tiptap-editor-container">
                 {editor && <FloatingToolbar editor={editor} />}
                 {editor && <BlockHandle editor={editor} />}
+                {editor && <InlineMarkToolbar editor={editor} />}
+                {editor && linkPopover && (
+                    <LinkPopover
+                        editor={editor}
+                        pos={linkPopover}
+                        initialUrl={linkPopover.href}
+                        isEdit={editor.isActive('link')}
+                        onClose={() => setLinkPopover(null)}
+                    />
+                )}
                 <EditorContent editor={editor} />
             </div>
 
