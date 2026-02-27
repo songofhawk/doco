@@ -189,19 +189,100 @@ body {
     }
   }
 
-  /* Image */
-  img {
+  /* Image Node View */
+  .image-node-wrapper {
+    margin: 0.75em 0;
+  }
+
+  .image-selected img {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+  }
+
+  .image-node-wrapper img {
     max-width: 100%;
     height: auto;
     border-radius: 0.5rem;
-    margin: 0.75em 0;
     cursor: default;
     transition: box-shadow 0.2s;
+  }
 
-    &.ProseMirror-selectednode {
-      outline: 2px solid var(--color-primary-500);
-      outline-offset: 2px;
-    }
+  /* 调整大小手柄 */
+  .resize-handle-right {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+  }
+
+  .resize-handle-right::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 1px;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 40px;
+    background: var(--color-primary-500);
+    border-radius: 2px;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .resize-handle-right:hover::after {
+    opacity: 1;
+    height: 60px;
+  }
+
+  /* 图片对齐工具栏 */
+  .image-toolbar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 20;
+  }
+
+  .image-selected:hover .image-toolbar,
+  .image-selected:focus-within .image-toolbar {
+    opacity: 1;
+  }
+
+  .image-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .image-toolbar-btn:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+  }
+
+  .image-toolbar-btn.active {
+    background-color: #eff6ff;
+    color: var(--color-primary-600);
   }
 
   /* 行内代码 */

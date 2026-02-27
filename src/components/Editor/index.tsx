@@ -12,7 +12,7 @@ import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, 
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import Collaboration from '@tiptap/extension-collaboration'
-import Image from '@tiptap/extension-image'
+import { ResizableImage } from './ResizableImage'
 import html2pdf from 'html2pdf.js'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
@@ -122,7 +122,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             openOnClick: false,
             HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
         }),
-        Image.configure({ inline: false, allowBase64: true }),
+        ResizableImage.configure({ inline: false, allowBase64: true }),
         Placeholder.configure({
             placeholder: '输入 / 唤起菜单，或直接开始写作...',
         }),
