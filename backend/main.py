@@ -13,7 +13,7 @@ import y_py as Y
 
 from ypy_websocket.websocket_server import WebsocketServer
 from ypy_websocket.ystore import BaseYStore
-from database import get_db, AsyncSessionLocal
+from database import get_db, AsyncSessionLocal, engine
 from models import KnowledgeBase, Folder, Document, YDocUpdate
 
 # Try to import ExceptionGroup for better error inspection (Python 3.11+ or exceptiongroup backport)
@@ -106,9 +106,23 @@ class DocoWebsocketServer(WebsocketServer):
 
 websocket_server = DocoWebsocketServer(auto_clean_rooms=False)
 
+async def _migrate_db():
+    """自动迁移：为已有表添加缺失的列"""
+    from sqlalchemy import text, inspect
+    async with engine.begin() as conn:
+        def _check_columns(sync_conn):
+            insp = inspect(sync_conn)
+            doc_cols = {c["name"] for c in insp.get_columns("documents")}
+            return doc_cols
+        doc_cols = await conn.run_sync(_check_columns)
+        if "kb_id" not in doc_cols:
+            await conn.execute(text("ALTER TABLE documents ADD COLUMN kb_id INTEGER REFERENCES knowledge_bases(id)"))
+            logger.info("Migrated: added kb_id to documents")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Doco Backend: Initializing...")
+    await _migrate_db()
     server_task = asyncio.create_task(websocket_server.start())
     try:
         await websocket_server.started.wait()
@@ -162,9 +176,21 @@ class DocBase(BaseModel):
     id: str
     title: str
     folder_id: Optional[int] = None
+    kb_id: Optional[int] = None
 
 class DocRead(DocBase):
     model_config = ConfigDict(from_attributes=True)
+
+class DocUpdate(BaseModel):
+    title: Optional[str] = None
+    folder_id: Optional[int] = None
+    kb_id: Optional[int] = None
+
+class FolderUpdate(BaseModel):
+    name: Optional[str] = None
+
+class KBUpdate(BaseModel):
+    name: Optional[str] = None
 
 # --- API Routes ---
 
@@ -196,7 +222,25 @@ async def delete_kb(kb_id: int, db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/kb/{kb_id}/folders", response_model=List[FolderRead])
 async def get_folders(kb_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Folder).where(Folder.kb_id == kb_id))
+    result = await db.execute(
+        select(Folder).where(Folder.kb_id == kb_id, Folder.parent_id == None)
+    )
+    return result.scalars().all()
+
+@app.get("/api/kb/{kb_id}/docs", response_model=List[DocRead])
+async def get_kb_docs(kb_id: int, db: AsyncSession = Depends(get_db)):
+    """获取知识库直属文档（不属于任何文件夹的文档）"""
+    result = await db.execute(
+        select(Document).where(Document.kb_id == kb_id, Document.folder_id == None)
+    )
+    return result.scalars().all()
+
+@app.get("/api/folders/{folder_id}/subfolders", response_model=List[FolderRead])
+async def get_subfolders(folder_id: int, db: AsyncSession = Depends(get_db)):
+    """获取文件夹的子文件夹"""
+    result = await db.execute(
+        select(Folder).where(Folder.parent_id == folder_id)
+    )
     return result.scalars().all()
 
 @app.post("/api/folders", response_model=FolderRead)
@@ -217,6 +261,13 @@ async def get_docs(folder_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Document).where(Document.folder_id == folder_id))
     return result.scalars().all()
 
+@app.get("/api/docs/{doc_id}", response_model=DocRead)
+async def get_doc(doc_id: str, db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
 @app.post("/api/docs", response_model=DocRead)
 async def create_doc(doc: DocBase, db: AsyncSession = Depends(get_db)):
     try:
@@ -229,6 +280,88 @@ async def create_doc(doc: DocBase, db: AsyncSession = Depends(get_db)):
         await db.rollback()
         logger.error(f"API Doc Create Error: {e}")
         raise HTTPException(status_code=500, detail="Database Error")
+
+@app.patch("/api/docs/{doc_id}", response_model=DocRead)
+async def update_doc(doc_id: str, update: DocUpdate, db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if update.title is not None:
+        doc.title = update.title
+    if update.folder_id is not None:
+        doc.folder_id = update.folder_id
+        doc.kb_id = None  # 移入文件夹时清除直属知识库
+    elif update.kb_id is not None:
+        doc.kb_id = update.kb_id
+        doc.folder_id = None  # 移入知识库直属时清除文件夹
+    await db.commit()
+    await db.refresh(doc)
+    return doc
+
+@app.delete("/api/docs/{doc_id}")
+async def delete_doc(doc_id: str, db: AsyncSession = Depends(get_db)):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    # 同时删除 ydoc 更新记录
+    from sqlalchemy import delete as sql_delete
+    await db.execute(sql_delete(YDocUpdate).where(YDocUpdate.doc_id == doc_id))
+    await db.delete(doc)
+    await db.commit()
+    return {"status": "ok"}
+
+@app.patch("/api/folders/{folder_id}", response_model=FolderRead)
+async def update_folder(folder_id: int, update: FolderUpdate, db: AsyncSession = Depends(get_db)):
+    folder = await db.get(Folder, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if update.name is not None:
+        folder.name = update.name
+    await db.commit()
+    await db.refresh(folder)
+    return folder
+
+@app.delete("/api/folders/{folder_id}")
+async def delete_folder(folder_id: int, db: AsyncSession = Depends(get_db)):
+    folder = await db.get(Folder, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    await db.delete(folder)
+    await db.commit()
+    return {"status": "ok"}
+
+@app.patch("/api/kb/{kb_id}", response_model=KBRead)
+async def update_kb(kb_id: int, update: KBUpdate, db: AsyncSession = Depends(get_db)):
+    kb = await db.get(KnowledgeBase, kb_id)
+    if not kb:
+        raise HTTPException(status_code=404, detail="KB not found")
+    if update.name is not None:
+        kb.name = update.name
+    await db.commit()
+    await db.refresh(kb)
+    return kb
+
+@app.get("/api/docs/{doc_id}/path")
+async def get_doc_path(doc_id: str, db: AsyncSession = Depends(get_db)):
+    """返回文档的完整路径信息：doc_id, folder_id, kb_id"""
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    folder = await db.get(Folder, doc.folder_id) if doc.folder_id else None
+    kb_id = doc.kb_id or (folder.kb_id if folder else None)
+    return {
+        "doc_id": doc.id,
+        "folder_id": doc.folder_id,
+        "kb_id": kb_id,
+    }
+
+@app.get("/api/search/docs")
+async def search_docs(q: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Document).where(Document.title.ilike(f"%{q}%")).limit(20)
+    )
+    docs = result.scalars().all()
+    return [{"id": d.id, "title": d.title, "folder_id": d.folder_id} for d in docs]
 
 # --- WebSocket ---
 

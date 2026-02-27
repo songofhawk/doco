@@ -31,6 +31,24 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
     const [isOpen, setIsOpen] = useState(false)
     const [showConvertMenu, setShowConvertMenu] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
+    const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    const scheduleHide = () => {
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = setTimeout(() => {
+            if (!isOpen) {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+            }
+        }, 150)
+    }
+
+    const cancelHide = () => {
+        if (hideTimerRef.current) {
+            clearTimeout(hideTimerRef.current)
+            hideTimerRef.current = null
+        }
+    }
 
     useEffect(() => {
         if (!editor || !editor.view) return
@@ -44,32 +62,61 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             if (containerRef.current?.contains(e.target as Node)) return
 
             const view = editor.view
-            let target = e.target as HTMLElement
-            while (target && target !== view.dom) {
-                if (target.classList && (target.classList.contains('ProseMirror') || target.hasAttribute('data-type'))) break
-                const style = window.getComputedStyle(target)
-                if (style.display === 'block' || style.display === 'list-item' || style.display === 'flex' || target.tagName === 'P' || target.tagName.match(/^H[1-6]$/)) break
-                target = target.parentElement as HTMLElement
-            }
 
-            if (target && target !== view.dom && view.dom.contains(target)) {
-                const rect = target.getBoundingClientRect()
-                const containerRect = container.getBoundingClientRect()
-                const editorRect = view.dom.getBoundingClientRect()
-                const lineHeight = parseFloat(window.getComputedStyle(target).lineHeight) || rect.height
-                const firstLineCenter = rect.top + Math.min(lineHeight, rect.height) / 2
-                setHandlePos({
-                    top: firstLineCenter - containerRect.top - 12,
-                    left: editorRect.left - containerRect.left - 56
-                })
-                setHoveredNode(target)
-            } else {
+            // 用 posAtCoords 从鼠标坐标精确定位到 ProseMirror 文档位置
+            const posInfo = view.posAtCoords({ left: e.clientX, top: e.clientY })
+            if (!posInfo) {
                 setHandlePos({ top: -999, left: -999 })
                 setHoveredNode(null)
+                return
             }
+
+            // 从文档位置 resolve 到顶层块节点（depth=1）
+            const $pos = view.state.doc.resolve(posInfo.pos)
+            const depth = Math.max(1, $pos.depth)
+            const topNodePos = $pos.before(depth)
+            const topNode = view.state.doc.nodeAt(topNodePos)
+            if (!topNode) {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+                return
+            }
+
+            // 从文档位置反查 DOM 节点
+            const domNode = view.nodeDOM(topNodePos) as HTMLElement | null
+            if (!domNode || !view.dom.contains(domNode)) {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+                return
+            }
+
+            const target = domNode
+            const rect = target.getBoundingClientRect()
+            const editorRect = view.dom.getBoundingClientRect()
+
+            // 找到 absolute 定位的实际基准元素（最近的 position:relative 祖先）
+            const handleEl = containerRef.current
+            const offsetParent = handleEl?.offsetParent as HTMLElement | null
+            const baseRect = offsetParent
+                ? offsetParent.getBoundingClientRect()
+                : container.getBoundingClientRect()
+
+            const computedStyle = window.getComputedStyle(target)
+            const lineHeightStr = computedStyle.lineHeight
+            const fontSize = parseFloat(computedStyle.fontSize) || 16
+            const lineHeight = parseFloat(lineHeightStr) || fontSize * 1.2
+            const paddingTop = parseFloat(computedStyle.paddingTop) || 0
+            const firstLineCenter = rect.top + paddingTop + Math.min(lineHeight, rect.height) / 2
+
+            setHandlePos({
+                top: firstLineCenter - baseRect.top - 12,
+                left: editorRect.left - baseRect.left - 40
+            })
+            setHoveredNode(target)
+            cancelHide()
         }
 
-        const onLeave = () => { if (!isOpen) setHandlePos({ top: -999, left: -999 }) }
+        const onLeave = () => { if (!isOpen) scheduleHide() }
 
         container.addEventListener('mousemove', updateHandlePosition)
         container.addEventListener('mouseleave', onLeave)
@@ -275,27 +322,20 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
     return (
         <div
             ref={containerRef}
-            className="absolute z-40 transition-opacity duration-200 flex items-center gap-1"
+            className="absolute z-40 transition-opacity duration-200 flex items-center"
             style={{
                 top: handlePos.top,
                 left: handlePos.left,
-                paddingRight: 20,
                 opacity: handlePos.top === -999 ? 0 : 1,
                 pointerEvents: handlePos.top === -999 ? 'none' : 'auto'
             }}
+            onMouseEnter={cancelHide}
+            onMouseLeave={scheduleHide}
         >
-            <button
-                className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-pointer"
-                onClick={handleAddBelow}
-                title="点击添加区块"
-            >
-                <Plus className="w-4 h-4" />
-            </button>
-
             <Popover.Root open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) setShowConvertMenu(false) }}>
                 <Popover.Trigger asChild>
-                    <button className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing outline-none">
-                        <GripVertical className="w-4 h-4" />
+                    <button className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing outline-none">
+                        <GripVertical className="w-5 h-5" />
                     </button>
                 </Popover.Trigger>
                 <Popover.Portal>

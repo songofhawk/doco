@@ -8,7 +8,7 @@ import { SlashCommand } from './SlashCommand'
 import { MermaidBlock } from './MermaidBlock'
 import { PlantUMLBlock } from './PlantUMLBlock'
 import { getSuggestionItems, renderItems } from './suggestions'
-import { forwardRef, useImperativeHandle, useEffect, useMemo } from 'react'
+import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import Collaboration from '@tiptap/extension-collaboration'
@@ -29,6 +29,11 @@ import { BlockHandle } from './BlockHandle'
 const lowlight = createLowlight(common)
 
 export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
+    const [title, setTitle] = useState('')
+    const [wordCount, setWordCount] = useState(0)
+    const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
+    const titleInputRef = useRef<HTMLTextAreaElement>(null)
+
     const ydoc = useMemo(() => new Y.Doc(), [docId])
     const provider = useMemo(() => {
         return new WebsocketProvider(
@@ -43,6 +48,33 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         const timer = setTimeout(() => provider.connect(), 0)
         return () => { clearTimeout(timer); provider.disconnect() }
     }, [provider])
+
+    // 加载文档标题
+    useEffect(() => {
+        fetch(`http://127.0.0.1:8000/api/docs/${docId}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.title) setTitle(d.title) })
+            .catch(() => {})
+    }, [docId])
+
+    // 标题防抖保存
+    const handleTitleChange = (newTitle: string) => {
+        setTitle(newTitle)
+        clearTimeout(titleTimerRef.current)
+        titleTimerRef.current = setTimeout(() => {
+            fetch(`http://127.0.0.1:8000/api/docs/${docId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            }).catch(() => {})
+        }, 600)
+    }
+
+    // 标题输入框自动高度
+    const autoResizeTitle = useCallback(() => {
+        const el = titleInputRef.current
+        if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+    }, [])
 
     const extensions = useMemo(() => [
         (StarterKit as any).configure({
@@ -128,6 +160,18 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         },
     }, [ydoc])
 
+    // 字数统计
+    useEffect(() => {
+        if (!editor) return
+        const update = () => {
+            const text = editor.state.doc.textContent || ''
+            setWordCount(text.replace(/\s/g, '').length)
+        }
+        update()
+        editor.on('update', update)
+        return () => { editor.off('update', update) }
+    }, [editor])
+
     useImperativeHandle(ref, () => ({
         exportMarkdown: () => {
             if (!editor) return
@@ -135,13 +179,13 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
             const link = document.createElement('a')
             link.href = URL.createObjectURL(blob)
-            link.download = 'document.md'
+            link.download = `${title || 'document'}.md`
             link.click()
         },
         exportPDF: () => {
             const element = document.querySelector('.tiptap-editor-container')
             if (element) {
-                html2pdf().from(element as HTMLElement).save('document.pdf')
+                html2pdf().from(element as HTMLElement).save(`${title || 'document'}.pdf`)
             }
         },
         exportWord: async () => {
@@ -150,16 +194,34 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
             const link = document.createElement('a')
             link.href = URL.createObjectURL(blob)
-            link.download = 'document.doc'
+            link.download = `${title || 'document'}.doc`
             link.click()
         }
     }))
 
     return (
-        <div className="w-full max-w-4xl mx-auto bg-white min-h-[80vh] shadow-sm rounded-lg mt-10 p-10 px-14 border border-gray-100 tiptap-editor-container relative group">
-            {editor && <FloatingToolbar editor={editor} />}
-            {editor && <BlockHandle editor={editor} />}
-            <EditorContent editor={editor} />
+        <div className="w-full max-w-4xl mx-auto bg-white min-h-[80vh] shadow-sm rounded-lg mt-6 p-10 px-14 border border-gray-100 relative group">
+            {/* 可编辑标题 */}
+            <textarea
+                ref={titleInputRef}
+                value={title}
+                onChange={e => { handleTitleChange(e.target.value); autoResizeTitle() }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start') } }}
+                placeholder="无标题"
+                rows={1}
+                className="w-full text-3xl font-bold text-gray-900 border-none outline-none resize-none bg-transparent placeholder:text-gray-300 mb-4 leading-snug"
+            />
+
+            <div className="tiptap-editor-container">
+                {editor && <FloatingToolbar editor={editor} />}
+                {editor && <BlockHandle editor={editor} />}
+                <EditorContent editor={editor} />
+            </div>
+
+            {/* 底部状态栏 */}
+            <div className="mt-6 pt-4 border-t border-gray-100 flex items-center text-xs text-gray-400">
+                <span>{wordCount} 字</span>
+            </div>
         </div>
     )
 })

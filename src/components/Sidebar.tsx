@@ -1,198 +1,735 @@
-import React, { useState, useEffect } from 'react';
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Library } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    Folder, FileText, ChevronRight, ChevronDown, Plus, Library,
+    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy
+} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const API_BASE = 'http://127.0.0.1:8000/api';
 
-export const Sidebar = () => {
+/* ---- 右键菜单 ---- */
+type MenuItem = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean } | 'divider';
+
+const ContextMenu = ({ x, y, items, onClose }: {
+    x: number; y: number;
+    items: MenuItem[];
+    onClose: () => void;
+}) => {
+    const ref = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [onClose]);
+
+    return (
+        <div ref={ref} className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px] text-sm"
+            style={{ top: y, left: x }}>
+            {items.map((item, i) =>
+                item === 'divider' ? (
+                    <div key={i} className="my-1 border-t border-gray-100" />
+                ) : (
+                    <button key={i}
+                        className={`flex items-center gap-2 w-full px-3 py-1.5 transition-colors ${item.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100'}`}
+                        onClick={() => { item.onClick(); onClose(); }}>
+                        {item.icon}{item.label}
+                    </button>
+                )
+            )}
+        </div>
+    );
+};
+
+/* ---- 内联编辑 ---- */
+const InlineEdit = ({ value, onSave, onCancel }: {
+    value: string; onSave: (v: string) => void; onCancel: () => void;
+}) => {
+    const [text, setText] = useState(value);
+    const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
+
+    return (
+        <input ref={inputRef} value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => {
+                if (e.key === 'Enter' && text.trim()) { e.preventDefault(); onSave(text.trim()); }
+                if (e.key === 'Escape') onCancel();
+            }}
+            onBlur={() => { if (text.trim()) onSave(text.trim()); else onCancel(); }}
+            className="flex-1 text-sm bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
+            onClick={e => e.stopPropagation()} />
+    );
+};
+
+/* ---- 移动文档弹窗 ---- */
+const MoveDialog = ({ kbs, onMove, onClose }: {
+    kbs: any[];
+    onMove: (folderId?: number, kbId?: number) => void;
+    onClose: () => void;
+}) => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+    const [folders, setFolders] = useState<Record<number, any[]>>({});
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [onClose]);
+
+    const loadFolders = async (kbId: number) => {
+        if (folders[kbId]) return;
+        try {
+            const res = await fetch(`${API_BASE}/kb/${kbId}/folders`);
+            if (res.ok) {
+                const data = await res.json();
+                setFolders(prev => ({ ...prev, [kbId]: data }));
+            }
+        } catch {}
+    };
+
+    const toggleKb = (kbId: number) => {
+        setExpanded(prev => ({ ...prev, [kbId]: !prev[kbId] }));
+        loadFolders(kbId);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div ref={ref} className="bg-white rounded-xl shadow-2xl w-72 max-h-80 flex flex-col overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">移动到…</span>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 text-sm">
+                    {kbs.map(kb => (
+                        <div key={kb.id}>
+                            <div className="flex items-center px-2 py-1.5 hover:bg-gray-100 rounded-md cursor-pointer"
+                                onClick={() => toggleKb(kb.id)}>
+                                <span className="mr-1 text-gray-400">
+                                    {expanded[kb.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                </span>
+                                <Library size={14} className="mr-2 text-indigo-500" />
+                                <span className="flex-1 truncate text-gray-700">{kb.name}</span>
+                                <button onClick={e => { e.stopPropagation(); onMove(undefined, kb.id); }}
+                                    className="text-xs text-blue-500 hover:text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-50">
+                                    选择
+                                </button>
+                            </div>
+                            {expanded[kb.id] && (folders[kb.id] || []).map((f: any) => (
+                                <div key={f.id}
+                                    className="flex items-center px-2 py-1.5 ml-5 hover:bg-gray-100 rounded-md cursor-pointer"
+                                    onClick={() => onMove(f.id)}>
+                                    <Folder size={13} className="mr-2 text-amber-500" />
+                                    <span className="flex-1 truncate text-gray-600">{f.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/* ---- 主侧边栏 ---- */
+export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => {
+    const location = useLocation();
+    const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
     const [expandedKbs, setExpandedKbs] = useState<Record<number, boolean>>({});
     const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
     const [content, setContent] = useState<Record<string, any[]>>({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[] | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
+    const [editingItem, setEditingItem] = useState<{ type: string; id: number | string } | null>(null);
+    const [movingDoc, setMovingDoc] = useState<{ docId: string; fromFolderId?: number; fromKbId?: number } | null>(null);
     const navigate = useNavigate();
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
+    // 加载知识库列表
+    useEffect(() => { fetchKbs(); }, []);
+
+    // 根据 URL 中的 docId 自动展开对应的树路径
     useEffect(() => {
-        fetchKbs();
-    }, []);
+        if (!currentDocId) return;
+
+        let cancelled = false;
+        const expandToDoc = async () => {
+            try {
+                const pathRes = await fetch(`${API_BASE}/docs/${currentDocId}/path`);
+                if (!pathRes.ok || cancelled) return;
+                const { folder_id, kb_id } = await pathRes.json();
+                if (!kb_id || cancelled) return;
+
+                // 加载知识库的顶层文件夹和直属文档
+                const fetches: Promise<Response>[] = [
+                    fetch(`${API_BASE}/kb/${kb_id}/folders`),
+                    fetch(`${API_BASE}/kb/${kb_id}/docs`),
+                ];
+                // 如果文档在文件夹内，也加载该文件夹的内容
+                if (folder_id) {
+                    fetches.push(
+                        fetch(`${API_BASE}/folders/${folder_id}/docs`),
+                        fetch(`${API_BASE}/folders/${folder_id}/subfolders`),
+                    );
+                }
+
+                const responses = await Promise.all(fetches);
+                if (cancelled) return;
+
+                const updates: Record<string, any[]> = {};
+                if (responses[0].ok) updates[`kb_${kb_id}_folders`] = await responses[0].json();
+                if (responses[1].ok) updates[`kb_${kb_id}_docs`] = await responses[1].json();
+                if (folder_id && responses[2]?.ok) updates[`folder_${folder_id}_docs`] = await responses[2].json();
+                if (folder_id && responses[3]?.ok) updates[`folder_${folder_id}_subfolders`] = await responses[3].json();
+                if (cancelled) return;
+
+                setExpandedKbs(prev => ({ ...prev, [kb_id]: true }));
+                if (folder_id) setExpandedFolders(prev => ({ ...prev, [folder_id]: true }));
+                setContent(prev => ({ ...prev, ...updates }));
+            } catch (e) {
+                console.error('[Sidebar] expand to doc failed:', e);
+            }
+        };
+        expandToDoc();
+        return () => { cancelled = true; };
+    }, [currentDocId]);
+
+    // 搜索防抖
+    useEffect(() => {
+        if (!searchQuery.trim()) { setSearchResults(null); return; }
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API_BASE}/search/docs?q=${encodeURIComponent(searchQuery)}`);
+                if (res.ok) setSearchResults(await res.json());
+            } catch { setSearchResults([]); }
+        }, 300);
+        return () => clearTimeout(searchTimerRef.current);
+    }, [searchQuery]);
 
     const fetchKbs = async () => {
         try {
-            console.log('[Sidebar] Fetching Knowledge Bases...');
             const res = await fetch(`${API_BASE}/kb`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            console.log('[Sidebar] KBs fetched:', data);
-            setKbs(data);
-        } catch (e) {
-            console.error('[Sidebar] Failed to fetch KBs:', e);
-        }
+            if (res.ok) setKbs(await res.json());
+        } catch (e) { console.error('[Sidebar] fetch KBs failed:', e); }
     };
 
     const toggleKb = async (kbId: number) => {
         setExpandedKbs(prev => ({ ...prev, [kbId]: !prev[kbId] }));
-        if (!content[`kb_${kbId}`]) {
+        if (!content[`kb_${kbId}_folders`]) {
             try {
-                const res = await fetch(`${API_BASE}/kb/${kbId}/folders`);
-                const folders = await res.json();
-                setContent(prev => ({ ...prev, [`kb_${kbId}`]: folders }));
-            } catch (e) {
-                console.error('Failed to fetch folders', e);
-            }
+                const [foldersRes, docsRes] = await Promise.all([
+                    fetch(`${API_BASE}/kb/${kbId}/folders`),
+                    fetch(`${API_BASE}/kb/${kbId}/docs`),
+                ]);
+                const updates: Record<string, any[]> = {};
+                if (foldersRes.ok) updates[`kb_${kbId}_folders`] = await foldersRes.json();
+                if (docsRes.ok) updates[`kb_${kbId}_docs`] = await docsRes.json();
+                setContent(prev => ({ ...prev, ...updates }));
+            } catch {}
         }
     };
 
     const toggleFolder = async (folderId: number) => {
         setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
-        if (!content[`folder_${folderId}`]) {
+        if (!content[`folder_${folderId}_docs`]) {
             try {
-                const res = await fetch(`${API_BASE}/folders/${folderId}/docs`);
-                const docs = await res.json();
-                setContent(prev => ({ ...prev, [`folder_${folderId}`]: docs }));
-            } catch (e) {
-                console.error('Failed to fetch docs', e);
-            }
+                const [docsRes, subfoldersRes] = await Promise.all([
+                    fetch(`${API_BASE}/folders/${folderId}/docs`),
+                    fetch(`${API_BASE}/folders/${folderId}/subfolders`),
+                ]);
+                const updates: Record<string, any[]> = {};
+                if (docsRes.ok) updates[`folder_${folderId}_docs`] = await docsRes.json();
+                if (subfoldersRes.ok) updates[`folder_${folderId}_subfolders`] = await subfoldersRes.json();
+                setContent(prev => ({ ...prev, ...updates }));
+            } catch {}
         }
     };
 
+    // ---- 创建 ----
     const addKb = async () => {
         const name = prompt('请输入知识库名称:');
         if (!name) return;
         try {
             const res = await fetch(`${API_BASE}/kb`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
             });
-            if (res.ok) {
-                console.log('KB added successfully');
-                await fetchKbs();
-            } else {
-                const err = await res.text();
-                alert(`创建失败: ${err}`);
-            }
-        } catch (e) {
-            console.error('Failed to add KB', e);
-            alert('网络错误，请稍后重试');
-        }
+            if (res.ok) await fetchKbs();
+        } catch {}
     };
 
-    const addFolder = async (kbId: number) => {
+    const addFolder = async (kbId: number, parentId?: number) => {
         const name = prompt('请输入文件夹名称:');
         if (!name) return;
         try {
+            const body: any = { name, kb_id: kbId };
+            if (parentId) body.parent_id = parentId;
             const res = await fetch(`${API_BASE}/folders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, kb_id: kbId })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             });
             if (res.ok) {
-                console.log('[Sidebar] Folder added successfully');
-                const resFolders = await fetch(`${API_BASE}/kb/${kbId}/folders`);
-                const folders = await resFolders.json();
-                setContent(prev => ({ ...prev, [`kb_${kbId}`]: folders }));
-                setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
-            } else {
-                alert('创建文件夹失败');
+                if (parentId) {
+                    // 刷新父文件夹的子文件夹列表
+                    const r2 = await fetch(`${API_BASE}/folders/${parentId}/subfolders`);
+                    if (r2.ok) {
+                        const subfolders = await r2.json();
+                        setContent(prev => ({ ...prev, [`folder_${parentId}_subfolders`]: subfolders }));
+                    }
+                    setExpandedFolders(prev => ({ ...prev, [parentId]: true }));
+                } else {
+                    // 刷新知识库的顶层文件夹列表
+                    const r2 = await fetch(`${API_BASE}/kb/${kbId}/folders`);
+                    if (r2.ok) {
+                        const folders = await r2.json();
+                        setContent(prev => ({ ...prev, [`kb_${kbId}_folders`]: folders }));
+                    }
+                    setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
+                }
             }
-        } catch (e) {
-            console.error('[Sidebar] Failed to add folder', e);
-        }
+        } catch {}
     };
 
-    const addDoc = async (folderId: number) => {
+    const addDoc = async (folderId?: number, kbId?: number) => {
         const title = prompt('请输入文档标题:');
         if (!title) return;
         const docId = `doc_${Math.random().toString(36).substr(2, 9)}`;
         try {
+            const body: any = { id: docId, title };
+            if (folderId) body.folder_id = folderId;
+            if (kbId) body.kb_id = kbId;
             const res = await fetch(`${API_BASE}/docs`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: docId, title, folder_id: folderId })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             });
             if (res.ok) {
-                console.log('[Sidebar] Doc added successfully');
-                const resDocs = await fetch(`${API_BASE}/folders/${folderId}/docs`);
-                const docs = await resDocs.json();
-                setContent(prev => ({ ...prev, [`folder_${folderId}`]: docs }));
-                setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
+                if (folderId) {
+                    const r2 = await fetch(`${API_BASE}/folders/${folderId}/docs`);
+                    if (r2.ok) {
+                        const docs = await r2.json();
+                        setContent(prev => ({ ...prev, [`folder_${folderId}_docs`]: docs }));
+                    }
+                    setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
+                } else if (kbId) {
+                    const r2 = await fetch(`${API_BASE}/kb/${kbId}/docs`);
+                    if (r2.ok) {
+                        const docs = await r2.json();
+                        setContent(prev => ({ ...prev, [`kb_${kbId}_docs`]: docs }));
+                    }
+                    setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
+                }
                 navigate(`/doc/${docId}`);
-            } else {
-                alert('创建文档失败');
             }
-        } catch (e) {
-            console.error('[Sidebar] Failed to add doc:', e);
-            alert('网络错误');
-        }
+        } catch {}
     };
 
-    return (
-        <div className="w-64 bg-[#f9f9f9] border-r border-gray-200 h-full flex flex-col pt-4 select-none">
-            <div className="px-5 mb-4 flex justify-between items-center">
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest">知识库</h2>
-                <button onClick={addKb} className="p-1 hover:bg-gray-200 rounded text-gray-500 transition-colors">
-                    <Plus size={16} />
+    // ---- 重命名 ----
+    const renameKb = async (kbId: number, newName: string) => {
+        try {
+            await fetch(`${API_BASE}/kb/${kbId}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+            setKbs(prev => prev.map(kb => kb.id === kbId ? { ...kb, name: newName } : kb));
+        } catch {}
+        setEditingItem(null);
+    };
+
+    const renameFolder = async (folderId: number, newName: string) => {
+        try {
+            await fetch(`${API_BASE}/folders/${folderId}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+            setContent(prev => {
+                const u = { ...prev };
+                for (const k of Object.keys(u)) {
+                    if (k.endsWith('_folders') || k.endsWith('_subfolders'))
+                        u[k] = u[k].map((f: any) => f.id === folderId ? { ...f, name: newName } : f);
+                }
+                return u;
+            });
+        } catch {}
+        setEditingItem(null);
+    };
+
+    const renameDoc = async (docId: string, newTitle: string) => {
+        try {
+            await fetch(`${API_BASE}/docs/${docId}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            });
+            setContent(prev => {
+                const u = { ...prev };
+                for (const k of Object.keys(u)) {
+                    if (k.endsWith('_docs'))
+                        u[k] = u[k].map((d: any) => d.id === docId ? { ...d, title: newTitle } : d);
+                }
+                return u;
+            });
+        } catch {}
+        setEditingItem(null);
+    };
+
+    // ---- 删除 ----
+    const deleteKb = async (kbId: number) => {
+        if (!confirm('确定删除此知识库？其下所有文件夹和文档将一并删除。')) return;
+        try {
+            await fetch(`${API_BASE}/kb/${kbId}`, { method: 'DELETE' });
+            setKbs(prev => prev.filter(kb => kb.id !== kbId));
+        } catch {}
+    };
+
+    const deleteFolder = async (folderId: number, kbId: number, parentId?: number) => {
+        if (!confirm('确定删除此文件夹？其下所有文档将一并删除。')) return;
+        try {
+            await fetch(`${API_BASE}/folders/${folderId}`, { method: 'DELETE' });
+            if (parentId) {
+                setContent(prev => ({
+                    ...prev,
+                    [`folder_${parentId}_subfolders`]: (prev[`folder_${parentId}_subfolders`] || []).filter((f: any) => f.id !== folderId)
+                }));
+            } else {
+                setContent(prev => ({
+                    ...prev,
+                    [`kb_${kbId}_folders`]: (prev[`kb_${kbId}_folders`] || []).filter((f: any) => f.id !== folderId)
+                }));
+            }
+        } catch {}
+    };
+
+    const deleteDoc = async (docId: string, folderId?: number, kbId?: number) => {
+        if (!confirm('确定删除此文档？')) return;
+        try {
+            await fetch(`${API_BASE}/docs/${docId}`, { method: 'DELETE' });
+            if (folderId) {
+                setContent(prev => ({
+                    ...prev,
+                    [`folder_${folderId}_docs`]: (prev[`folder_${folderId}_docs`] || []).filter((d: any) => d.id !== docId)
+                }));
+            } else if (kbId) {
+                setContent(prev => ({
+                    ...prev,
+                    [`kb_${kbId}_docs`]: (prev[`kb_${kbId}_docs`] || []).filter((d: any) => d.id !== docId)
+                }));
+            }
+            if (currentDocId === docId) navigate('/');
+        } catch {}
+    };
+
+    // ---- 移动文档 ----
+    const startMoveDoc = (docId: string, fromFolderId?: number, fromKbId?: number) => {
+        setMovingDoc({ docId, fromFolderId, fromKbId });
+    };
+
+    const moveDocTo = async (targetFolderId?: number, targetKbId?: number) => {
+        if (!movingDoc) return;
+        try {
+            const body: any = { folder_id: targetFolderId || null };
+            if (targetKbId && !targetFolderId) body.kb_id = targetKbId;
+            await fetch(`${API_BASE}/docs/${movingDoc.docId}`, {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            // 从原位置移除
+            if (movingDoc.fromFolderId) {
+                setContent(prev => ({
+                    ...prev,
+                    [`folder_${movingDoc.fromFolderId}_docs`]: (prev[`folder_${movingDoc.fromFolderId}_docs`] || []).filter((d: any) => d.id !== movingDoc.docId)
+                }));
+            } else if (movingDoc.fromKbId) {
+                setContent(prev => ({
+                    ...prev,
+                    [`kb_${movingDoc.fromKbId}_docs`]: (prev[`kb_${movingDoc.fromKbId}_docs`] || []).filter((d: any) => d.id !== movingDoc.docId)
+                }));
+            }
+            // 刷新目标位置
+            if (targetFolderId) {
+                const r = await fetch(`${API_BASE}/folders/${targetFolderId}/docs`);
+                if (r.ok) {
+                    const docs = await r.json();
+                    setContent(prev => ({ ...prev, [`folder_${targetFolderId}_docs`]: docs }));
+                }
+            } else if (targetKbId) {
+                const r = await fetch(`${API_BASE}/kb/${targetKbId}/docs`);
+                if (r.ok) {
+                    const docs = await r.json();
+                    setContent(prev => ({ ...prev, [`kb_${targetKbId}_docs`]: docs }));
+                }
+            }
+        } catch {}
+        setMovingDoc(null);
+    };
+
+    // ---- 右键菜单构建 ----
+    const showKbMenu = (e: React.MouseEvent, kb: any) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({
+            x: e.clientX, y: e.clientY,
+            items: [
+                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
+                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
+                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
+            ]
+        });
+    };
+
+    const showFolderMenu = (e: React.MouseEvent, folder: any, kbId: number, parentId?: number) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({
+            x: e.clientX, y: e.clientY,
+            items: [
+                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
+                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(folder.id) },
+                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
+                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
+            ]
+        });
+    };
+
+    const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
+        { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/doc/${doc.id}`) },
+        { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId) },
+        'divider',
+        { label: '移动到…', icon: <FolderInput size={14} />, onClick: () => startMoveDoc(doc.id, folderId, kbId) },
+        { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'doc', id: doc.id }) },
+        'divider',
+        { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteDoc(doc.id, folderId, kbId), danger: true },
+    ];
+
+    const showDocMenu = (e: React.MouseEvent, doc: any, folderId?: number, kbId?: number) => {
+        e.preventDefault(); e.stopPropagation();
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: buildDocMenuItems(doc, folderId, kbId) });
+    };
+
+    // ---- 渲染文档项 ----
+    const renderDoc = (doc: any, folderId?: number, kbId?: number) => (
+        <div key={doc.id}
+            className={`flex items-center px-2 py-1.5 rounded-md transition-colors cursor-pointer group ${
+                currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+            onClick={() => navigate(`/doc/${doc.id}`)}
+            onContextMenu={e => showDocMenu(e, doc, folderId, kbId)}>
+            <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />
+            {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
+                <InlineEdit value={doc.title}
+                    onSave={v => renameDoc(doc.id, v)}
+                    onCancel={() => setEditingItem(null)} />
+            ) : (
+                <span className="flex-1 text-xs truncate">{doc.title}</span>
+            )}
+            <button onClick={e => {
+                    e.stopPropagation();
+                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                    setCtxMenu({ x: rect.left, y: rect.bottom + 2, items: buildDocMenuItems(doc, folderId, kbId) });
+                }}
+                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                <MoreHorizontal size={12} />
+            </button>
+        </div>
+    );
+
+    // ---- 递归渲染文件夹 ----
+    const renderFolder = (folder: any, kbId: number, parentId?: number) => (
+        <div key={folder.id}>
+            <div className="flex items-center px-2 py-1.5 hover:bg-gray-100 group cursor-pointer rounded-md transition-colors"
+                onClick={() => toggleFolder(folder.id)}
+                onContextMenu={e => showFolderMenu(e, folder, kbId, parentId)}>
+                <span className="mr-1 text-gray-400">
+                    {expandedFolders[folder.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </span>
+                <Folder size={14} className="mr-2 text-amber-500 shrink-0" />
+                {editingItem?.type === 'folder' && editingItem.id === folder.id ? (
+                    <InlineEdit value={folder.name}
+                        onSave={v => renameFolder(folder.id, v)}
+                        onCancel={() => setEditingItem(null)} />
+                ) : (
+                    <span className="flex-1 text-xs truncate font-medium text-gray-600">{folder.name}</span>
+                )}
+                <button onClick={e => {
+                        e.stopPropagation();
+                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                        setCtxMenu({
+                            x: rect.left, y: rect.bottom + 2,
+                            items: [
+                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
+                                { label: '新建文件夹', icon: <Folder size={14} />, onClick: () => addFolder(kbId, folder.id) },
+                            ]
+                        });
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                    <Plus size={12} />
+                </button>
+                <button onClick={e => {
+                        e.stopPropagation();
+                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                        setCtxMenu({
+                            x: rect.left, y: rect.bottom + 2,
+                            items: [
+                                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
+                                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(folder.id) },
+                                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
+                                'divider',
+                                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
+                            ]
+                        });
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                    <MoreHorizontal size={12} />
                 </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-2">
-                {kbs.map(kb => (
-                    <div key={kb.id} className="mb-1">
-                        <div
-                            className="flex items-center px-3 py-1.5 hover:bg-gray-200 group cursor-pointer rounded-md transition-colors"
-                            onClick={() => toggleKb(kb.id)}
-                        >
-                            <Library size={16} className="mr-2 text-indigo-500" />
-                            <span className="flex-1 text-sm truncate font-medium text-gray-700">{kb.name}</span>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); addFolder(kb.id); }}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-300 rounded text-gray-500 transition-opacity"
-                            >
-                                <Plus size={14} />
-                            </button>
-                            <span className="ml-1 text-gray-400">
-                                {expandedKbs[kb.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </span>
-                        </div>
-                        {expandedKbs[kb.id] && content[`kb_${kb.id}`] && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                {content[`kb_${kb.id}`].map(folder => (
-                                    <div key={folder.id}>
-                                        <div
-                                            className="flex items-center px-3 py-1.5 hover:bg-gray-200 group cursor-pointer rounded-md transition-colors"
-                                            onClick={() => toggleFolder(folder.id)}
-                                        >
-                                            <Folder size={14} className="mr-2 text-amber-500" />
-                                            <span className="flex-1 text-xs truncate font-medium text-gray-600">{folder.name}</span>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); addDoc(folder.id); }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-300 rounded text-gray-500 transition-opacity"
-                                            >
-                                                <Plus size={12} />
-                                            </button>
-                                            <span className="ml-1 text-gray-400">
-                                                {expandedFolders[folder.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                            </span>
-                                        </div>
-                                        {expandedFolders[folder.id] && content[`folder_${folder.id}`] && (
-                                            <div className="ml-4 mt-1 space-y-1">
-                                                {content[`folder_${folder.id}`].map(doc => (
-                                                    <Link
-                                                        key={doc.id}
-                                                        to={`/doc/${doc.id}`}
-                                                        className="flex items-center px-3 py-1.5 hover:bg-gray-200 text-xs text-gray-500 rounded-md transition-colors no-underline"
-                                                    >
-                                                        <FileText size={12} className="mr-2 text-gray-400" />
-                                                        <span className="truncate">{doc.title}</span>
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ))}
+
+            {expandedFolders[folder.id] && (
+                <div className="ml-5">
+                    {(content[`folder_${folder.id}_subfolders`] || []).map((sub: any) =>
+                        renderFolder(sub, kbId, folder.id)
+                    )}
+                    {(content[`folder_${folder.id}_docs`] || []).map((doc: any) =>
+                        renderDoc(doc, folder.id)
+                    )}
+                </div>
+            )}
+        </div>
+    );
+    if (collapsed) return null;
+
+    return (
+        <div className="w-64 bg-[#fafafa] border-r border-gray-200 h-full flex flex-col select-none">
+            {/* 搜索栏 */}
+            <div className="px-3 pt-3 pb-2">
+                <div className="relative">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="搜索文档..."
+                        className="w-full pl-8 pr-8 py-1.5 text-sm bg-gray-100 border-none rounded-md outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 transition-colors placeholder:text-gray-400"
+                    />
+                    {searchQuery && (
+                        <button onClick={() => setSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* 搜索结果 */}
+            {searchResults !== null ? (
+                <div className="flex-1 overflow-y-auto px-2 pb-2">
+                    <div className="px-3 py-1.5 text-xs text-gray-400">
+                        {searchResults.length > 0 ? `找到 ${searchResults.length} 个文档` : '无匹配结果'}
+                    </div>
+                    {searchResults.map(doc => (
+                        <button key={doc.id}
+                            onClick={() => { navigate(`/doc/${doc.id}`); setSearchQuery(''); }}
+                            className={`flex items-center px-3 py-2 w-full text-left text-sm rounded-md transition-colors ${
+                                currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                            }`}>
+                            <FileText size={14} className="mr-2 shrink-0 text-gray-400" />
+                            <span className="truncate">{doc.title}</span>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                /* 文档树 */
+                <div className="flex-1 overflow-y-auto px-2 pb-2">
+                    <div className="px-3 mb-2 flex justify-between items-center">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">知识库</span>
+                        <button onClick={addKb} className="p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors">
+                            <Plus size={14} />
+                        </button>
+                    </div>
+
+                    {kbs.map(kb => (
+                        <div key={kb.id} className="mb-0.5">
+                            {/* 知识库行 */}
+                            <div className="flex items-center px-2 py-1.5 hover:bg-gray-100 group cursor-pointer rounded-md transition-colors"
+                                onClick={() => toggleKb(kb.id)}
+                                onContextMenu={e => showKbMenu(e, kb)}>
+                                <span className="mr-1 text-gray-400">
+                                    {expandedKbs[kb.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                </span>
+                                <Library size={15} className="mr-2 text-indigo-500 shrink-0" />
+                                {editingItem?.type === 'kb' && editingItem.id === kb.id ? (
+                                    <InlineEdit value={kb.name}
+                                        onSave={v => renameKb(kb.id, v)}
+                                        onCancel={() => setEditingItem(null)} />
+                                ) : (
+                                    <span className="flex-1 text-sm truncate font-medium text-gray-700">{kb.name}</span>
+                                )}
+                                <button onClick={e => {
+                                        e.stopPropagation();
+                                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                        setCtxMenu({
+                                            x: rect.left, y: rect.bottom + 2,
+                                            items: [
+                                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                                                { label: '新建文件夹', icon: <Folder size={14} />, onClick: () => addFolder(kb.id) },
+                                            ]
+                                        });
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                                    <Plus size={14} />
+                                </button>
+                                <button onClick={e => {
+                                        e.stopPropagation();
+                                        const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                        setCtxMenu({
+                                            x: rect.left, y: rect.bottom + 2,
+                                            items: [
+                                                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
+                                                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                                                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
+                                                'divider',
+                                                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
+                                            ]
+                                        });
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                                    <MoreHorizontal size={14} />
+                                </button>
+                            </div>
+
+                            {/* 知识库内容：文件夹 + 直属文档 */}
+                            {expandedKbs[kb.id] && (
+                                <div className="ml-3">
+                                    {(content[`kb_${kb.id}_folders`] || []).map((folder: any) =>
+                                        renderFolder(folder, kb.id)
+                                    )}
+                                    {(content[`kb_${kb.id}_docs`] || []).map((doc: any) =>
+                                        renderDoc(doc, undefined, kb.id)
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {kbs.length === 0 && (
+                        <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <Library size={32} className="mx-auto mb-3 text-gray-300" />
+                            <p>还没有知识库</p>
+                            <button onClick={addKb} className="mt-2 text-blue-500 hover:text-blue-600 text-sm">
+                                创建第一个知识库
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* 右键菜单 */}
+            {ctxMenu && <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />}
+
+            {/* 移动文档弹窗 */}
+            {movingDoc && <MoveDialog kbs={kbs} onMove={(fId, kId) => moveDocTo(fId, kId)} onClose={() => setMovingDoc(null)} />}
         </div>
     );
 };
