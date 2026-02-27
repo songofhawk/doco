@@ -36,6 +36,7 @@ import { LinkPopover } from './LinkPopover'
 import { DocSettings } from './DocSettings'
 import { TableOfContents } from './TableOfContents'
 import { TableToolbar } from './TableToolbar'
+import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './PasteMarkdownDialog'
 
 const lowlight = createLowlight(common)
 
@@ -47,6 +48,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     const [bgColor, setBgColor] = useState('#ffffff')
     const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
+    const pasteDialog = usePasteMarkdownDialog()
 
     // 保存文档设置到后端
     const patchDocSettings = useCallback((patch: Record<string, unknown>) => {
@@ -211,6 +213,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             handlePaste(_view, event) {
                 const items = event.clipboardData?.items
                 if (!items) return false
+                // 图片粘贴
                 for (const item of items) {
                     if (item.type.startsWith('image/')) {
                         event.preventDefault()
@@ -223,6 +226,27 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
                         reader.readAsDataURL(file)
                         return true
                     }
+                }
+                // Markdown 粘贴检测
+                const text = event.clipboardData?.getData('text/plain') || ''
+                if (text && detectMarkdown(text)) {
+                    event.preventDefault()
+                    pasteDialog.prompt(text).then((asRichText) => {
+                        if (asRichText && editor) {
+                            // 转换为富文本：通过 setContent 在当前光标位置插入解析后的内容
+                            editor.commands.insertContent(
+                                (editor.storage as any).markdown.parser.parse(text)
+                            )
+                        } else if (editor) {
+                            // 以代码块插入
+                            editor.commands.insertContent({
+                                type: 'codeBlock',
+                                attrs: { language: 'markdown' },
+                                content: [{ type: 'text', text }],
+                            })
+                        }
+                    })
+                    return true
                 }
                 return false
             },
@@ -388,6 +412,13 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
                 )}
                 <EditorContent editor={editor} />
             </div>
+
+            {/* Markdown 粘贴提示弹窗 */}
+            <PasteMarkdownDialog
+                visible={pasteDialog.state.visible}
+                text={pasteDialog.state.text}
+                onChoice={pasteDialog.handleChoice}
+            />
 
             {/* 底部状态栏 */}
             <div className="mt-6 pt-4 border-t border-gray-100 flex items-center text-xs text-gray-400">

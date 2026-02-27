@@ -546,3 +546,94 @@ body {
   background: #f3f4f6;
   margin: 3px 4px;
 }
+
+/* Markdown 粘贴提示弹窗 */
+.paste-md-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: paste-md-fade-in 0.15s ease;
+}
+
+.paste-md-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  padding: 20px 24px;
+  max-width: 420px;
+  width: 90%;
+  animation: paste-md-slide-up 0.15s ease;
+}
+
+.paste-md-dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+
+.paste-md-dialog-preview {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.paste-md-dialog-preview code {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+.paste-md-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.paste-md-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.paste-md-btn-primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.paste-md-btn-primary:hover {
+  background: #2563eb;
+}
+
+.paste-md-btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.paste-md-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+@keyframes paste-md-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes paste-md-slide-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

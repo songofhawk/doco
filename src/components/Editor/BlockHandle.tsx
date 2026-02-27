@@ -387,6 +387,19 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         // 提取块内的纯文本内容
         const textContent = node.textContent
 
+        // 代码块转正文时，如果语言是 markdown，解析为富文本
+        if (type === 'paragraph' && node.type.name === 'codeBlock' && node.attrs.language === 'markdown' && textContent) {
+            const { tr } = editor.state
+            tr.delete(pos, endPos)
+            editor.view.dispatch(tr)
+            const parsed = (editor.storage as any).markdown?.parser?.parse(textContent)
+            if (parsed) {
+                editor.commands.insertContentAt(pos, parsed)
+            }
+            closeMenu()
+            return
+        }
+
         // 用 tr 删除旧块，插入目标类型的新块
         const { tr, schema } = editor.state
         tr.delete(pos, endPos)
