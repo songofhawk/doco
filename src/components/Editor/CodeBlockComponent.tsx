@@ -11,7 +11,7 @@ export const CodeBlockComponent = ({ node, updateAttributes, extension }: any) =
     const languages = extension.options.lowlight.listLanguages() || ['javascript', 'typescript', 'html', 'css', 'json', 'python', 'java', 'cpp', 'rust']
 
     return (
-        <NodeViewWrapper className="code-block border border-gray-200 rounded-lg overflow-hidden my-6 bg-[#0d1117]">
+        <NodeViewWrapper className="code-block rounded-lg overflow-hidden my-6" style={{ backgroundColor: 'var(--color-editor-codeblock-bg)', border: '1px solid var(--color-editor-codeblock-border)' }}>
             <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 text-gray-500 text-xs font-medium">
                 <div className="flex items-center gap-2">
                     <FileCode className="w-4 h-4 text-gray-400" />

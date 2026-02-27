@@ -5,6 +5,29 @@
   --color-primary-100: #dbeafe;
   --color-primary-500: #3b82f6;
   --color-primary-600: #2563eb;
+
+  /* 代码块 */
+  --color-editor-codeblock-bg: #f8f9fa;
+  --color-editor-codeblock-text: #383a42;
+  --color-editor-codeblock-border: #e8eaed;
+
+  /* 行内代码 */
+  --color-editor-code-bg: #f1f3f5;
+  --color-editor-code-text: #ab5959;
+  --color-editor-code-hover-bg: #e9ecef;
+  --color-editor-code-hover-ring: #dbe4ff;
+
+  /* 引用块 */
+  --color-editor-quote-border: #d0d7de;
+  --color-editor-quote-text: #57606a;
+
+  /* 高亮标记 */
+  --color-editor-mark-bg: #fff3bf;
+  --color-editor-mark-hover-bg: #ffe066;
+  --color-editor-mark-hover-ring: #fff9db;
+
+  /* 分割线 */
+  --color-editor-hr: #e5e7eb;
 }
 
 body {
@@ -121,16 +144,16 @@ body {
   }
 
   blockquote {
-    border-left: 3px solid var(--color-primary-500);
+    border-left: 3px solid var(--color-editor-quote-border);
     padding-left: 1rem;
     margin-left: 0;
-    color: #4b5563;
+    color: var(--color-editor-quote-text);
     font-style: italic;
   }
 
   pre {
-    background-color: #0d1117;
-    color: #c9d1d9;
+    background-color: var(--color-editor-codeblock-bg);
+    color: var(--color-editor-codeblock-text);
     padding: 1rem;
     border-radius: 0.5rem;
     overflow-x: auto;
@@ -256,16 +279,16 @@ body {
 
   /* 行内代码 */
   code {
-    background-color: #f3f4f6;
-    color: #ef4444;
+    background-color: var(--color-editor-code-bg);
+    color: var(--color-editor-code-text);
     padding: 0.15em 0.4em;
     border-radius: 0.25rem;
     font-size: 0.875em;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     transition: background-color 0.15s, box-shadow 0.15s;
     &:hover {
-      background-color: #e5e7eb;
-      box-shadow: 0 0 0 2px #dbeafe;
+      background-color: var(--color-editor-code-hover-bg);
+      box-shadow: 0 0 0 2px var(--color-editor-code-hover-ring);
     }
   }
 
@@ -286,19 +309,19 @@ body {
   /* 分割线 */
   hr {
     border: none;
-    border-top: 2px solid #e5e7eb;
+    border-top: 2px solid var(--color-editor-hr);
     margin: 1.5em 0;
   }
 
   /* 高亮标记 */
   mark {
-    background-color: #fef08a;
+    background-color: var(--color-editor-mark-bg);
     padding: 0.1em 0.2em;
     border-radius: 0.15rem;
     transition: background-color 0.15s, box-shadow 0.15s;
     &:hover {
-      background-color: #fde047;
-      box-shadow: 0 0 0 2px #fef9c3;
+      background-color: var(--color-editor-mark-hover-bg);
+      box-shadow: 0 0 0 2px var(--color-editor-mark-hover-ring);
     }
   }
 
@@ -636,4 +659,27 @@ body {
 @keyframes paste-md-slide-up {
   from { opacity: 0; transform: translateY(8px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== 暗色模式预留（跟随系统偏好） ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-editor-codeblock-bg: #1e1e2e;
+    --color-editor-codeblock-text: #cdd6f4;
+    --color-editor-codeblock-border: #313244;
+
+    --color-editor-code-bg: #313244;
+    --color-editor-code-text: #f38ba8;
+    --color-editor-code-hover-bg: #45475a;
+    --color-editor-code-hover-ring: #45475a;
+
+    --color-editor-quote-border: #585b70;
+    --color-editor-quote-text: #a6adc8;
+
+    --color-editor-mark-bg: #5c5226;
+    --color-editor-mark-hover-bg: #7a6d2e;
+    --color-editor-mark-hover-ring: #4a4020;
+
+    --color-editor-hr: #313244;
+  }
 }
