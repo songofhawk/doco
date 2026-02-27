@@ -57,7 +57,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             .catch(() => {})
     }, [docId])
 
-    // 标题防抖保存
+    // 标题防抖保存 + 通知侧边栏同步
     const handleTitleChange = (newTitle: string) => {
         setTitle(newTitle)
         clearTimeout(titleTimerRef.current)
@@ -67,8 +67,19 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: newTitle })
             }).catch(() => {})
+            window.dispatchEvent(new CustomEvent('doc-title-changed', { detail: { docId, title: newTitle } }))
         }, 600)
     }
+
+    // 监听侧边栏重命名 → 同步编辑器标题
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { docId: renamedId, title: newTitle } = (e as CustomEvent).detail
+            if (renamedId === docId) setTitle(newTitle)
+        }
+        window.addEventListener('doc-renamed', handler)
+        return () => window.removeEventListener('doc-renamed', handler)
+    }, [docId])
 
     // 标题输入框自动高度
     const autoResizeTitle = useCallback(() => {

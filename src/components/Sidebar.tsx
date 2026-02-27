@@ -213,6 +213,23 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
         return () => clearTimeout(searchTimerRef.current);
     }, [searchQuery]);
 
+    // 监听编辑器标题变更 → 同步侧边栏文档列表
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { docId, title } = (e as CustomEvent).detail
+            setContent(prev => {
+                const u = { ...prev }
+                for (const k of Object.keys(u)) {
+                    if (k.endsWith('_docs'))
+                        u[k] = u[k].map((d: any) => d.id === docId ? { ...d, title } : d)
+                }
+                return u
+            })
+        }
+        window.addEventListener('doc-title-changed', handler)
+        return () => window.removeEventListener('doc-title-changed', handler)
+    }, [])
+
     const fetchKbs = async () => {
         try {
             const res = await fetch(`${API_BASE}/kb`);
@@ -374,6 +391,8 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
                 }
                 return u;
             });
+            // 通知编辑器同步标题
+            window.dispatchEvent(new CustomEvent('doc-renamed', { detail: { docId, title: newTitle } }))
         } catch {}
         setEditingItem(null);
     };
