@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, LargeBinary
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, LargeBinary, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -30,6 +30,8 @@ class Document(Base):
     title = Column(String, nullable=False)
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
     kb_id = Column(Integer, ForeignKey("knowledge_bases.id"), nullable=True)
+    heading_numbered = Column(Boolean, default=False, nullable=False, server_default="0")
+    bg_color = Column(String, default="#ffffff", nullable=False, server_default="#ffffff")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

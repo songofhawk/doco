@@ -91,6 +91,13 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 return
             }
 
+            // 表格有自己的行列操作手柄，不显示 BlockHandle
+            if (topNode.type.name === 'table') {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+                return
+            }
+
             // 从文档位置反查 DOM 节点
             const domNode = view.nodeDOM(topNodePos) as HTMLElement | null
             if (!domNode || !view.dom.contains(domNode)) {

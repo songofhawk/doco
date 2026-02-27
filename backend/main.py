@@ -118,6 +118,12 @@ async def _migrate_db():
         if "kb_id" not in doc_cols:
             await conn.execute(text("ALTER TABLE documents ADD COLUMN kb_id INTEGER REFERENCES knowledge_bases(id)"))
             logger.info("Migrated: added kb_id to documents")
+        if "heading_numbered" not in doc_cols:
+            await conn.execute(text("ALTER TABLE documents ADD COLUMN heading_numbered BOOLEAN NOT NULL DEFAULT 0"))
+            logger.info("Migrated: added heading_numbered to documents")
+        if "bg_color" not in doc_cols:
+            await conn.execute(text("ALTER TABLE documents ADD COLUMN bg_color VARCHAR NOT NULL DEFAULT '#ffffff'"))
+            logger.info("Migrated: added bg_color to documents")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -177,6 +183,8 @@ class DocBase(BaseModel):
     title: str
     folder_id: Optional[int] = None
     kb_id: Optional[int] = None
+    heading_numbered: bool = False
+    bg_color: str = "#ffffff"
 
 class DocRead(DocBase):
     model_config = ConfigDict(from_attributes=True)
@@ -185,6 +193,8 @@ class DocUpdate(BaseModel):
     title: Optional[str] = None
     folder_id: Optional[int] = None
     kb_id: Optional[int] = None
+    heading_numbered: Optional[bool] = None
+    bg_color: Optional[str] = None
 
 class FolderUpdate(BaseModel):
     name: Optional[str] = None
@@ -294,6 +304,10 @@ async def update_doc(doc_id: str, update: DocUpdate, db: AsyncSession = Depends(
     elif update.kb_id is not None:
         doc.kb_id = update.kb_id
         doc.folder_id = None  # 移入知识库直属时清除文件夹
+    if update.heading_numbered is not None:
+        doc.heading_numbered = update.heading_numbered
+    if update.bg_color is not None:
+        doc.bg_color = update.bg_color
     await db.commit()
     await db.refresh(doc)
     return doc

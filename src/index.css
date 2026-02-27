@@ -423,3 +423,158 @@ body {
 .toc-item.text-blue-600 {
   border-left-color: #3b82f6;
 }
+
+/* ===== 表格样式 ===== */
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.ProseMirror td,
+.ProseMirror th {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  position: relative;
+  min-width: 80px;
+}
+
+.ProseMirror th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ProseMirror td > *,
+.ProseMirror th > * {
+  margin: 0;
+}
+
+/* 选中单元格高亮 */
+.ProseMirror .selectedCell {
+  background-color: #dbeafe;
+}
+
+/* 列拖拽调整宽度手柄 */
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #3b82f6;
+  pointer-events: none;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ===== 表格行列操作手柄 ===== */
+.table-handle {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.table-handle:hover,
+.table-handle.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.table-col-handle {
+  height: 18px;
+}
+
+.table-row-handle {
+  width: 18px;
+}
+
+/* 添加行/列按钮 */
+.table-add-btn {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #d1d5db;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.table-add-btn:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.table-add-row {
+  height: 18px;
+}
+
+.table-add-col {
+  width: 18px;
+}
+
+/* 表格操作菜单 */
+.table-menu {
+  position: absolute;
+  z-index: 50;
+}
+
+.table-menu-inner {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  min-width: 150px;
+}
+
+.table-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  text-align: left;
+}
+
+.table-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.table-menu-item.danger {
+  color: #ef4444;
+}
+
+.table-menu-item.danger:hover {
+  background: #fef2f2;
+}
+
+.table-menu-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 3px 4px;
+}

@@ -12,6 +12,10 @@ import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, 
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import Collaboration from '@tiptap/extension-collaboration'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableCell } from '@tiptap/extension-table-cell'
 import { ResizableImage } from './ResizableImage'
 import html2pdf from 'html2pdf.js'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
@@ -31,6 +35,7 @@ import { InlineMarkToolbar } from './InlineMarkToolbar'
 import { LinkPopover } from './LinkPopover'
 import { DocSettings } from './DocSettings'
 import { TableOfContents } from './TableOfContents'
+import { TableToolbar } from './TableToolbar'
 
 const lowlight = createLowlight(common)
 
@@ -42,6 +47,15 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     const [bgColor, setBgColor] = useState('#ffffff')
     const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
+
+    // 保存文档设置到后端
+    const patchDocSettings = useCallback((patch: Record<string, unknown>) => {
+        fetch(`http://127.0.0.1:8000/api/docs/${docId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch)
+        }).catch(() => {})
+    }, [docId])
 
     const ydoc = useMemo(() => new Y.Doc(), [docId])
     const provider = useMemo(() => {
@@ -58,11 +72,16 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         return () => { clearTimeout(timer); provider.disconnect() }
     }, [provider])
 
-    // 加载文档标题
+    // 加载文档标题和设置
     useEffect(() => {
         fetch(`http://127.0.0.1:8000/api/docs/${docId}`)
             .then(r => r.ok ? r.json() : null)
-            .then(d => { if (d?.title) setTitle(d.title) })
+            .then(d => {
+                if (!d) return
+                if (d.title) setTitle(d.title)
+                if (d.heading_numbered !== undefined) setHeadingNumbered(d.heading_numbered)
+                if (d.bg_color) setBgColor(d.bg_color)
+            })
             .catch(() => {})
     }, [docId])
 
@@ -102,10 +121,14 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
 
     // 监听 Cmd+Shift+N 快捷键切换标题编号
     useEffect(() => {
-        const handler = () => setHeadingNumbered(v => !v)
+        const handler = () => setHeadingNumbered(v => {
+            const next = !v
+            patchDocSettings({ heading_numbered: next })
+            return next
+        })
         window.addEventListener('toggle-heading-numbered', handler)
         return () => window.removeEventListener('toggle-heading-numbered', handler)
-    }, [])
+    }, [patchDocSettings])
 
     // 标题输入框自动高度
     const autoResizeTitle = useCallback(() => {
@@ -144,6 +167,10 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         Markdown,
         MermaidBlock,
         PlantUMLBlock,
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableHeader,
+        TableCell,
         SlashCommand.configure({
             suggestion: {
                 items: getSuggestionItems,
@@ -258,9 +285,16 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <DocSettings
                     headingNumbered={headingNumbered}
-                    onToggleNumbered={() => setHeadingNumbered(v => !v)}
+                    onToggleNumbered={() => setHeadingNumbered(v => {
+                        const next = !v
+                        patchDocSettings({ heading_numbered: next })
+                        return next
+                    })}
                     bgColor={bgColor}
-                    onBgColorChange={setBgColor}
+                    onBgColorChange={(c: string) => {
+                        setBgColor(c)
+                        patchDocSettings({ bg_color: c })
+                    }}
                 />
             </div>
 
@@ -275,10 +309,11 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
                 className="w-full text-3xl font-bold text-gray-900 border-none outline-none resize-none bg-transparent placeholder:text-gray-300 mb-4 leading-snug"
             />
 
-            <div className="tiptap-editor-container">
+            <div className="tiptap-editor-container relative">
                 {editor && <FloatingToolbar editor={editor} />}
                 {editor && <BlockHandle editor={editor} />}
                 {editor && <InlineMarkToolbar editor={editor} />}
+                {editor && <TableToolbar editor={editor} />}
                 {editor && linkPopover && (
                     <LinkPopover
                         editor={editor}
