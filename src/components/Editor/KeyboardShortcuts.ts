@@ -128,6 +128,12 @@ export const KeyboardShortcuts = Extension.create({
                 return false
             },
 
+            // Cmd+Shift+J: 切换标题多级编号
+            'Mod-Shift-j': () => {
+                window.dispatchEvent(new CustomEvent('toggle-heading-numbered'))
+                return true
+            },
+
             // Cmd+K: 添加/编辑链接（通过自定义事件触发弹层）
             'Mod-k': ({ editor }) => {
                 const coords = editor.view.coordsAtPos(editor.state.selection.from)

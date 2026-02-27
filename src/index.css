@@ -42,8 +42,6 @@ body {
 .ProseMirror {
   outline: none;
   min-height: 100%;
-  counter-reset: h1;
-
   >*+* {
     margin-top: 0.75em;
   }
@@ -62,14 +60,6 @@ body {
     margin-bottom: 0.5em;
     font-weight: 700;
     line-height: 1.2;
-    counter-reset: h2;
-  }
-
-  h1::before {
-    counter-increment: h1;
-    content: counter(h1) ". ";
-    color: #9ca3af;
-    margin-right: 0.5rem;
   }
 
   h2 {
@@ -78,14 +68,6 @@ body {
     margin-bottom: 0.5em;
     font-weight: 600;
     line-height: 1.2;
-    counter-reset: h3;
-  }
-
-  h2::before {
-    counter-increment: h2;
-    content: counter(h1) "." counter(h2) " ";
-    color: #9ca3af;
-    margin-right: 0.5rem;
   }
 
   h3 {
@@ -94,14 +76,6 @@ body {
     margin-bottom: 0.5em;
     font-weight: 600;
     line-height: 1.2;
-    counter-reset: h4;
-  }
-
-  h3::before {
-    counter-increment: h3;
-    content: counter(h1) "." counter(h2) "." counter(h3) " ";
-    color: #9ca3af;
-    margin-right: 0.5rem;
   }
 
   h4 {
@@ -112,11 +86,38 @@ body {
     line-height: 1.2;
   }
 
-  h4::before {
-    counter-increment: h4;
-    content: counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) " ";
-    color: #9ca3af;
-    margin-right: 0.5rem;
+  /* 标题多级编号（受 .heading-numbered 控制） */
+  &.heading-numbered {
+    counter-reset: h1;
+
+    h1 { counter-reset: h2; }
+    h2 { counter-reset: h3; }
+    h3 { counter-reset: h4; }
+
+    h1::before {
+      counter-increment: h1;
+      content: counter(h1) ". ";
+      color: #9ca3af;
+      margin-right: 0.5rem;
+    }
+    h2::before {
+      counter-increment: h2;
+      content: counter(h1) "." counter(h2) " ";
+      color: #9ca3af;
+      margin-right: 0.5rem;
+    }
+    h3::before {
+      counter-increment: h3;
+      content: counter(h1) "." counter(h2) "." counter(h3) " ";
+      color: #9ca3af;
+      margin-right: 0.5rem;
+    }
+    h4::before {
+      counter-increment: h4;
+      content: counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) " ";
+      color: #9ca3af;
+      margin-right: 0.5rem;
+    }
   }
 
   ul {
@@ -358,4 +359,67 @@ body {
     user-select: none;
     white-space: nowrap;
   }
+}
+
+/* 目录导航 */
+.toc-aside {
+  position: fixed;
+  top: 5rem;
+  z-index: 20;
+}
+
+.toc-trigger {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.toc-trigger:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.toc-panel {
+  position: absolute;
+  top: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem 0.5rem;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
+.toc-panel-visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.toc-item {
+  display: block;
+  line-height: 1.6;
+  border-left: 2px solid transparent;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.toc-item:hover {
+  border-left-color: #d1d5db;
+}
+
+.toc-item.text-blue-600 {
+  border-left-color: #3b82f6;
 }

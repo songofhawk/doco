@@ -29,6 +29,8 @@ import { BlockHandle } from './BlockHandle'
 import { KeyboardShortcuts } from './KeyboardShortcuts'
 import { InlineMarkToolbar } from './InlineMarkToolbar'
 import { LinkPopover } from './LinkPopover'
+import { DocSettings } from './DocSettings'
+import { TableOfContents } from './TableOfContents'
 
 const lowlight = createLowlight(common)
 
@@ -36,6 +38,8 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     const [title, setTitle] = useState('')
     const [wordCount, setWordCount] = useState(0)
     const [linkPopover, setLinkPopover] = useState<{ top: number; left: number; href: string } | null>(null)
+    const [headingNumbered, setHeadingNumbered] = useState(false)
+    const [bgColor, setBgColor] = useState('#ffffff')
     const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -94,6 +98,13 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         }
         window.addEventListener('editor-link-edit', handler)
         return () => window.removeEventListener('editor-link-edit', handler)
+    }, [])
+
+    // 监听 Cmd+Shift+N 快捷键切换标题编号
+    useEffect(() => {
+        const handler = () => setHeadingNumbered(v => !v)
+        window.addEventListener('toggle-heading-numbered', handler)
+        return () => window.removeEventListener('toggle-heading-numbered', handler)
     }, [])
 
     // 标题输入框自动高度
@@ -203,6 +214,13 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         return () => { editor.off('update', update) }
     }, [editor])
 
+    // 同步标题编号 class 到 ProseMirror DOM
+    useEffect(() => {
+        const el = editor?.view?.dom
+        if (!el) return
+        el.classList.toggle('heading-numbered', headingNumbered)
+    }, [editor, headingNumbered])
+
     useImperativeHandle(ref, () => ({
         exportMarkdown: () => {
             if (!editor) return
@@ -231,7 +249,21 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
     }))
 
     return (
-        <div className="w-full max-w-4xl mx-auto bg-white min-h-[80vh] shadow-sm rounded-lg mt-6 p-10 px-14 border border-gray-100 relative group">
+        <div className="w-full max-w-4xl mx-auto min-h-[80vh] shadow-sm rounded-lg mt-6 p-10 px-14 border border-gray-100 relative group transition-colors"
+            style={{ backgroundColor: bgColor }}
+        >
+            {/* 左侧目录导航 — 绝对定位在卡片左侧外部 */}
+            {editor && <TableOfContents editor={editor} headingNumbered={headingNumbered} />}
+            {/* 文档设置按钮 */}
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <DocSettings
+                    headingNumbered={headingNumbered}
+                    onToggleNumbered={() => setHeadingNumbered(v => !v)}
+                    bgColor={bgColor}
+                    onBgColorChange={setBgColor}
+                />
+            </div>
+
             {/* 可编辑标题 */}
             <textarea
                 ref={titleInputRef}
