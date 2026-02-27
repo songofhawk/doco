@@ -63,6 +63,60 @@ const InlineEdit = ({ value, onSave, onCancel }: {
     );
 };
 
+/* ---- 输入对话框 ---- */
+const InputDialog = ({ title, placeholder, onConfirm, onClose }: {
+    title: string;
+    placeholder?: string;
+    onConfirm: (value: string) => void;
+    onClose: () => void;
+}) => {
+    const [value, setValue] = useState('');
+    const ref = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => { inputRef.current?.focus(); }, []);
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [onClose]);
+
+    const handleSubmit = () => {
+        if (value.trim()) { onConfirm(value.trim()); onClose(); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div ref={ref} className="bg-white rounded-xl shadow-2xl w-80 overflow-hidden">
+                <div className="px-5 pt-5 pb-3">
+                    <h3 className="text-sm font-medium text-gray-800 mb-3">{title}</h3>
+                    <input
+                        ref={inputRef}
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); if (e.key === 'Escape') onClose(); }}
+                        placeholder={placeholder}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-gray-300"
+                    />
+                </div>
+                <div className="flex justify-end gap-2 px-5 pb-4 pt-1">
+                    <button onClick={onClose}
+                        className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        取消
+                    </button>
+                    <button onClick={handleSubmit}
+                        disabled={!value.trim()}
+                        className="px-3 py-1.5 text-xs text-white bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors">
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 /* ---- 移动文档弹窗 ---- */
 const MoveDialog = ({ kbs, onMove, onClose }: {
     kbs: any[];
@@ -148,6 +202,10 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
     const [editingItem, setEditingItem] = useState<{ type: string; id: number | string } | null>(null);
     const [movingDoc, setMovingDoc] = useState<{ docId: string; fromFolderId?: number; fromKbId?: number } | null>(null);
+    const [inputDialog, setInputDialog] = useState<{
+        title: string; placeholder?: string;
+        onConfirm: (value: string) => void;
+    } | null>(null);
     const navigate = useNavigate();
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -270,81 +328,88 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
     };
 
     // ---- 创建 ----
-    const addKb = async () => {
-        const name = prompt('请输入知识库名称:');
-        if (!name) return;
-        try {
-            const res = await fetch(`${API_BASE}/kb`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-            if (res.ok) await fetchKbs();
-        } catch {}
+    const addKb = () => {
+        setInputDialog({
+            title: '新建知识库', placeholder: '请输入知识库名称',
+            onConfirm: async (name) => {
+                try {
+                    const res = await fetch(`${API_BASE}/kb`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    if (res.ok) await fetchKbs();
+                } catch {}
+            }
+        });
     };
 
-    const addFolder = async (kbId: number, parentId?: number) => {
-        const name = prompt('请输入文件夹名称:');
-        if (!name) return;
-        try {
-            const body: any = { name, kb_id: kbId };
-            if (parentId) body.parent_id = parentId;
-            const res = await fetch(`${API_BASE}/folders`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            if (res.ok) {
-                if (parentId) {
-                    // 刷新父文件夹的子文件夹列表
-                    const r2 = await fetch(`${API_BASE}/folders/${parentId}/subfolders`);
-                    if (r2.ok) {
-                        const subfolders = await r2.json();
-                        setContent(prev => ({ ...prev, [`folder_${parentId}_subfolders`]: subfolders }));
+    const addFolder = (kbId: number, parentId?: number) => {
+        setInputDialog({
+            title: '新建文件夹', placeholder: '请输入文件夹名称',
+            onConfirm: async (name) => {
+                try {
+                    const body: any = { name, kb_id: kbId };
+                    if (parentId) body.parent_id = parentId;
+                    const res = await fetch(`${API_BASE}/folders`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (res.ok) {
+                        if (parentId) {
+                            const r2 = await fetch(`${API_BASE}/folders/${parentId}/subfolders`);
+                            if (r2.ok) {
+                                const subfolders = await r2.json();
+                                setContent(prev => ({ ...prev, [`folder_${parentId}_subfolders`]: subfolders }));
+                            }
+                            setExpandedFolders(prev => ({ ...prev, [parentId]: true }));
+                        } else {
+                            const r2 = await fetch(`${API_BASE}/kb/${kbId}/folders`);
+                            if (r2.ok) {
+                                const folders = await r2.json();
+                                setContent(prev => ({ ...prev, [`kb_${kbId}_folders`]: folders }));
+                            }
+                            setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
+                        }
                     }
-                    setExpandedFolders(prev => ({ ...prev, [parentId]: true }));
-                } else {
-                    // 刷新知识库的顶层文件夹列表
-                    const r2 = await fetch(`${API_BASE}/kb/${kbId}/folders`);
-                    if (r2.ok) {
-                        const folders = await r2.json();
-                        setContent(prev => ({ ...prev, [`kb_${kbId}_folders`]: folders }));
-                    }
-                    setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
-                }
+                } catch {}
             }
-        } catch {}
+        });
     };
 
-    const addDoc = async (folderId?: number, kbId?: number) => {
-        const title = prompt('请输入文档标题:');
-        if (!title) return;
-        const docId = `doc_${Math.random().toString(36).substr(2, 9)}`;
-        try {
-            const body: any = { id: docId, title };
-            if (folderId) body.folder_id = folderId;
-            if (kbId) body.kb_id = kbId;
-            const res = await fetch(`${API_BASE}/docs`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            if (res.ok) {
-                if (folderId) {
-                    const r2 = await fetch(`${API_BASE}/folders/${folderId}/docs`);
-                    if (r2.ok) {
-                        const docs = await r2.json();
-                        setContent(prev => ({ ...prev, [`folder_${folderId}_docs`]: docs }));
+    const addDoc = (folderId?: number, kbId?: number) => {
+        setInputDialog({
+            title: '新建文档', placeholder: '请输入文档标题',
+            onConfirm: async (title) => {
+                const docId = `doc_${Math.random().toString(36).substr(2, 9)}`;
+                try {
+                    const body: any = { id: docId, title };
+                    if (folderId) body.folder_id = folderId;
+                    if (kbId) body.kb_id = kbId;
+                    const res = await fetch(`${API_BASE}/docs`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (res.ok) {
+                        if (folderId) {
+                            const r2 = await fetch(`${API_BASE}/folders/${folderId}/docs`);
+                            if (r2.ok) {
+                                const docs = await r2.json();
+                                setContent(prev => ({ ...prev, [`folder_${folderId}_docs`]: docs }));
+                            }
+                            setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
+                        } else if (kbId) {
+                            const r2 = await fetch(`${API_BASE}/kb/${kbId}/docs`);
+                            if (r2.ok) {
+                                const docs = await r2.json();
+                                setContent(prev => ({ ...prev, [`kb_${kbId}_docs`]: docs }));
+                            }
+                            setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
+                        }
+                        navigate(`/doc/${docId}`);
                     }
-                    setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
-                } else if (kbId) {
-                    const r2 = await fetch(`${API_BASE}/kb/${kbId}/docs`);
-                    if (r2.ok) {
-                        const docs = await r2.json();
-                        setContent(prev => ({ ...prev, [`kb_${kbId}_docs`]: docs }));
-                    }
-                    setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
-                }
-                navigate(`/doc/${docId}`);
+                } catch {}
             }
-        } catch {}
+        });
     };
 
     // ---- 重命名 ----
@@ -749,6 +814,16 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
 
             {/* 移动文档弹窗 */}
             {movingDoc && <MoveDialog kbs={kbs} onMove={(fId, kId) => moveDocTo(fId, kId)} onClose={() => setMovingDoc(null)} />}
+
+            {/* 输入对话框 */}
+            {inputDialog && (
+                <InputDialog
+                    title={inputDialog.title}
+                    placeholder={inputDialog.placeholder}
+                    onConfirm={inputDialog.onConfirm}
+                    onClose={() => setInputDialog(null)}
+                />
+            )}
         </div>
     );
 };

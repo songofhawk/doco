@@ -86,39 +86,7 @@ body {
     line-height: 1.2;
   }
 
-  /* 标题多级编号（受 .heading-numbered 控制） */
-  &.heading-numbered {
-    counter-reset: h1;
-
-    h1 { counter-reset: h2; }
-    h2 { counter-reset: h3; }
-    h3 { counter-reset: h4; }
-
-    h1::before {
-      counter-increment: h1;
-      content: counter(h1) ". ";
-      color: #9ca3af;
-      margin-right: 0.5rem;
-    }
-    h2::before {
-      counter-increment: h2;
-      content: counter(h1) "." counter(h2) " ";
-      color: #9ca3af;
-      margin-right: 0.5rem;
-    }
-    h3::before {
-      counter-increment: h3;
-      content: counter(h1) "." counter(h2) "." counter(h3) " ";
-      color: #9ca3af;
-      margin-right: 0.5rem;
-    }
-    h4::before {
-      counter-increment: h4;
-      content: counter(h1) "." counter(h2) "." counter(h3) "." counter(h4) " ";
-      color: #9ca3af;
-      margin-right: 0.5rem;
-    }
-  }
+  /* 标题多级编号样式由 JS 动态注入（见 index.tsx doco-heading-numbering） */
 
   ul {
     list-style-type: disc;

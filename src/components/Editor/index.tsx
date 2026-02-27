@@ -241,14 +241,77 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         return () => { editor.off('update', update) }
     }, [editor])
 
-    // 同步标题编号 class 到 ProseMirror DOM
+    // 同步标题编号：动态生成 CSS counter 规则适配最小标题级别
+    const [minHeadingLevel, setMinHeadingLevel] = useState(1)
     useEffect(() => {
         const el = editor?.view?.dom
         if (!el) return
         el.classList.toggle('heading-numbered', headingNumbered)
+
+        const detectMinLevel = () => {
+            let min = 4
+            editor.state.doc.descendants((node) => {
+                if (node.type.name === 'heading' && node.attrs.level < min) {
+                    min = node.attrs.level as number
+                }
+            })
+            setMinHeadingLevel(prev => prev !== min ? min : prev)
+        }
+        detectMinLevel()
+        editor.on('update', detectMinLevel)
+        return () => { editor.off('update', detectMinLevel) }
     }, [editor, headingNumbered])
 
+    // 注入动态 CSS counter 规则
+    useEffect(() => {
+        const styleId = 'doco-heading-numbering'
+        let style = document.getElementById(styleId) as HTMLStyleElement | null
+        if (!style) {
+            style = document.createElement('style')
+            style.id = styleId
+            document.head.appendChild(style)
+        }
+        if (!headingNumbered) {
+            style.textContent = ''
+            return
+        }
+        // 根据 minHeadingLevel 生成 counter 规则
+        // 例如 minLevel=2 时，h2 作为第一级，h3 作为第二级
+        const tags = ['h1', 'h2', 'h3', 'h4']
+        const used = tags.slice(minHeadingLevel - 1) // 从 minLevel 开始的标签
+        const counterNames = used.map((_, i) => `hn${i + 1}`)
+
+        let css = `.ProseMirror.heading-numbered {\n`
+        css += `  counter-reset: ${counterNames.join(' ')};\n`
+        // 每级标题重置下级计数器
+        used.forEach((tag, i) => {
+            const resets = counterNames.slice(i + 1)
+            if (resets.length) css += `  ${tag} { counter-reset: ${resets.join(' ')}; }\n`
+        })
+        // 每级标题的 ::before 编号
+        used.forEach((tag, i) => {
+            const parts = counterNames.slice(0, i + 1).map(c => `counter(${c})`).join(' "."')
+            const suffix = i === 0 ? ' ". "' : ' " "'
+            css += `  ${tag}::before {\n`
+            css += `    counter-increment: ${counterNames[i]};\n`
+            css += `    content: ${parts}${suffix};\n`
+            css += `    color: #9ca3af; margin-right: 0.5rem;\n`
+            css += `  }\n`
+        })
+        css += `}`
+        style.textContent = css
+        return () => { style!.textContent = '' }
+    }, [headingNumbered, minHeadingLevel])
+
     useImperativeHandle(ref, () => ({
+        importMarkdown: (markdown: string) => {
+            if (!editor) return
+            editor.commands.setContent(markdown)
+        },
+        importHTML: (html: string) => {
+            if (!editor) return
+            editor.commands.setContent(html)
+        },
         exportMarkdown: () => {
             if (!editor) return
             const md = (editor.storage as any).markdown.getMarkdown()

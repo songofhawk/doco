@@ -107,16 +107,19 @@ export function TableOfContents({ editor, headingNumbered }: { editor: Editor; h
     return null
   }
 
-  // 计算多级编号（与 CSS counter 逻辑一致）
+  // 计算多级编号（自动适配最小标题级别）
+  const minLevel = items.length > 0 ? Math.min(...items.map(i => i.level)) : 1
   const getNumbering = (index: number): string => {
     if (!headingNumbered) return ''
-    const counters = [0, 0, 0, 0]
+    const depth = 4
+    const counters = new Array(depth).fill(0)
     for (let i = 0; i <= index; i++) {
-      const lvl = items[i].level
-      counters[lvl - 1]++
-      for (let j = lvl; j < 4; j++) counters[j] = 0
+      const lvl = items[i].level - minLevel // 归一化：最小级别 → 0
+      counters[lvl]++
+      for (let j = lvl + 1; j < depth; j++) counters[j] = 0
     }
-    return counters.slice(0, items[index].level).join('.') + ' '
+    const cur = items[index].level - minLevel
+    return counters.slice(0, cur + 1).join('.') + ' '
   }
 
   const indent: Record<number, string> = {
