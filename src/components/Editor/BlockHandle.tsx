@@ -5,7 +5,7 @@ import {
     GripVertical, Plus, Trash2, Copy, Scissors, ArrowDownToLine,
     ArrowUpToLine, CopyPlus, Type, Heading1, Heading2, Heading3,
     List, ListOrdered, ListChecks, Quote, Code, ChevronRight,
-    FileText, Pilcrow
+    FileText, Pilcrow, ChevronsUpDown
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -98,9 +98,17 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 return
             }
 
-            // 从文档位置反查 DOM 节点
-            const domNode = view.nodeDOM(topNodePos) as HTMLElement | null
+            // 从文档位置反查 DOM 节点，向上查找到编辑器直接子元素
+            let domNode = view.nodeDOM(topNodePos) as HTMLElement | null
             if (!domNode || !view.dom.contains(domNode)) {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+                return
+            }
+            while (domNode && domNode.parentElement !== view.dom) {
+                domNode = domNode.parentElement
+            }
+            if (!domNode) {
                 setHandlePos({ top: -999, left: -999 })
                 setHoveredNode(null)
                 return
@@ -155,13 +163,35 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
 
     const closeMenu = () => { setIsOpen(false); setShowConvertMenu(false); setFocusIndex(-1) }
 
+    // 判断当前块是否已折叠
+    const isCollapsed = (): boolean => {
+        const pos = getNodePos()
+        if (pos === null) return false
+        return ((editor.storage as any).collapse?.collapsed as Set<number>)?.has(pos) ?? false
+    }
+
+    // 判断当前块是否可折叠（多行内容才可以）
+    const canCollapse = (): boolean => {
+        if (!hoveredNode) return false
+        if (isCollapsed()) return true
+        return hoveredNode.scrollHeight > 60
+    }
+
+    const handleToggleCollapse = () => {
+        const pos = getNodePos()
+        if (pos === null) return
+        ;(editor.commands as any).toggleCollapse(pos)
+        closeMenu()
+    }
+
     // ---- 键盘导航 ----
     const [focusIndex, setFocusIndex] = useState(-1)
     const menuRef = useRef<HTMLDivElement>(null)
     const convertMenuRef = useRef<HTMLDivElement>(null)
 
     // 主菜单项定义（用于键盘导航索引）
-    const MAIN_MENU_COUNT = 10 // 转换为 + 剪切/复制/复制纯文本/复制MD + 复制块/上移/下移/插入 + 删除
+    const showCollapse = canCollapse()
+    const MAIN_MENU_COUNT = showCollapse ? 11 : 10
     const CONVERT_MENU_COUNT = 9
 
     // 菜单打开时重置焦点并聚焦容器
@@ -182,19 +212,19 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         }
     }, [showConvertMenu])
 
-    // 主菜单项 action 映射（与渲染顺序一致）
-    const getMainActions = useCallback(() => [
-        () => { setShowConvertMenu(true) },       // 0: 转换为
-        handleCut,                                  // 1: 剪切
-        handleCopy,                                 // 2: 复制
-        handleCopyAsText,                           // 3: 复制为纯文本
-        handleCopyAsMarkdown,                       // 4: 复制为 Markdown
-        handleDuplicate,                            // 5: 复制块
-        handleMoveUp,                               // 6: 向上移动
-        handleMoveDown,                             // 7: 向下移动
-        handleAddBelow,                             // 8: 在下方插入
-        handleDelete,                               // 9: 删除
-    ], [])
+    // 主菜单项 action 映射（与渲染顺序一致，动态包含折叠项）
+    const getMainActions = useCallback(() => {
+        const actions: (() => void)[] = [
+            () => { setShowConvertMenu(true) },
+        ]
+        if (showCollapse) actions.push(handleToggleCollapse)
+        actions.push(
+            handleCut, handleCopy, handleCopyAsText, handleCopyAsMarkdown,
+            handleDuplicate, handleMoveUp, handleMoveDown, handleAddBelow,
+            handleDelete,
+        )
+        return actions
+    }, [showCollapse])
 
     // 转换子菜单项 action 映射
     const getConvertActions = useCallback(() => [
@@ -456,6 +486,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
 
     const fi = showConvertMenu ? -1 : focusIndex // 主菜单焦点（子菜单打开时禁用）
     const ci = showConvertMenu ? focusIndex : -1  // 子菜单焦点
+    const o = showCollapse ? 1 : 0 // 折叠项占位偏移
 
     return (
         <div
@@ -505,25 +536,33 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
 
                             <div className="h-px bg-gray-100 my-1" />
 
+                            {/* 折叠/展开（仅多行块显示） */}
+                            {showCollapse && (
+                                <>
+                                    <MenuItem icon={ChevronsUpDown} label={isCollapsed() ? '展开' : '折叠'} onClick={handleToggleCollapse} focused={fi === 1} />
+                                    <div className="h-px bg-gray-100 my-1" />
+                                </>
+                            )}
+
                             {/* 剪切 / 复制 / 粘贴区 */}
-                            <MenuItem icon={Scissors} label="剪切" shortcut="⌘X" onClick={handleCut} focused={fi === 1} />
-                            <MenuItem icon={Copy} label="复制" shortcut="⌘C" onClick={handleCopy} focused={fi === 2} />
-                            <MenuItem icon={FileText} label="复制为纯文本" onClick={handleCopyAsText} focused={fi === 3} />
-                            <MenuItem icon={Code} label="复制为 Markdown" onClick={handleCopyAsMarkdown} focused={fi === 4} />
+                            <MenuItem icon={Scissors} label="剪切" shortcut="⌘X" onClick={handleCut} focused={fi === 1 + o} />
+                            <MenuItem icon={Copy} label="复制" shortcut="⌘C" onClick={handleCopy} focused={fi === 2 + o} />
+                            <MenuItem icon={FileText} label="复制为纯文本" onClick={handleCopyAsText} focused={fi === 3 + o} />
+                            <MenuItem icon={Code} label="复制为 Markdown" onClick={handleCopyAsMarkdown} focused={fi === 4 + o} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 块操作区 */}
-                            <MenuItem icon={CopyPlus} label="复制块" shortcut="⌘D" onClick={handleDuplicate} focused={fi === 5} />
-                            <MenuItem icon={ArrowUpToLine} label="向上移动" shortcut="⌥↑" onClick={handleMoveUp} focused={fi === 6} />
-                            <MenuItem icon={ArrowDownToLine} label="向下移动" shortcut="⌥↓" onClick={handleMoveDown} focused={fi === 7} />
-                            <MenuItem icon={Plus} label="在下方插入" shortcut="⌘⏎" onClick={handleAddBelow} focused={fi === 8} />
+                            <MenuItem icon={CopyPlus} label="复制块" shortcut="⌘D" onClick={handleDuplicate} focused={fi === 5 + o} />
+                            <MenuItem icon={ArrowUpToLine} label="向上移动" shortcut="⌥↑" onClick={handleMoveUp} focused={fi === 6 + o} />
+                            <MenuItem icon={ArrowDownToLine} label="向下移动" shortcut="⌥↓" onClick={handleMoveDown} focused={fi === 7 + o} />
+                            <MenuItem icon={Plus} label="在下方插入" shortcut="⌘⏎" onClick={handleAddBelow} focused={fi === 8 + o} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 删除 */}
                             <button
-                                className={`flex items-center px-3 py-1.5 text-red-600 rounded-md transition-colors w-full text-left ${fi === 9 ? 'bg-red-50' : 'hover:bg-red-50'}`}
+                                className={`flex items-center px-3 py-1.5 text-red-600 rounded-md transition-colors w-full text-left ${fi === 9 + o ? 'bg-red-50' : 'hover:bg-red-50'}`}
                                 onClick={handleDelete}
                             >
                                 <Trash2 className="w-4 h-4 mr-3 text-red-400" />

@@ -30,6 +30,7 @@ import { ReactNodeViewRenderer } from '@tiptap/react'
 import { CodeBlockComponent } from './CodeBlockComponent'
 import { FloatingToolbar } from './BubbleMenu'
 import { BlockHandle } from './BlockHandle'
+import { CollapseExtension } from './CollapseExtension'
 import { KeyboardShortcuts } from './KeyboardShortcuts'
 import { InlineMarkToolbar } from './InlineMarkToolbar'
 import { LinkPopover } from './LinkPopover'
@@ -185,6 +186,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
             provider: provider,
         }),
         KeyboardShortcuts,
+        CollapseExtension,
     ], [ydoc, provider])
 
     const editor = useEditor({
