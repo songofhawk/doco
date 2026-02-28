@@ -5,7 +5,7 @@ import {
     GripVertical, Plus, Trash2, Copy, Scissors, ArrowDownToLine,
     ArrowUpToLine, CopyPlus, Type, Heading1, Heading2, Heading3,
     List, ListOrdered, ListChecks, Quote, Code, ChevronRight,
-    FileText, Pilcrow, ChevronsUpDown
+    FileText, Pilcrow, ChevronsUpDown, Minus
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -198,7 +198,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
     // 主菜单项定义（用于键盘导航索引）
     const showCollapse = canCollapse()
     const MAIN_MENU_COUNT = showCollapse ? 11 : 10
-    const CONVERT_MENU_COUNT = 9
+    const CONVERT_MENU_COUNT = 10
 
     // 菜单打开时重置焦点并聚焦容器
     useEffect(() => {
@@ -243,6 +243,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         () => handleConvert('taskList'),
         () => handleConvert('blockquote'),
         () => handleConvert('codeBlock'),
+        () => handleConvert('horizontalRule'),
     ], [])
 
     const handleMainKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -477,6 +478,9 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 newNode = schema.nodes.codeBlock.create(null,
                     textContent ? schema.text(textContent) : null)
                 break
+            case 'horizontalRule':
+                newNode = schema.nodes.horizontalRule.create()
+                break
         }
 
         if (newNode) {
@@ -597,6 +601,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                                 <div className="h-px bg-gray-100 my-1" />
                                 <ConvertItem icon={Quote} label="引用" onClick={() => handleConvert('blockquote')} focused={ci === 7} />
                                 <ConvertItem icon={Code} label="代码块" onClick={() => handleConvert('codeBlock')} focused={ci === 8} />
+                                <ConvertItem icon={Minus} label="分隔线" onClick={() => handleConvert('horizontalRule')} focused={ci === 9} />
                             </div>
                         )}
                     </Popover.Content>

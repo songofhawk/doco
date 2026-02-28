@@ -1,7 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
-import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus } from 'lucide-react'
 
 export const getSuggestionItems = ({ query }: { query: string }) => {
     return [
@@ -106,6 +106,14 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                 editor.chain().focus().deleteRange(range)
                     .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
                     .run()
+            },
+        },
+        {
+            title: '分隔线',
+            description: '插入水平分隔线',
+            icon: Minus,
+            command: ({ editor, range }: any) => {
+                editor.chain().focus().deleteRange(range).setHorizontalRule().run()
             },
         }
     ].filter(item => item.title.toLowerCase().startsWith(query.toLowerCase()) || item.title.includes(query))
