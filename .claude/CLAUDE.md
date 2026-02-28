@@ -1,6 +1,6 @@
 # Doco Editor — 项目说明
 
-基于 **Tiptap (ProseMirror) + React + Vite** 的富文本协同编辑器，支持多端实时同步（Yjs CRDT），设计为可嵌入到其他项目的独立模块。
+基于 **Tiptap (ProseMirror) + React + Vite** 的富文本协同编辑器，支持多端实时同步（Yjs CRDT），具备知识库管理能力。
 
 永远输出中文。
 ---
@@ -10,10 +10,15 @@
 | 层 | 技术 |
 |---|---|
 | 前端框架 | React 18 + Vite + TypeScript |
+| 路由 | react-router-dom v7 |
 | CSS | Tailwind CSS v4 |
 | 编辑器 | Tiptap v3（基于 ProseMirror） |
-| 协同算法 | Yjs (CRDT) |
+| UI 组件 | Radix UI (Popover)、Lucide React (图标)、Tippy.js (弹层) |
+| 协同算法 | Yjs (CRDT) + y-websocket |
+| 图表 | Mermaid、PlantUML (plantuml-encoder) |
+| 导出/导入 | html2pdf.js、html-to-docx、mammoth、pdfjs-dist |
 | 后端 | Python FastAPI + ypy-websocket |
+| 数据库 | SQLAlchemy (async) + aiosqlite (SQLite) |
 
 ---
 
@@ -22,21 +27,40 @@
 ```
 doco/
 ├── src/
-│   ├── App.tsx                        # 根组件，挂载 Editor，提供导出按钮
-│   └── components/Editor/
-│       ├── index.tsx                  # 编辑器主组件（Yjs 初始化、所有扩展注册）
-│       ├── BubbleMenu.tsx             # 选区浮动工具栏（行内格式化）
-│       ├── BlockHandle.tsx            # 块级操作手柄（悬停显示 +/⠿ 菜单）
-│       ├── CodeBlockComponent.tsx     # 代码块自定义节点（语言选择 + 复制）
-│       ├── MermaidBlock.ts            # Mermaid 图表自定义节点定义
-│       ├── MermaidComponent.tsx       # Mermaid 图表渲染组件
-│       ├── SlashCommand.ts            # / 命令扩展配置
-│       ├── suggestions.ts             # / 菜单列表数据 + Tippy.js 渲染
-│       └── CommandList.tsx            # / 菜单 UI 组件
+│   ├── main.tsx                       # 应用入口
+│   ├── App.tsx                        # 根组件，路由管理，导入/导出，侧边栏
+│   └── components/
+│       ├── Sidebar.tsx                # 知识库侧边栏（文档树管理）
+│       └── Editor/
+│           ├── index.tsx              # 编辑器主组件（Yjs 初始化、所有扩展注册）
+│           ├── BubbleMenu.tsx         # 选区浮动工具栏（行内格式化）
+│           ├── BlockHandle.tsx        # 块级操作手柄（悬停菜单：转换/折叠/移动/复制/删除）
+│           ├── CodeBlockComponent.tsx # 代码块（语言选择 + 复制 + 自动换行）
+│           ├── MermaidBlock.ts        # Mermaid 图表节点定义
+│           ├── MermaidComponent.tsx   # Mermaid 图表渲染（双击编辑、实时预览）
+│           ├── PlantUMLBlock.ts       # PlantUML 图表节点定义
+│           ├── PlantUMLComponent.tsx  # PlantUML 图表渲染
+│           ├── CalloutBlock.ts        # 高亮块节点定义（emoji + color）
+│           ├── CalloutComponent.tsx   # 高亮块渲染组件
+│           ├── ResizableImage.ts      # 可调整大小的图片扩展（width + align）
+│           ├── ImageComponent.tsx     # 图片渲染组件（拖拽缩放）
+│           ├── CollapseExtension.ts   # 块折叠扩展（ProseMirror Plugin + Decoration）
+│           ├── KeyboardShortcuts.ts   # 全局键盘快捷键扩展
+│           ├── SlashCommand.ts        # / 命令扩展（支持 `/` 和 `、` 触发）
+│           ├── suggestions.ts         # / 菜单列表数据 + Tippy.js 渲染
+│           ├── CommandList.tsx         # / 菜单 UI 组件
+│           ├── LinkPopover.tsx         # 链接编辑弹窗
+│           ├── InlineMarkToolbar.tsx   # 行内标记工具栏
+│           ├── TableToolbar.tsx        # 表格操作工具栏
+│           ├── TableOfContents.tsx     # 目录生成组件
+│           ├── DocSettings.tsx         # 文档设置面板（标题编号、背景色）
+│           └── PasteMarkdownDialog.tsx # Markdown 粘贴检测与转换对话框
 ├── backend/
-│   ├── main.py                        # FastAPI 服务入口（Yjs WebSocket 同步）
-│   └── requirements.txt              # Python 依赖
-└── index.css                          # 全局样式（ProseMirror、协同光标）
+│   ├── main.py                        # FastAPI 服务入口（WebSocket + REST API）
+│   ├── database.py                    # SQLAlchemy 异步数据库配置
+│   ├── models.py                      # ORM 模型（KnowledgeBase/Folder/Document/YDocUpdate）
+│   └── requirements.txt               # Python 依赖
+└── src/index.css                      # 全局样式（ProseMirror、协同光标、折叠块）
 ```
 
 ---
@@ -47,14 +71,20 @@ doco/
 
 编辑器通过 `useEditor` 注册以下 Tiptap 扩展：
 
-- **StarterKit**：基础段落/标题/列表/引用/加粗/斜体等
-- **CodeBlockLowlight** + 自定义 `CodeBlockComponent`：代码块语法高亮 + 语言选择 + 复制按钮
+- **StarterKit**（禁用 history 和 codeBlock）：基础段落/标题/列表/引用/加粗/斜体等
+- **CodeBlockLowlight** + 自定义 `CodeBlockComponent`：代码块语法高亮 + 语言选择 + 复制 + 自动换行
 - **Underline / TextStyle / Color / Highlight / Link / TextAlign**：行内样式扩展
 - **Placeholder**：空编辑器占位提示
 - **TaskList / TaskItem**：带勾选框的任务列表（支持嵌套）
 - **Markdown**（tiptap-markdown）：Markdown 序列化/反序列化
+- **Table / TableRow / TableHeader / TableCell**：表格支持
 - **MermaidBlock**：Mermaid 图表块级节点
-- **SlashCommand**：`/` 命令面板
+- **PlantUMLBlock**：PlantUML 图表块级节点
+- **CalloutBlock**：高亮块（带 emoji 和颜色属性）
+- **ResizableImage**：可调整大小和对齐的图片扩展
+- **CollapseExtension**：块折叠（ProseMirror Plugin + Decoration）
+- **KeyboardShortcuts**：全局快捷键（块移动/复制/标题切换/对齐等）
+- **SlashCommand**：`/` 和 `、` 命令面板
 - **Collaboration**：Yjs 协同扩展（绑定 Y.Doc）
 
 ### 2. 协同编辑（Yjs）
@@ -112,30 +142,75 @@ const extensions = useMemo(() => [
 
 ### 3. 浮动工具栏（`BubbleMenu.tsx`）
 
-选中文本后自动弹出的行内格式工具栏，包含：加粗、斜体、下划线、删除线、行内代码、高亮、链接、左/居中/右对齐。
+选中文本后自动弹出的行内格式工具栏，包含：加粗、斜体、下划线、删除线、行内代码、高亮、链接、左/居中/右对齐。支持键盘导航（↑↓ 切换，Enter/Space 执行）和快捷键提示。
 
 ### 4. 块操作手柄（`BlockHandle.tsx`）
 
-鼠标悬停在块元素左侧会出现两个按钮：
+鼠标悬停在块元素左侧显示操作菜单，功能包括：
 
-- **`+`**：在下方插入新段落
-- **`⠿`（六点拖拽图标）**：打开 Popover 菜单（剪切、复制、删除、在下方添加）
+- **转换为**：子菜单（正文、H1/H2/H3、无序/有序/任务列表、引用、代码块、高亮块、分隔线）
+- **折叠/展开**（仅多行块）
+- **剪切** (⌘X) / **复制** (⌘C) / **复制为纯文本** / **复制为 Markdown**
+- **复制块** (⌘D) / **向上移动** (⌥↑) / **向下移动** (⌥↓)
+- **在下方插入** (⌘⏎) / **删除** (Del)
 
-通过 `editor.view.posAtDOM()` 获取 ProseMirror 文档位置，再用 `editor.chain()` 执行操作。
+通过 `editor.view.posAtCoords()` → `resolve()` → `before(depth)` 定位顶层块节点，支持完整键盘导航。
 
 ### 5. / 命令面板（`SlashCommand` / `suggestions.ts`）
 
-输入 `/` 触发菜单，支持：一级标题、二级标题、三级标题、无序列表、任务列表、引用、代码块、Mermaid 流程图。
+输入 `/` 或 `、` 触发菜单，支持：H1/H2/H3、无序列表、任务列表、引用、代码块、图片、Mermaid 流程图、PlantUML 图、表格 (3×3)、高亮块、分隔线。
 
-使用 `tippy.js` 渲染下拉弹层，通过 Tiptap `suggestion` 扩展机制实现。
+支持模糊搜索（含中文拼音缩写：yjbt=一级标题），使用 `tippy.js` 渲染下拉弹层。
 
-### 6. 导出功能
+### 6. 块折叠（`CollapseExtension.ts`）
 
-在 `Editor` 组件上通过 `forwardRef` + `useImperativeHandle` 暴露：
+基于 ProseMirror Plugin + Decoration 实现多行块折叠/展开：
 
+- 折叠状态存储在 `editor.storage.collapse.collapsed` (Set\<number\>)
+- 文档变更时自动映射折叠位置（`tr.mapping.map`）
+- 点击折叠块自动展开
+- CSS 类 `.doco-collapsed` 控制样式
+
+### 7. 键盘快捷键（`KeyboardShortcuts.ts`）
+
+| 快捷键 | 功能 |
+|--------|------|
+| ⌥↑/↓ | 向上/下移动当前块 |
+| ⌘D | 复制当前块 |
+| ⌘⏎ | 在下方插入新段落 |
+| ⌘⇧H | 切换高亮 |
+| ⌘⇧L/E/R | 左/居中/右对齐 |
+| ⌘⌥1/2/3/0 | 切换 H1/H2/H3/正文 |
+| ⌘⇧J | 切换标题多级编号 |
+| ⌘K | 添加/编辑链接 |
+
+### 8. 导出与导入
+
+**导出**（通过 `forwardRef` + `useImperativeHandle` 暴露）：
 - `exportMarkdown()`：序列化为 Markdown 文件下载
 - `exportPDF()`：基于 `html2pdf.js` 导出 PDF
-- `exportWord()`：生成 `.doc`（HTML 包装为 Word 格式）
+- `exportWord()`：基于 `html-to-docx` 生成 `.docx`
+
+**导入**（`App.tsx`）：
+- Markdown 文件（`.md`）
+- Word 文件（`.docx`，通过 `mammoth` 转换）
+- PDF 文件（`.pdf`，通过 `pdfjs-dist` 提取文本）
+
+### 9. 知识库管理（`Sidebar.tsx` + 后端 REST API）
+
+侧边栏提供知识库 → 文件夹 → 文档的树形管理，支持创建/重命名/删除/移动。
+
+### 10. 文档设置（`DocSettings.tsx`）
+
+文档级设置面板，支持标题多级编号（`heading_numbered`）和背景色（`bg_color`）。
+
+### 11. 其他组件
+
+- **TableToolbar**：表格操作工具栏（增删行列、合并单元格等）
+- **TableOfContents**：根据标题自动生成目录
+- **LinkPopover**：链接编辑弹窗（⌘K 触发）
+- **PasteMarkdownDialog**：检测粘贴内容是否为 Markdown，提供转换选项
+- **ResizableImage**：图片拖拽缩放 + 对齐（left/center/right）
 
 ---
 
@@ -154,25 +229,32 @@ python main.py
 
 ---
 
-## 持久化机制（`DocoYStore`）
+## 后端架构（`backend/`）
 
-后端通过自定义 `DocoYStore` 类实现 Yjs 文档持久化：
+### 数据模型（`models.py`）
+
+| 模型 | 说明 | 关键字段 |
+|------|------|---------|
+| KnowledgeBase | 知识库 | id, name |
+| Folder | 文件夹（支持嵌套） | id, name, kb_id, parent_id |
+| Document | 文档 | id (UUID/room name), title, folder_id, kb_id, heading_numbered, bg_color |
+| YDocUpdate | Yjs 增量更新 | id, doc_id (索引), update (LargeBinary) |
+
+### REST API 路由（`main.py`）
+
+**知识库**：`GET/POST /api/kb`、`PATCH/DELETE /api/kb/{kb_id}`
+
+**文件夹**：`GET /api/kb/{kb_id}/folders`、`GET /api/folders/{id}/subfolders`、`POST/PATCH/DELETE /api/folders`
+
+**文档**：`GET /api/kb/{kb_id}/docs`、`GET /api/folders/{id}/docs`、`GET/POST/PATCH/DELETE /api/docs/{id}`、`GET /api/docs/{id}/path`
+
+**搜索**：`GET /api/search/docs?q=...`（模糊搜索文档标题）
+
+### 持久化机制（`DocoYStore`）
+
+自定义 `DocoYStore(BaseYStore)` 将 Yjs 增量更新写入 SQLite：
 
 ```python
-# backend/main.py
-
-class DocoYStore(BaseYStore):
-    """继承 ypy-websocket 的 BaseYStore，将更新写入 SQLite。"""
-
-    async def write(self, data: bytes) -> None:
-        if len(data) <= 2:  # 过滤空更新（Yjs 空状态为 2 字节）
-            return
-        # 写入 ydoc_updates 表
-
-    async def read(self):
-        # 异步生成器，按顺序 yield (update, metadata) 元组
-
-# 房间初始化时使用内置 ystore 机制
 store = DocoYStore(room_name)
 room = YRoom(ystore=store, ready=False)  # ready=False 防止加载时触发写入
 await store.apply_updates(room.ydoc)      # 加载历史更新
