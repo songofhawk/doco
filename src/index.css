@@ -325,6 +325,90 @@ body {
     }
   }
 
+  /* 高亮块 Callout */
+  .callout {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin: 0.75em 0;
+    position: relative;
+  }
+
+  .callout-emoji-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .callout-emoji-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .callout-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .callout-content > *:first-child {
+    margin-top: 0;
+  }
+
+  .callout-content > *:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Callout 颜色主题 */
+  .callout-blue { background: #eff6ff; border-left: 3px solid #3b82f6; }
+  .callout-yellow { background: #fefce8; border-left: 3px solid #eab308; }
+  .callout-red { background: #fef2f2; border-left: 3px solid #ef4444; }
+  .callout-green { background: #f0fdf4; border-left: 3px solid #22c55e; }
+  .callout-gray { background: #f9fafb; border-left: 3px solid #9ca3af; }
+  .callout-orange { background: #fff7ed; border-left: 3px solid #f97316; }
+  .callout-purple { background: #faf5ff; border-left: 3px solid #a855f7; }
+
+  /* Callout emoji 选择器 */
+  .callout-picker {
+    position: absolute;
+    top: 2.5rem;
+    left: 0.5rem;
+    z-index: 50;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 100px;
+  }
+
+  .callout-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.1s;
+  }
+
+  .callout-picker-item:hover {
+    background: #f3f4f6;
+  }
+
   /* Collaboration Cursors */
   .collaboration-cursor__caret {
     border-left: 1px solid #0d0d0d;

@@ -6,6 +6,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
 import { SlashCommand } from './SlashCommand'
 import { MermaidBlock } from './MermaidBlock'
+import { CalloutBlock } from './CalloutBlock'
 import { PlantUMLBlock } from './PlantUMLBlock'
 import { getSuggestionItems, renderItems } from './suggestions'
 import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, useCallback } from 'react'
@@ -170,6 +171,7 @@ export const Editor = forwardRef(({ docId }: { docId: string }, ref) => {
         Markdown,
         MermaidBlock,
         PlantUMLBlock,
+        CalloutBlock,
         Table.configure({ resizable: true }),
         TableRow,
         TableHeader,

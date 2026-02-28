@@ -5,7 +5,7 @@ import {
     GripVertical, Plus, Trash2, Copy, Scissors, ArrowDownToLine,
     ArrowUpToLine, CopyPlus, Type, Heading1, Heading2, Heading3,
     List, ListOrdered, ListChecks, Quote, Code, ChevronRight,
-    FileText, Pilcrow, ChevronsUpDown, Minus
+    FileText, Pilcrow, ChevronsUpDown, Minus, Lightbulb
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -160,14 +160,19 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
     // posAtDOM 返回的是块内部文本位置，需要 resolve 后回溯到顶层块节点
     const getNodePos = (): number | null => {
         if (!hoveredNode || !editor.view) return null
-        const pos = editor.view.posAtDOM(hoveredNode, 0)
-        const $pos = editor.state.doc.resolve(pos)
-        // 回溯到 depth=1 的顶层块节点（doc 的直接子节点）
-        const depth = Math.max(1, $pos.depth)
-        return $pos.before(depth)
+        if (!editor.view.dom.contains(hoveredNode)) return null
+        try {
+            const pos = editor.view.posAtDOM(hoveredNode, 0)
+            if (pos < 0) return null
+            const $pos = editor.state.doc.resolve(pos)
+            const depth = Math.max(1, $pos.depth)
+            return $pos.before(depth)
+        } catch {
+            return null
+        }
     }
 
-    const closeMenu = () => { setIsOpen(false); setShowConvertMenu(false); setFocusIndex(-1) }
+    const closeMenu = () => { setIsOpen(false); setShowConvertMenu(false); setFocusIndex(-1); setHoveredNode(null) }
 
     // 判断当前块是否已折叠
     const isCollapsed = (): boolean => {
@@ -198,7 +203,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
     // 主菜单项定义（用于键盘导航索引）
     const showCollapse = canCollapse()
     const MAIN_MENU_COUNT = showCollapse ? 11 : 10
-    const CONVERT_MENU_COUNT = 10
+    const CONVERT_MENU_COUNT = 11
 
     // 菜单打开时重置焦点并聚焦容器
     useEffect(() => {
@@ -243,6 +248,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         () => handleConvert('taskList'),
         () => handleConvert('blockquote'),
         () => handleConvert('codeBlock'),
+        () => handleConvert('calloutBlock'),
         () => handleConvert('horizontalRule'),
     ], [])
 
@@ -437,6 +443,18 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             return
         }
 
+        // 容器节点（如 callout）转正文：提取内部子块替换整个容器
+        if (node.type.spec.content?.includes('block') && type === 'paragraph') {
+            const { tr } = editor.state
+            const children: any[] = []
+            node.content.forEach(child => children.push(child.copy(child.content)))
+            tr.replaceWith(pos, endPos, children)
+            editor.view.dispatch(tr)
+            editor.commands.setTextSelection(pos + 1)
+            closeMenu()
+            return
+        }
+
         // 用 tr 删除旧块，插入目标类型的新块
         const { tr, schema } = editor.state
         tr.delete(pos, endPos)
@@ -480,6 +498,11 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 break
             case 'horizontalRule':
                 newNode = schema.nodes.horizontalRule.create()
+                break
+            case 'calloutBlock':
+                newNode = schema.nodes.calloutBlock.create(null,
+                    schema.nodes.paragraph.create(null,
+                        textContent ? schema.text(textContent) : null))
                 break
         }
 
@@ -601,7 +624,8 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                                 <div className="h-px bg-gray-100 my-1" />
                                 <ConvertItem icon={Quote} label="引用" onClick={() => handleConvert('blockquote')} focused={ci === 7} />
                                 <ConvertItem icon={Code} label="代码块" onClick={() => handleConvert('codeBlock')} focused={ci === 8} />
-                                <ConvertItem icon={Minus} label="分隔线" onClick={() => handleConvert('horizontalRule')} focused={ci === 9} />
+                                <ConvertItem icon={Lightbulb} label="高亮块" onClick={() => handleConvert('calloutBlock')} focused={ci === 9} />
+                                <ConvertItem icon={Minus} label="分隔线" onClick={() => handleConvert('horizontalRule')} focused={ci === 10} />
                             </div>
                         )}
                     </Popover.Content>
