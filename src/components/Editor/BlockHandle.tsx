@@ -125,12 +125,18 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 ? offsetParent.getBoundingClientRect()
                 : container.getBoundingClientRect()
 
-            const computedStyle = window.getComputedStyle(target)
-            const lineHeightStr = computedStyle.lineHeight
-            const fontSize = parseFloat(computedStyle.fontSize) || 16
-            const lineHeight = parseFloat(lineHeightStr) || fontSize * 1.2
-            const paddingTop = parseFloat(computedStyle.paddingTop) || 0
-            const firstLineCenter = rect.top + paddingTop + Math.min(lineHeight, rect.height) / 2
+            const isTargetCollapsed = target.classList.contains('doco-collapsed')
+            let firstLineCenter: number
+            if (isTargetCollapsed) {
+                firstLineCenter = rect.top + rect.height / 2
+            } else {
+                const computedStyle = window.getComputedStyle(target)
+                const lineHeightStr = computedStyle.lineHeight
+                const fontSize = parseFloat(computedStyle.fontSize) || 16
+                const lineHeight = parseFloat(lineHeightStr) || fontSize * 1.2
+                const paddingTop = parseFloat(computedStyle.paddingTop) || 0
+                firstLineCenter = rect.top + paddingTop + Math.min(lineHeight, rect.height) / 2
+            }
 
             setHandlePos({
                 top: firstLineCenter - baseRect.top - 12,
