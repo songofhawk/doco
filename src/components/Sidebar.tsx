@@ -190,7 +190,7 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
 };
 
 /* ---- 主侧边栏 ---- */
-export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => {
+export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { collapsed?: boolean; onToggle?: () => void; onDocRenamed?: (docId: string, title: string) => void }) => {
     const location = useLocation();
     const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
@@ -457,7 +457,7 @@ export const Sidebar = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle
                 return u;
             });
             // 通知编辑器同步标题
-            window.dispatchEvent(new CustomEvent('doc-renamed', { detail: { docId, title: newTitle } }))
+            onDocRenamed?.(docId, newTitle)
         } catch {}
         setEditingItem(null);
     };

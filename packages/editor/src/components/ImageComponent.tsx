@@ -3,7 +3,7 @@ import { NodeViewWrapper, NodeViewProps } from '@tiptap/react'
 import { AlignLeft, AlignCenter, AlignRight, Trash2 } from 'lucide-react'
 
 export const ImageComponent = ({ node, updateAttributes, selected, deleteNode, editor }: NodeViewProps) => {
-    const { src, alt, width, align } = node.attrs
+    const { src, alt, width, align } = node.attrs as any
     const imgRef = useRef<HTMLImageElement>(null)
     const [resizing, setResizing] = useState(false)
     const startX = useRef(0)

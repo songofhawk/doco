@@ -119,7 +119,7 @@ export const KeyboardShortcuts = Extension.create({
             // Delete / Backspace 删除选中的块节点
             'Delete': ({ editor }) => {
                 const { selection } = editor.state
-                if (selection.node) {
+                if ((selection as any).node) {
                     const { tr } = editor.state
                     tr.delete(selection.from, selection.to)
                     editor.view.dispatch(tr)

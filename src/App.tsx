@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
-import { Editor } from './components/Editor'
+import { DocoEditor } from '@doco/editor'
+import '@doco/editor/style.css'
 import { Sidebar } from './components/Sidebar'
 import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown } from 'lucide-react'
 import mammoth from 'mammoth'
@@ -28,10 +29,58 @@ const EmptyState = () => (
   </div>
 )
 
-const EditorPage = ({ exportRef }: { exportRef: any }) => {
+const API_BASE = 'http://127.0.0.1:8000/api'
+
+const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitle?: string }) => {
   const { id } = useParams<{ id: string }>()
+  const [meta, setMeta] = useState<any>(undefined)
+  useEffect(() => {
+    if (!id) return
+    fetch(`${API_BASE}/docs/${id}`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setMeta({
+            title: d.title,
+            headingNumbered: d.heading_numbered,
+            bgColor: d.bg_color,
+            collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean).map(Number) : [],
+          })
+    }).catch(() => {})
+  }, [id])
   if (!id) return <EmptyState />
-  return <Editor ref={exportRef} docId={id} key={id} />
+  return (
+    <DocoEditor
+      ref={exportRef}
+      docId={id}
+      key={id}
+      initialMeta={meta}
+      collaboration={{ websocketUrl: 'ws://127.0.0.1:8000/ws' }}
+      onTitleChange={(docId, title) => {
+        fetch(`${API_BASE}/docs/${docId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        }).catch(() => {})
+      }}
+      onSettingsChange={(docId, settings) => {
+        const payload: any = { ...settings }
+        if (settings.collapsedBlocks !== undefined) {
+          payload.collapsed_blocks = settings.collapsedBlocks.join(',')
+          delete payload.collapsedBlocks
+        }
+        if (settings.headingNumbered !== undefined) {
+          payload.heading_numbered = settings.headingNumbered
+          delete payload.headingNumbered
+        }
+        if (settings.bgColor !== undefined) {
+          payload.bg_color = settings.bgColor
+          delete payload.bgColor
+        }
+        fetch(`${API_BASE}/docs/${docId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {})
+      }}
+      externalTitle={externalTitle}
+    />
+  )
 }
 
 const COLLAPSE_BREAKPOINT = 768
@@ -39,6 +88,7 @@ const COLLAPSE_BREAKPOINT = 768
 function App() {
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [externalTitle, setExternalTitle] = useState<string | undefined>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < COLLAPSE_BREAKPOINT)
   const [exportOpen, setExportOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -151,11 +201,11 @@ function App() {
           </div>
         </header>
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+          <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
           <main className="flex-1 overflow-y-auto bg-gray-50">
             <Routes>
-              <Route path="/" element={<EditorPage exportRef={exportRef} />} />
-              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} />} />
+              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} />} />
+              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} />} />
             </Routes>
           </main>
         </div>

@@ -1,0 +1,769 @@
+/* Doco Editor Styles — scoped under .doco-editor-root */
+
+.doco-editor-root {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-editor-codeblock-bg: #f8f9fa;
+  --color-editor-codeblock-text: #383a42;
+  --color-editor-codeblock-border: #e8eaed;
+  --color-editor-code-bg: #f1f3f5;
+  --color-editor-code-text: #ab5959;
+  --color-editor-code-hover-bg: #e9ecef;
+  --color-editor-code-hover-ring: #dbe4ff;
+  --color-editor-quote-border: #d0d7de;
+  --color-editor-quote-text: #57606a;
+  --color-editor-mark-bg: #fff3bf;
+  --color-editor-mark-hover-bg: #ffe066;
+  --color-editor-mark-hover-ring: #fff9db;
+  --color-editor-hr: #e5e7eb;
+}
+
+/* Base Tiptap Editor Styles */
+.doco-editor-root .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  >*+* {
+    margin-top: 0.75em;
+  }
+
+  p.is-editor-empty:first-child::before {
+    color: #adb5bd;
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+  h1 {
+    font-size: 2.25em;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.75em;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  h3 {
+    font-size: 1.5em;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  h4 {
+    font-size: 1.25em;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  /* 标题多级编号样式由 JS 动态注入（见 index.tsx doco-heading-numbering） */
+
+  ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+  }
+
+  ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+  }
+
+  ul[data-type="taskList"] {
+    list-style: none;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      margin-top: 0.5em;
+
+      >label {
+        flex: 0 0 auto;
+        margin-right: 0.5rem;
+        user-select: none;
+        margin-top: 0.2rem;
+      }
+
+      >div {
+        flex: 1 1 auto;
+      }
+    }
+  }
+
+  blockquote {
+    border-left: 3px solid var(--color-editor-quote-border);
+    padding-left: 1rem;
+    margin-left: 0;
+    color: var(--color-editor-quote-text);
+    font-style: italic;
+  }
+
+  pre {
+    background-color: var(--color-editor-codeblock-bg);
+    color: var(--color-editor-codeblock-text);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+
+    code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+
+    .hljs {
+      background: transparent;
+      padding: 0;
+    }
+  }
+
+  .code-block {
+    pre {
+      background: transparent;
+      padding: 1rem;
+      border-radius: 0;
+      margin: 0;
+    }
+  }
+
+  /* Image Node View */
+  .image-node-wrapper {
+    margin: 0.75em 0;
+  }
+
+  .image-selected img {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+  }
+
+  .image-node-wrapper img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    cursor: default;
+    transition: box-shadow 0.2s;
+  }
+
+  /* 调整大小手柄 */
+  .resize-handle-right {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+  }
+
+  .resize-handle-right::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 1px;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 40px;
+    background: var(--color-primary-500);
+    border-radius: 2px;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .resize-handle-right:hover::after {
+    opacity: 1;
+    height: 60px;
+  }
+
+  /* 图片对齐工具栏 */
+  .image-toolbar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 20;
+  }
+
+  .image-selected:hover .image-toolbar,
+  .image-selected:focus-within .image-toolbar {
+    opacity: 1;
+  }
+
+  .image-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .image-toolbar-btn:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+  }
+
+  .image-toolbar-btn.active {
+    background-color: #eff6ff;
+    color: var(--color-primary-600);
+  }
+
+  /* 行内代码 */
+  code {
+    background-color: var(--color-editor-code-bg);
+    color: var(--color-editor-code-text);
+    padding: 0.15em 0.4em;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    transition: background-color 0.15s, box-shadow 0.15s;
+    &:hover {
+      background-color: var(--color-editor-code-hover-bg);
+      box-shadow: 0 0 0 2px var(--color-editor-code-hover-ring);
+    }
+  }
+
+  /* 链接 */
+  a {
+    color: var(--color-primary-600);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    transition: color 0.15s, box-shadow 0.15s;
+    border-radius: 0.15rem;
+    &:hover {
+      color: var(--color-primary-500);
+      box-shadow: 0 0 0 2px #dbeafe;
+    }
+  }
+
+  /* 分割线 */
+  hr {
+    border: none;
+    border-top: 1px solid var(--color-editor-hr);
+    margin: 2em 0;
+  }
+
+  /* 高亮标记 */
+  mark {
+    background-color: var(--color-editor-mark-bg);
+    padding: 0.1em 0.2em;
+    border-radius: 0.15rem;
+    transition: background-color 0.15s, box-shadow 0.15s;
+    &:hover {
+      background-color: var(--color-editor-mark-hover-bg);
+      box-shadow: 0 0 0 2px var(--color-editor-mark-hover-ring);
+    }
+  }
+
+  /* 高亮块 Callout */
+  .callout {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin: 0.75em 0;
+    position: relative;
+  }
+
+  .callout-emoji-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .callout-emoji-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  .callout-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .callout-content > *:first-child {
+    margin-top: 0;
+  }
+
+  .callout-content > *:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Callout 颜色主题 */
+  .callout-blue { background: #eff6ff; border-left: 3px solid #3b82f6; }
+  .callout-yellow { background: #fefce8; border-left: 3px solid #eab308; }
+  .callout-red { background: #fef2f2; border-left: 3px solid #ef4444; }
+  .callout-green { background: #f0fdf4; border-left: 3px solid #22c55e; }
+  .callout-gray { background: #f9fafb; border-left: 3px solid #9ca3af; }
+  .callout-orange { background: #fff7ed; border-left: 3px solid #f97316; }
+  .callout-purple { background: #faf5ff; border-left: 3px solid #a855f7; }
+
+  /* Callout emoji 选择器 */
+  .callout-picker {
+    position: absolute;
+    top: 2.5rem;
+    left: 0.5rem;
+    z-index: 50;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 100px;
+  }
+
+  .callout-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.1s;
+  }
+
+  .callout-picker-item:hover {
+    background: #f3f4f6;
+  }
+
+  /* Collaboration Cursors */
+  .collaboration-cursor__caret {
+    border-left: 1px solid #0d0d0d;
+    border-right: 1px solid #0d0d0d;
+    margin-left: -1px;
+    margin-right: -1px;
+    pointer-events: none;
+    position: relative;
+    word-break: normal;
+  }
+
+  .collaboration-cursor__label {
+    border-radius: 3px 3px 3px 0;
+    color: #fff;
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 600;
+    left: -1px;
+    line-height: normal;
+    padding: 0.1rem 0.3rem;
+    position: absolute;
+    top: -1.4em;
+    user-select: none;
+    white-space: nowrap;
+  }
+}
+
+/* 目录导航 */
+.doco-editor-root .toc-aside {
+  position: fixed;
+  top: 5rem;
+  z-index: 20;
+}
+
+.doco-editor-root .toc-trigger {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.doco-editor-root .toc-trigger:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.doco-editor-root .toc-panel {
+  position: absolute;
+  top: 0;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 0.75rem 0.5rem;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
+.doco-editor-root .toc-panel-visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.doco-editor-root .toc-item {
+  display: block;
+  line-height: 1.6;
+  border-left: 2px solid transparent;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.doco-editor-root .toc-item:hover {
+  border-left-color: #d1d5db;
+}
+
+.doco-editor-root .toc-item.text-blue-600 {
+  border-left-color: #3b82f6;
+}
+
+/* ===== 表格样式 ===== */
+.doco-editor-root .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.doco-editor-root .ProseMirror td,
+.doco-editor-root .ProseMirror th {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  position: relative;
+  min-width: 80px;
+}
+
+.doco-editor-root .ProseMirror th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.doco-editor-root .ProseMirror td > *,
+.doco-editor-root .ProseMirror th > * {
+  margin: 0;
+}
+
+/* 选中单元格高亮 */
+.doco-editor-root .ProseMirror .selectedCell {
+  background-color: #dbeafe;
+}
+
+/* 列拖拽调整宽度手柄 */
+.doco-editor-root .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #3b82f6;
+  pointer-events: none;
+}
+
+.doco-editor-root .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ===== 表格行列操作手柄 ===== */
+.doco-editor-root .table-handle {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.doco-editor-root .table-handle:hover,
+.doco-editor-root .table-handle.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.doco-editor-root .table-col-handle {
+  height: 18px;
+}
+
+.doco-editor-root .table-row-handle {
+  width: 18px;
+}
+
+/* 添加行/列按钮 */
+.doco-editor-root .table-add-btn {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #d1d5db;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.doco-editor-root .table-add-btn:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.doco-editor-root .table-add-row {
+  height: 18px;
+}
+
+.doco-editor-root .table-add-col {
+  width: 18px;
+}
+
+/* 表格操作菜单 */
+.doco-editor-root .table-menu {
+  position: absolute;
+  z-index: 50;
+}
+
+.doco-editor-root .table-menu-inner {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 4px;
+  min-width: 150px;
+}
+
+.doco-editor-root .table-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  text-align: left;
+}
+
+.doco-editor-root .table-menu-item:hover {
+  background: #f3f4f6;
+}
+
+.doco-editor-root .table-menu-item.danger {
+  color: #ef4444;
+}
+
+.doco-editor-root .table-menu-item.danger:hover {
+  background: #fef2f2;
+}
+
+.doco-editor-root .table-menu-divider {
+  height: 1px;
+  background: #f3f4f6;
+  margin: 3px 4px;
+}
+
+/* Markdown 粘贴提示弹窗 */
+.doco-editor-root .paste-md-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: paste-md-fade-in 0.15s ease;
+}
+
+.doco-editor-root .paste-md-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  padding: 20px 24px;
+  max-width: 420px;
+  width: 90%;
+  animation: paste-md-slide-up 0.15s ease;
+}
+
+.doco-editor-root .paste-md-dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 12px;
+}
+
+.doco-editor-root .paste-md-dialog-preview {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.doco-editor-root .paste-md-dialog-preview code {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+.doco-editor-root .paste-md-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.doco-editor-root .paste-md-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.doco-editor-root .paste-md-btn-primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.doco-editor-root .paste-md-btn-primary:hover {
+  background: #2563eb;
+}
+
+.doco-editor-root .paste-md-btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.doco-editor-root .paste-md-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+@keyframes paste-md-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes paste-md-slide-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ===== 块折叠样式 ===== */
+.doco-editor-root .ProseMirror .doco-collapsed {
+  position: relative;
+  max-height: 1.6lh;
+  overflow: hidden;
+  cursor: pointer;
+  border-bottom: 2px dashed #d1d5db;
+  padding-bottom: 2px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+.doco-editor-root .ProseMirror .doco-collapsed:hover {
+  border-bottom-color: #9ca3af;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* 代码块折叠：保留顶部工具栏（doco-collapsed 在 node-view-wrapper 上，.code-block 是子元素）
+   .code-block 有 my-6(24px) + 1px border + 41px toolbar = 66px，再留点余量 */
+.doco-editor-root .ProseMirror .doco-collapsed:has(> .code-block) {
+  max-height: 70px;
+  background-color: transparent;
+  border-radius: 0.5rem;
+}
+
+/* 引用块折叠：保留首行 */
+.doco-editor-root .ProseMirror blockquote.doco-collapsed {
+  max-height: 2.8em;
+}
+
+/* 列表折叠：保留第一项 */
+.doco-editor-root .ProseMirror ul.doco-collapsed,
+.doco-editor-root .ProseMirror ol.doco-collapsed {
+  max-height: 2.2em;
+}
+
+/* 表格折叠：保留表头行 */
+.doco-editor-root .ProseMirror table.doco-collapsed {
+  max-height: 2.8em;
+}
+
+/* ===== 暗色模式预留（跟随系统偏好） ===== */
+@media (prefers-color-scheme: dark) {
+  .doco-editor-root {
+    --color-editor-codeblock-bg: #1e1e2e;
+    --color-editor-codeblock-text: #cdd6f4;
+    --color-editor-codeblock-border: #313244;
+
+    --color-editor-code-bg: #313244;
+    --color-editor-code-text: #f38ba8;
+    --color-editor-code-hover-bg: #45475a;
+    --color-editor-code-hover-ring: #45475a;
+
+    --color-editor-quote-border: #585b70;
+    --color-editor-quote-text: #a6adc8;
+
+    --color-editor-mark-bg: #5c5226;
+    --color-editor-mark-hover-bg: #7a6d2e;
+    --color-editor-mark-hover-ring: #4a4020;
+
+    --color-editor-hr: #313244;
+  }
+}

@@ -124,6 +124,9 @@ async def _migrate_db():
         if "bg_color" not in doc_cols:
             await conn.execute(text("ALTER TABLE documents ADD COLUMN bg_color VARCHAR NOT NULL DEFAULT '#ffffff'"))
             logger.info("Migrated: added bg_color to documents")
+        if "collapsed_blocks" not in doc_cols:
+            await conn.execute(text("ALTER TABLE documents ADD COLUMN collapsed_blocks TEXT NOT NULL DEFAULT ''"))
+            logger.info("Migrated: added collapsed_blocks to documents")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -185,6 +188,7 @@ class DocBase(BaseModel):
     kb_id: Optional[int] = None
     heading_numbered: bool = False
     bg_color: str = "#ffffff"
+    collapsed_blocks: str = ""
 
 class DocRead(DocBase):
     model_config = ConfigDict(from_attributes=True)
@@ -195,6 +199,7 @@ class DocUpdate(BaseModel):
     kb_id: Optional[int] = None
     heading_numbered: Optional[bool] = None
     bg_color: Optional[str] = None
+    collapsed_blocks: Optional[str] = None
 
 class FolderUpdate(BaseModel):
     name: Optional[str] = None
@@ -308,6 +313,8 @@ async def update_doc(doc_id: str, update: DocUpdate, db: AsyncSession = Depends(
         doc.heading_numbered = update.heading_numbered
     if update.bg_color is not None:
         doc.bg_color = update.bg_color
+    if update.collapsed_blocks is not None:
+        doc.collapsed_blocks = update.collapsed_blocks
     await db.commit()
     await db.refresh(doc)
     return doc
