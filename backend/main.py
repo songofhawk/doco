@@ -37,17 +37,41 @@ class DocoYStore(BaseYStore):
         self._started = None
         self._starting = False
         self._task_group = None
+        self._pending_updates = []
+        self._save_task = None
 
     async def write(self, data: bytes) -> None:
-        logger.info(f"[YStore] write called for {self.room_name}, data size: {len(data) if data else 0}")
         if not data or len(data) <= 2:
-            logger.info(f"[YStore] Skipping small update for {self.room_name}")
             return
+
+        self._pending_updates.append(data)
+
+        if self._save_task:
+            self._save_task.cancel()
+
+        self._save_task = asyncio.create_task(self._debounced_save())
+
+    async def _debounced_save(self):
         try:
+            await asyncio.sleep(2.0)
+            if not self._pending_updates:
+                return
+
+            updates = self._pending_updates[:]
+            self._pending_updates.clear()
+
+            # 合并所有更新为一个
+            merged_doc = Y.YDoc()
+            for data in updates:
+                Y.apply_update(merged_doc, data)
+            merged_update = Y.encode_state_as_update(merged_doc)
+
             async with AsyncSessionLocal() as session:
-                session.add(YDocUpdate(doc_id=self.room_name, update=data))
+                session.add(YDocUpdate(doc_id=self.room_name, update=merged_update))
                 await session.commit()
-                logger.info(f"Persisted {len(data)} bytes for {self.room_name}")
+                logger.info(f"Persisted 1 merged update ({len(updates)} updates) for {self.room_name}")
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
             logger.error(f"Write error for {self.room_name}: {e}")
 
