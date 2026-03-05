@@ -78,9 +78,11 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                 const input = document.createElement('input')
                 input.type = 'file'
                 input.accept = 'image/*'
+                let uploading = false
                 input.onchange = async (e) => {
                     const file = (e.target as HTMLInputElement).files?.[0]
-                    if (!file) return
+                    if (!file || uploading) return
+                    uploading = true
                     const formData = new FormData()
                     formData.append('file', file)
                     try {
@@ -92,6 +94,8 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                         editor.chain().focus().setImage({ src: `http://127.0.0.1:8000${data.url}` }).run()
                     } catch (err) {
                         console.error('Upload failed:', err)
+                    } finally {
+                        uploading = false
                     }
                 }
                 input.click()

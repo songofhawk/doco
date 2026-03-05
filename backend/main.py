@@ -138,11 +138,27 @@ async def _migrate_db():
     """自动迁移：为已有表添加缺失的列"""
     from sqlalchemy import text, inspect
     async with engine.begin() as conn:
-        def _check_columns(sync_conn):
+        def _check_tables_and_columns(sync_conn):
             insp = inspect(sync_conn)
-            doc_cols = {c["name"] for c in insp.get_columns("documents")}
-            return doc_cols
-        doc_cols = await conn.run_sync(_check_columns)
+            tables = insp.get_table_names()
+            doc_cols = {c["name"] for c in insp.get_columns("documents")} if "documents" in tables else set()
+            return tables, doc_cols
+        tables, doc_cols = await conn.run_sync(_check_tables_and_columns)
+
+        if "attachments" not in tables:
+            await conn.execute(text("""
+                CREATE TABLE attachments (
+                    id VARCHAR PRIMARY KEY,
+                    filename VARCHAR NOT NULL,
+                    filepath VARCHAR NOT NULL,
+                    mime_type VARCHAR NOT NULL,
+                    size INTEGER NOT NULL,
+                    doc_id VARCHAR REFERENCES documents(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            logger.info("Migrated: created attachments table")
+
         if "kb_id" not in doc_cols:
             await conn.execute(text("ALTER TABLE documents ADD COLUMN kb_id INTEGER REFERENCES knowledge_bases(id)"))
             logger.info("Migrated: added kb_id to documents")
