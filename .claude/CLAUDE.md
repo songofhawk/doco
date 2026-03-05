@@ -269,7 +269,13 @@ room.ready = True                          # 开始监听新更新
 
 ## 开发规范
 
-- 使用 Playwright 验证前端功能时，必须使用无头模式（headless），避免弹出浏览器窗口干扰用户。
+### 关键规则
+
+1. **编辑器组件是独立包**：每次修改 `packages/editor/` 下的代码后，必须在该目录下运行 `pnpm run build` 编译，否则主项目无法使用最新代码。
+
+2. **全局对话框必须使用 Portal**：任何全局覆盖的对话框（如 `DocHistory`）必须使用 `createPortal(content, document.body)` 挂载到 body，避免被父容器的 CSS（opacity/visibility/overflow）影响导致意外隐藏。
+
+3. **Playwright 测试**：使用 Playwright 验证前端功能时，必须使用无头模式（headless），避免弹出浏览器窗口干扰用户。
 
 ---
 

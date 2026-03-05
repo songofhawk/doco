@@ -3,9 +3,9 @@ import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Dict
 
-from fastapi import FastAPI, WebSocket, Depends, HTTPException, Request
+from fastapi import FastAPI, WebSocket, Depends, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,10 @@ import y_py as Y
 from ypy_websocket.websocket_server import WebsocketServer
 from ypy_websocket.ystore import BaseYStore
 from database import get_db, AsyncSessionLocal, engine
-from models import KnowledgeBase, Folder, Document, YDocUpdate
+from models import KnowledgeBase, Folder, Document, YDocUpdate, Attachment
+import uuid
+import os
+from pathlib import Path
 
 # Try to import ExceptionGroup for better error inspection (Python 3.11+ or exceptiongroup backport)
 try:
@@ -435,6 +438,109 @@ def log_exception_group(e, room_name):
             log_exception_group(sub_e, room_name)
     else:
         logger.error(f"Sub-exception in room {room_name}: {e}", exc_info=True)
+
+# 图片上传目录
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@app.post("/api/attachments/upload")
+async def upload_attachment(
+    file: UploadFile = File(...),
+    doc_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    file_id = str(uuid.uuid4())
+    ext = Path(file.filename).suffix if file.filename else ""
+    filepath = UPLOAD_DIR / f"{file_id}{ext}"
+
+    content = await file.read()
+    filepath.write_bytes(content)
+
+    attachment = Attachment(
+        id=file_id,
+        filename=file.filename or "untitled",
+        filepath=str(filepath),
+        mime_type=file.content_type or "application/octet-stream",
+        size=len(content),
+        doc_id=doc_id
+    )
+    db.add(attachment)
+    await db.commit()
+
+    return {"id": file_id, "url": f"/api/attachments/{file_id}"}
+
+@app.get("/api/attachments/{attachment_id}")
+async def get_attachment(attachment_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Attachment).where(Attachment.id == attachment_id))
+    attachment = result.scalar_one_or_none()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(attachment.filepath, media_type=attachment.mime_type, filename=attachment.filename)
+
+@app.get("/api/docs/{doc_id}/history")
+async def get_doc_history(doc_id: str, db: AsyncSession = Depends(get_db)):
+    """获取文档历史版本列表"""
+    result = await db.execute(
+        select(YDocUpdate).where(YDocUpdate.doc_id == doc_id).order_by(YDocUpdate.created_at.desc())
+    )
+    updates = result.scalars().all()
+    return [{"id": u.id, "created_at": u.created_at.isoformat()} for u in updates]
+
+@app.get("/api/docs/{doc_id}/history/{update_id}")
+async def get_doc_version(doc_id: str, update_id: int, db: AsyncSession = Depends(get_db)):
+    """获取指定版本的文档内容"""
+    result = await db.execute(
+        select(YDocUpdate).where(YDocUpdate.doc_id == doc_id, YDocUpdate.id <= update_id).order_by(YDocUpdate.created_at)
+    )
+    updates = result.scalars().all()
+
+    ydoc = Y.YDoc()
+    for update in updates:
+        Y.apply_update(ydoc, update.update)
+
+    state = Y.encode_state_as_update(ydoc)
+    return {"state": state.hex()}
+
+@app.post("/api/docs/{doc_id}/restore/{update_id}")
+async def restore_doc_version(doc_id: str, update_id: int, db: AsyncSession = Depends(get_db)):
+    """恢复到指定版本"""
+    result = await db.execute(
+        select(YDocUpdate).where(YDocUpdate.doc_id == doc_id, YDocUpdate.id <= update_id).order_by(YDocUpdate.created_at)
+    )
+    updates = result.scalars().all()
+
+    ydoc = Y.YDoc()
+    for update in updates:
+        Y.apply_update(ydoc, update.update)
+
+    snapshot = Y.encode_state_as_update(ydoc)
+
+    from sqlalchemy import delete as sql_delete
+    await db.execute(sql_delete(YDocUpdate).where(YDocUpdate.doc_id == doc_id))
+    db.add(YDocUpdate(doc_id=doc_id, update=snapshot))
+    await db.commit()
+
+    return {"message": "恢复成功"}
+
+@app.post("/api/docs/{doc_id}/compact")
+async def compact_document(doc_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(YDocUpdate).where(YDocUpdate.doc_id == doc_id).order_by(YDocUpdate.created_at))
+    updates = result.scalars().all()
+
+    if len(updates) <= 1:
+        return {"message": "无需压缩", "before": len(updates), "after": len(updates)}
+
+    ydoc = Y.YDoc()
+    for update in updates:
+        Y.apply_update(ydoc, update.update)
+
+    snapshot = Y.encode_state_as_update(ydoc)
+
+    await db.execute(select(YDocUpdate).where(YDocUpdate.doc_id == doc_id).delete())
+    db.add(YDocUpdate(doc_id=doc_id, update=snapshot))
+    await db.commit()
+
+    return {"message": "压缩完成", "before": len(updates), "after": 1, "size": len(snapshot)}
 
 @app.websocket("/ws/{room_name}")
 async def ws_endpoint(websocket: WebSocket, room_name: str):

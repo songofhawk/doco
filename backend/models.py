@@ -45,3 +45,13 @@ class YDocUpdate(Base):
     doc_id = Column(String, index=True, nullable=False)
     update = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Attachment(Base):
+    __tablename__ = "attachments"
+    id = Column(String, primary_key=True, index=True)
+    filename = Column(String, nullable=False)
+    filepath = Column(String, nullable=False)
+    mime_type = Column(String, nullable=False)
+    size = Column(Integer, nullable=False)
+    doc_id = Column(String, ForeignKey("documents.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

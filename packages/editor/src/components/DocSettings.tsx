@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Settings, ListOrdered, Palette } from 'lucide-react'
+import { Settings, ListOrdered, Palette, Clock } from 'lucide-react'
+import { DocHistory } from './DocHistory'
 
 const BG_COLORS = [
     { label: '默认白', value: '#ffffff' },
@@ -12,20 +13,22 @@ const BG_COLORS = [
 ]
 
 interface DocSettingsProps {
+    docId: string
     headingNumbered: boolean
     onToggleNumbered: () => void
     bgColor: string
     onBgColorChange: (color: string) => void
 }
 
-export function DocSettings({ headingNumbered, onToggleNumbered, bgColor, onBgColorChange }: DocSettingsProps) {
+export function DocSettings({ docId, headingNumbered, onToggleNumbered, bgColor, onBgColorChange }: DocSettingsProps) {
     const [open, setOpen] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
     const panelRef = useRef<HTMLDivElement>(null)
     const btnRef = useRef<HTMLButtonElement>(null)
 
     // 点击外部关闭
     useEffect(() => {
-        if (!open) return
+        if (!open || showHistory) return
         const handler = (e: MouseEvent) => {
             if (panelRef.current?.contains(e.target as Node)) return
             if (btnRef.current?.contains(e.target as Node)) return
@@ -33,7 +36,7 @@ export function DocSettings({ headingNumbered, onToggleNumbered, bgColor, onBgCo
         }
         document.addEventListener('mousedown', handler)
         return () => document.removeEventListener('mousedown', handler)
-    }, [open])
+    }, [open, showHistory])
 
     return (
         <div className="relative">
@@ -75,6 +78,18 @@ export function DocSettings({ headingNumbered, onToggleNumbered, bgColor, onBgCo
                     {/* 分割线 */}
                     <div className="mx-3 my-1.5 border-t border-gray-100" />
 
+                    {/* 文档历史 */}
+                    <button
+                        onClick={() => { setShowHistory(true); setOpen(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                        <Clock size={16} className="text-gray-500 shrink-0" />
+                        <span className="text-sm text-gray-700">文档历史</span>
+                    </button>
+
+                    {/* 分割线 */}
+                    <div className="mx-3 my-1.5 border-t border-gray-100" />
+
                     {/* 背景颜色 */}
                     <div className="px-3 py-2">
                         <div className="flex items-center gap-2 mb-2">
@@ -94,6 +109,14 @@ export function DocSettings({ headingNumbered, onToggleNumbered, bgColor, onBgCo
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showHistory && (
+                <DocHistory
+                    docId={docId}
+                    onClose={() => setShowHistory(false)}
+                    onRestore={() => window.location.reload()}
+                />
             )}
         </div>
     )

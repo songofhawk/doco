@@ -396,6 +396,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             {/* 文档设置按钮 */}
             <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <DocSettings
+                    docId={docId}
                     headingNumbered={headingNumbered}
                     onToggleNumbered={() => setHeadingNumbered(v => {
                         const next = !v
