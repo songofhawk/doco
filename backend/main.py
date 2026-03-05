@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.future import select
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 import y_py as Y
 
@@ -536,7 +537,7 @@ async def compact_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
     snapshot = Y.encode_state_as_update(ydoc)
 
-    await db.execute(select(YDocUpdate).where(YDocUpdate.doc_id == doc_id).delete())
+    await db.execute(delete(YDocUpdate).where(YDocUpdate.doc_id == doc_id))
     db.add(YDocUpdate(doc_id=doc_id, update=snapshot))
     await db.commit()
 
