@@ -75,15 +75,6 @@ export const ImageComponent = ({ node, updateAttributes, selected, deleteNode, e
                         onMouseDown={onMouseDown}
                     />
                 )}
-
-                {/* 对齐工具栏 */}
-                {selected && (
-                    <ImageToolbar
-                        align={align || 'left'}
-                        onAlign={(a) => updateAttributes({ align: a })}
-                        onDelete={deleteNode}
-                    />
-                )}
             </div>
         </NodeViewWrapper>
     )
