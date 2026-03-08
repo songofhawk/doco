@@ -45,7 +45,7 @@ import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
-    docId, initialMeta, collaboration, onTitleChange, onSettingsChange,
+    docId, initialMeta, collaboration, onTitleChange, onSettingsChange, onExport,
     externalTitle, extraExtensions, placeholder: placeholderText, className, style
 }, ref) => {
     const [title, setTitle] = useState('')
@@ -77,8 +77,31 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     useEffect(() => {
         const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
         if (!provider) return () => { idb.destroy() }
-        const timer = setTimeout(() => provider.connect(), 0)
-        return () => { clearTimeout(timer); provider.disconnect(); idb.destroy() }
+
+        let syncHandler: ((isSynced: boolean) => void) | null = null
+
+        idb.once('synced', () => {
+            provider.connect()
+
+            // 连接同步后，主动触发一次文档更新以推送完整状态
+            syncHandler = (isSynced: boolean) => {
+                if (isSynced) {
+                    // 触发一个空事务，让 Yjs 重新同步状态
+                    ydoc.transact(() => {})
+                    if (syncHandler) {
+                        provider.off('sync', syncHandler)
+                        syncHandler = null
+                    }
+                }
+            }
+            provider.on('sync', syncHandler)
+        })
+
+        return () => {
+            if (syncHandler) provider.off('sync', syncHandler)
+            provider.disconnect()
+            idb.destroy()
+        }
     }, [provider, ydoc, docId])
 
     // 从 props 加载文档元数据
@@ -147,6 +170,14 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 codeBlock: false,
                 undoRedo: !provider,
             }),
+        ]
+
+        // Collaboration 必须在自定义节点之前注册
+        if (provider) {
+            exts.push(Collaboration.configure({ document: ydoc, field: 'default' }))
+        }
+
+        exts.push(
             CodeBlockLowlight.extend({
                 addNodeView() {
                     return ReactNodeViewRenderer(CodeBlockComponent as any)
@@ -184,10 +215,8 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             CollapseExtension.configure({
                 onCollapseChange: handleCollapseChange,
             }),
-        ]
-        if (provider) {
-            exts.push(Collaboration.configure({ document: ydoc, field: 'default', provider }))
-        }
+        )
+
         if (extraExtensions) exts.push(...extraExtensions)
         return exts
     }, [ydoc, provider, placeholderText, extraExtensions, handleCollapseChange])
@@ -292,6 +321,32 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         editor.on('update', update)
         return () => { editor.off('update', update) }
     }, [editor])
+
+    // 自动导出 Markdown（停止编辑 5 秒后）
+    useEffect(() => {
+        if (!editor || !onExport) return
+
+        let timer: any
+        let lastContent = ''
+
+        const handleUpdate = () => {
+            clearTimeout(timer)
+            timer = setTimeout(async () => {
+                const markdown = (editor.storage as any).markdown?.getMarkdown?.() || ''
+                if (markdown && markdown !== lastContent) {
+                    lastContent = markdown
+                    await onExport(docId, markdown)
+                }
+            }, 5000)
+        }
+
+        editor.on('update', handleUpdate)
+        return () => {
+            clearTimeout(timer)
+            editor.off('update', handleUpdate)
+        }
+    }, [editor, docId, onExport])
+
 
     // 同步标题编号：动态生成 CSS counter 规则适配最小标题级别
     const [minHeadingLevel, setMinHeadingLevel] = useState(1)

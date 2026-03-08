@@ -78,6 +78,13 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
           body: JSON.stringify(payload)
         }).catch(() => {})
       }}
+      onExport={async (docId, markdown) => {
+        await fetch(`${API_BASE}/export/markdown`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ doc_id: docId, markdown })
+        }).catch(() => {})
+      }}
       externalTitle={externalTitle}
     />
   )

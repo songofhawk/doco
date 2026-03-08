@@ -9,8 +9,20 @@ export const CalloutBlock = Node.create({
 
     addAttributes() {
         return {
-            emoji: { default: '💡' },
-            color: { default: 'blue' },
+            emoji: {
+                default: '💡',
+                parseHTML: element => element.getAttribute('data-emoji'),
+                renderHTML: attributes => ({
+                    'data-emoji': attributes.emoji,
+                }),
+            },
+            color: {
+                default: 'blue',
+                parseHTML: element => element.getAttribute('data-color'),
+                renderHTML: attributes => ({
+                    'data-color': attributes.color,
+                }),
+            },
         }
     },
 

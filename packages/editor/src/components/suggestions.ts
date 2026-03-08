@@ -107,7 +107,12 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
             keywords: ['mermaid', 'flowchart', 'lct'],
             icon: Network,
             command: ({ editor, range }: any) => {
-                editor.chain().focus().deleteRange(range).insertContent({ type: 'mermaidBlock' }).run()
+                editor.chain().focus().deleteRange(range).insertContent({
+                    type: 'mermaidBlock',
+                    attrs: {
+                        code: 'graph TD\n  A[开始] --> B[核心处理]\n  B --> C[结束]'
+                    }
+                }).run()
             },
         },
         {
@@ -116,7 +121,12 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
             keywords: ['plantuml', 'uml', 'sequence'],
             icon: FileCode,
             command: ({ editor, range }: any) => {
-                editor.chain().focus().deleteRange(range).insertContent({ type: 'plantUMLBlock' }).run()
+                editor.chain().focus().deleteRange(range).insertContent({
+                    type: 'plantUMLBlock',
+                    attrs: {
+                        code: '@startuml\nAlice -> Bob: 你好\nBob --> Alice: 你好!\n@enduml'
+                    }
+                }).run()
             },
         },
         {

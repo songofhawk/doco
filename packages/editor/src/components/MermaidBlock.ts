@@ -11,6 +11,12 @@ export const MermaidBlock = Node.create({
         return {
             code: {
                 default: 'graph TD\n  A[开始] --> B[核心处理]\n  B --> C[结束]',
+                parseHTML: element => element.getAttribute('data-code'),
+                renderHTML: attributes => {
+                    return {
+                        'data-code': attributes.code,
+                    }
+                },
             },
         }
     },

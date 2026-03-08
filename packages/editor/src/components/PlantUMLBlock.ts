@@ -11,6 +11,10 @@ export const PlantUMLBlock = Node.create({
         return {
             code: {
                 default: '@startuml\nAlice -> Bob: 你好\nBob --> Alice: 你好!\n@enduml',
+                parseHTML: element => element.getAttribute('data-code'),
+                renderHTML: attributes => ({
+                    'data-code': attributes.code,
+                }),
             },
         }
     },

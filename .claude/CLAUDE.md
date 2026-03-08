@@ -3,6 +3,28 @@
 基于 **Tiptap (ProseMirror) + React + Vite** 的富文本协同编辑器，支持多端实时同步（Yjs CRDT），具备知识库管理能力。
 
 永远输出中文。
+
+---
+
+## 自动导出 Markdown
+
+系统支持后端自动导出文档为 Markdown 文件，方便 AI 读取文档内容。
+
+**实现方案：**
+- 后端导出：使用 `export_service.py` 从数据库重建 YDoc 并转换为 Markdown
+- 导出路径：`exports/{知识库}/{文件夹}/{文档标题}.md`
+- 手动触发：`python backend/batch_export.py` 批量导出所有文档
+
+**已知问题：**
+- 历史数据可能不完整：之前的 bug (`len(data) <= 2` 过滤) 导致部分文档的更新记录丢失
+- 数据存储：前端使用 IndexedDB 作为主存储，后端数据库作为备份
+- 恢复方法：在前端打开文档并编辑，触发完整同步到后端
+
+**关键文件：**
+- 后端导出服务：[export_service.py](backend/export_service.py)
+- 批量导出脚本：[batch_export.py](backend/batch_export.py)
+- 持久化修复：[main.py:44-46](backend/main.py#L44-L46) 移除了 `len(data) <= 2` 过滤
+
 ---
 
 ## 技术栈
