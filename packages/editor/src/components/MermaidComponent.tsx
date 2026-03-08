@@ -153,7 +153,7 @@ export const MermaidComponent = (props: any) => {
                     style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 >
                     <div
-                        className="select-none"
+                        className="select-none bg-white p-6 rounded-lg shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                         style={{
                             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -161,7 +161,7 @@ export const MermaidComponent = (props: any) => {
                         }}
                     >
                         {error ? (
-                            <div className="text-red-500 text-sm bg-white p-4 rounded">{error}</div>
+                            <div className="text-red-500 text-sm">{error}</div>
                         ) : (
                             <div dangerouslySetInnerHTML={{ __html: svg }} />
                         )}

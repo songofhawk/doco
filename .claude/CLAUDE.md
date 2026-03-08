@@ -112,10 +112,38 @@ doco/
 ### 2. 协同编辑（Yjs）
 
 ```
-前端 y-websocket (WebsocketProvider)
-  ↕  binary CRDT 增量消息
-后端 ypy-websocket (WebsocketServer) running in FastAPI
+前端 IndexedDB (y-indexeddb) ← 本地持久化
+       ↕
+前端 Y.Doc ← y-websocket (WebsocketProvider)
+       ↕  binary CRDT 增量消息
+后端 ypy-websocket (WebsocketServer) → SQLite (YDocUpdate 表)
 ```
+
+**双重持久化机制：**
+
+- **前端 IndexedDB**：使用 `y-indexeddb` 将 YDoc 自动保存到浏览器本地，作为主存储
+- **后端 SQLite**：通过 `DocoYStore` 将增量更新写入数据库，作为备份和多端同步
+
+**前端初始化流程** ([DocoEditor.tsx:76-105](packages/editor/src/DocoEditor.tsx#L76-L105))：
+
+```typescript
+// 1. 先从 IndexedDB 加载本地数据
+const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
+
+// 2. 等待 IndexedDB 同步完成后再连接 WebSocket
+idb.once('synced', () => {
+  provider.connect()
+
+  // 3. WebSocket 连接成功后，触发空事务推送完整状态到后端
+  provider.on('sync', (isSynced) => {
+    if (isSynced) {
+      ydoc.transact(() => {}) // 触发同步
+    }
+  })
+})
+```
+
+> ⚠️ **重要**：IndexedDB 是主存储，后端数据库是备份。历史数据可能因之前的 bug 不完整，需在前端打开文档并编辑以触发完整同步。
 
 **关键实现要点：**
 
