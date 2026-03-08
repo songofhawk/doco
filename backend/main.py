@@ -16,6 +16,7 @@ from ypy_websocket.websocket_server import WebsocketServer
 from ypy_websocket.ystore import BaseYStore
 from database import get_db, AsyncSessionLocal, engine
 from models import KnowledgeBase, Folder, Document, YDocUpdate, Attachment
+from export_service import export_document_to_markdown
 import uuid
 import os
 from pathlib import Path
@@ -34,46 +35,84 @@ class DocoYStore(BaseYStore):
 
     def __init__(self, room_name: str):
         self.room_name = room_name
+        self.ydoc = None
         self._started = None
         self._starting = False
         self._task_group = None
         self._pending_updates = []
         self._save_task = None
+        self._last_write_at = 0.0
+
+    def bind_doc(self, ydoc: Y.YDoc) -> None:
+        self.ydoc = ydoc
 
     async def write(self, data: bytes) -> None:
-        if not data or len(data) <= 2:
+        if not data:
             return
 
+        self._last_write_at = asyncio.get_running_loop().time()
+        size = len(data)
         self._pending_updates.append(data)
+        pending_count = len(self._pending_updates)
+        logger.info(
+            f"[YStore] write() room={self.room_name} size={size}B pending={pending_count}"
+        )
 
-        if self._save_task:
-            self._save_task.cancel()
-
-        self._save_task = asyncio.create_task(self._debounced_save())
+        if self._save_task is None or self._save_task.done():
+            self._save_task = asyncio.create_task(self._debounced_save())
 
     async def _debounced_save(self):
         try:
-            await asyncio.sleep(2.0)
-            if not self._pending_updates:
+            while True:
+                delay = 2.0 - (asyncio.get_running_loop().time() - self._last_write_at)
+                if delay > 0:
+                    await asyncio.sleep(delay)
+
+                if not self._pending_updates:
+                    return
+
+                # If new writes arrived during the sleep window, keep debouncing.
+                quiet_for = asyncio.get_running_loop().time() - self._last_write_at
+                if quiet_for < 2.0:
+                    continue
+
+                updates = self._pending_updates[:]
+                self._pending_updates.clear()
+                sizes = [len(u) for u in updates]
+                total_bytes = sum(sizes)
+
+                logger.info(
+                    f"[YStore] flush-start room={self.room_name} batch={len(updates)} total={total_bytes}B sizes={sizes}"
+                )
+
+                if self.ydoc is None:
+                    logger.warning(f"[YStore] flush-skip room={self.room_name} reason=no-ydoc")
+                    return
+
+                snapshot = Y.encode_state_as_update(self.ydoc)
+                snapshot_size = len(snapshot)
+
+                if snapshot_size <= 2:
+                    logger.info(
+                        f"[YStore] flush-skip room={self.room_name} reason=empty-snapshot size={snapshot_size}B"
+                    )
+                    return
+
+                # Persist the whole room snapshot so reconnect-replayed docs are stored too.
+                async with AsyncSessionLocal() as session:
+                    skipped_count = sum(1 for data in updates if len(data) <= 2)
+                    session.add(YDocUpdate(doc_id=self.room_name, update=snapshot))
+                    await session.commit()
+                    logger.info(
+                        f"[YStore] flush-done room={self.room_name} snapshot={snapshot_size}B source_batch={len(updates)} skipped_small={skipped_count}"
+                    )
                 return
-
-            updates = self._pending_updates[:]
-            self._pending_updates.clear()
-
-            # 合并所有更新为一个
-            merged_doc = Y.YDoc()
-            for data in updates:
-                Y.apply_update(merged_doc, data)
-            merged_update = Y.encode_state_as_update(merged_doc)
-
-            async with AsyncSessionLocal() as session:
-                session.add(YDocUpdate(doc_id=self.room_name, update=merged_update))
-                await session.commit()
-                logger.info(f"Persisted 1 merged update ({len(updates)} updates) for {self.room_name}")
         except asyncio.CancelledError:
             pass
         except Exception as e:
             logger.error(f"Write error for {self.room_name}: {e}")
+        finally:
+            self._save_task = None
 
     async def read(self):
         """Async generator yielding (update, metadata) tuples."""
@@ -111,12 +150,19 @@ class DocoWebsocketServer(WebsocketServer):
             # Use YRoom with built-in ystore for persistence
             store = DocoYStore(name)
             room = YRoom(ystore=store, ready=False)
+            store.bind_doc(room.ydoc)
 
             # Load existing state
             try:
                 await store.apply_updates(room.ydoc)
                 state_size = len(Y.encode_state_as_update(room.ydoc))
                 logger.info(f"Room {name} loaded ({state_size} bytes)")
+
+                # 如果状态太小（可能是损坏的数据），清空让客户端重新同步
+                if state_size <= 10:
+                    logger.warning(f"Room {name} has corrupted/empty state, clearing to force client sync")
+                    room.ydoc = Y.YDoc()
+                    store.bind_doc(room.ydoc)
             except Exception as e:
                 logger.error(f"Load error for {name}: {e}")
 
@@ -445,18 +491,14 @@ class FastAPIWebsocket:
         except: pass
 
     async def recv(self) -> bytes:
-        logger.info("[WS] Waiting for message...")
         msg = await self._websocket.receive()
-        logger.info(f"[WS] Got message type: {msg.get('type')}")
         if msg.get("type") == "websocket.disconnect":
             raise ConnectionError("Disconnected")
         data = msg.get("bytes")
         if data is not None:
-            logger.info(f"[WS] Received {len(data)} bytes")
             return data
         text = msg.get("text")
         if text is not None:
-            logger.info(f"[WS] Received text: {len(text)} chars")
             return text.encode()
         raise ConnectionError("Protocol Error")
 
@@ -583,15 +625,84 @@ async def compact_document(doc_id: str, db: AsyncSession = Depends(get_db)):
 
     return {"message": "压缩完成", "before": len(updates), "after": 1, "size": len(snapshot)}
 
+@app.post("/api/export/all")
+async def export_all_docs(db: AsyncSession = Depends(get_db)):
+    """批量导出所有文档为 Markdown"""
+    result = await db.execute(select(Document))
+    documents = result.scalars().all()
+
+    success_count = 0
+    for doc in documents:
+        export_path = await export_document_to_markdown(doc.id, db)
+        if export_path:
+            success_count += 1
+
+    return {"message": "导出完成", "total": len(documents), "success": success_count}
+
+class MarkdownExportRequest(BaseModel):
+    doc_id: str
+    markdown: str
+
+@app.post("/api/export/markdown")
+async def save_markdown_export(request: MarkdownExportRequest, db: AsyncSession = Depends(get_db)):
+    """接收前端转换好的 Markdown 并保存"""
+    from export_service import save_markdown_content
+
+    export_path = await save_markdown_content(request.doc_id, request.markdown, db)
+    if export_path:
+        return {"success": True, "path": str(export_path)}
+    return {"success": False, "error": "导出失败"}
+
+class DocContentUpdate(BaseModel):
+    markdown: str
+
+@app.get("/api/docs/{doc_id}/markdown")
+async def get_doc_markdown(doc_id: str, db: AsyncSession = Depends(get_db)):
+    """获取文档的 Markdown 内容（供 AI Agent 读取）"""
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    result = await db.execute(
+        select(YDocUpdate).where(YDocUpdate.doc_id == doc_id).order_by(YDocUpdate.created_at)
+    )
+    updates = result.scalars().all()
+
+    ydoc = Y.YDoc()
+    for update in updates:
+        Y.apply_update(ydoc, update.update)
+
+    from export_service import _ydoc_to_markdown
+    markdown = await _ydoc_to_markdown(ydoc, doc)
+
+    return {"doc_id": doc_id, "title": doc.title, "markdown": markdown}
+
+@app.put("/api/docs/{doc_id}/markdown")
+async def update_doc_markdown(doc_id: str, update: DocContentUpdate, db: AsyncSession = Depends(get_db)):
+    """更新文档内容（从 Markdown，供 AI Agent 写入）"""
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    from export_service import _markdown_to_ydoc
+    ydoc = _markdown_to_ydoc(update.markdown)
+    snapshot = Y.encode_state_as_update(ydoc)
+
+    from sqlalchemy import delete as sql_delete
+    await db.execute(sql_delete(YDocUpdate).where(YDocUpdate.doc_id == doc_id))
+    db.add(YDocUpdate(doc_id=doc_id, update=snapshot))
+    await db.commit()
+
+    return {"success": True, "doc_id": doc_id}
+
 @app.websocket("/ws/{room_name}")
 async def ws_endpoint(websocket: WebSocket, room_name: str):
     await websocket.accept()
     logger.info(f"[WS] Client connected to room: {room_name}")
     try:
         ws = FastAPIWebsocket(websocket)
-        logger.info(f"[WS] Calling serve, server task_group: {websocket_server._task_group is not None}")
         await websocket_server.serve(ws)
-        logger.info(f"[WS] serve returned for {room_name}")
+        logger.info(f"[WS] Client session closed for room: {room_name}")
     except Exception as e:
         if "Disconnected" in str(e) or "protocol.disconnect" in str(e):
             logger.info(f"WebSocket client disconnected from {room_name}")
