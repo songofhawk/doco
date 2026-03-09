@@ -36,7 +36,27 @@ export const PlantUMLComponent = (props: any) => {
             if (!res.ok) throw new Error(`PlantUML 服务返回 ${res.status}`)
             const svg = await res.text()
             if (svg.includes('<svg')) {
-                setSvgUrl(svg)
+                // 放大 SVG 3 倍
+                try {
+                    const parser = new DOMParser()
+                    const doc = parser.parseFromString(svg, 'image/svg+xml')
+                    const svgEl = doc.querySelector('svg')
+                    if (svgEl) {
+                        const width = parseFloat(svgEl.getAttribute('width') || '0')
+                        const height = parseFloat(svgEl.getAttribute('height') || '0')
+                        if (width > 0 && height > 0) {
+                            svgEl.setAttribute('width', String(width * 3))
+                            svgEl.setAttribute('height', String(height * 3))
+                            setSvgUrl(new XMLSerializer().serializeToString(svgEl))
+                        } else {
+                            setSvgUrl(svg)
+                        }
+                    } else {
+                        setSvgUrl(svg)
+                    }
+                } catch {
+                    setSvgUrl(svg)
+                }
                 setError(null)
             } else {
                 setError('PlantUML 语法错误')
@@ -84,7 +104,7 @@ export const PlantUMLComponent = (props: any) => {
     }
 
     const openFullscreen = () => {
-        setScale(2)
+        setScale(1)
         setPosition({ x: 0, y: 0 })
         setIsFullscreen(true)
     }
@@ -103,7 +123,7 @@ export const PlantUMLComponent = (props: any) => {
                             spellCheck={false}
                             placeholder="输入 PlantUML 代码..."
                         />
-                        <div className="p-4 flex justify-center bg-white min-h-[120px] items-center">
+                        <div className="p-4 bg-white overflow-auto" style={{ maxHeight: 'none' }}>
                             {loading ? (
                                 <div className="text-gray-400 text-sm">渲染中...</div>
                             ) : error ? (
@@ -115,7 +135,7 @@ export const PlantUMLComponent = (props: any) => {
                     </div>
                 ) : (
                     <div
-                        className="p-6 cursor-pointer flex justify-center min-h-[120px] items-center bg-gray-50/50"
+                        className="p-6 cursor-pointer bg-gray-50/50 overflow-auto"
                         onDoubleClick={() => setIsEditing(true)}
                     >
                         {loading ? (
@@ -150,7 +170,7 @@ export const PlantUMLComponent = (props: any) => {
 
             {isFullscreen && createPortal(
                 <div
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
+                    className="fixed inset-0 bg-black/80 z-50 overflow-hidden"
                     onClick={() => setIsFullscreen(false)}
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
@@ -160,10 +180,10 @@ export const PlantUMLComponent = (props: any) => {
                     style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 >
                     <div
-                        className="select-none"
+                        className="select-none absolute top-1/2 left-1/2"
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                            transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${scale})`,
                             transformOrigin: 'center',
                         }}
                     >

@@ -4,7 +4,49 @@ import { Maximize2, Edit3 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import mermaid from 'mermaid'
 
-mermaid.initialize({ startOnLoad: false, theme: 'default' })
+const MERMAID_FONT_SIZE = 24
+const MERMAID_MAX_VIEWPORT_HEIGHT = 1080
+const MIN_FULLSCREEN_SCALE = 0.2
+const MAX_FULLSCREEN_SCALE = 4
+const FULLSCREEN_ZOOM_SENSITIVITY = 0.0015
+
+mermaid.initialize({
+    startOnLoad: false,
+    theme: 'default',
+    themeVariables: {
+        fontSize: `${MERMAID_FONT_SIZE}px`,
+        fontFamily: 'arial'
+    }
+})
+
+const normalizeMermaidSvg = (rawSvg: string) => {
+    try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(rawSvg, 'image/svg+xml')
+        const svgEl = doc.querySelector('svg')
+
+        if (!svgEl) return rawSvg
+
+        const width = svgEl.getAttribute('width')
+        const height = svgEl.getAttribute('height')
+        const viewBox = svgEl.getAttribute('viewBox')?.split(/\s+/).map(Number)
+
+        if ((!width || !height) && viewBox && viewBox.length === 4) {
+            svgEl.setAttribute('width', String(viewBox[2]))
+            svgEl.setAttribute('height', String(viewBox[3]))
+        }
+
+        svgEl.style.maxWidth = 'none'
+        svgEl.style.width = 'max-content'
+        svgEl.style.height = 'auto'
+        svgEl.style.display = 'block'
+        svgEl.style.backgroundColor = '#fff'
+
+        return new XMLSerializer().serializeToString(svgEl)
+    } catch {
+        return rawSvg
+    }
+}
 
 export const MermaidComponent = (props: any) => {
     const [code, setCode] = useState(props.node.attrs.code)
@@ -26,9 +68,9 @@ export const MermaidComponent = (props: any) => {
                     if (isMounted) setSvg('')
                     return
                 }
-                const { svg } = await mermaid.render(id.current, code)
+                const { svg: rawSvg } = await mermaid.render(id.current, code)
                 if (isMounted) {
-                    setSvg(svg)
+                    setSvg(normalizeMermaidSvg(rawSvg))
                     setError(null)
                 }
             } catch (err: any) {
@@ -48,6 +90,17 @@ export const MermaidComponent = (props: any) => {
         }
     }, [code])
 
+    useEffect(() => {
+        if (!isFullscreen) return
+
+        const previousOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        return () => {
+            document.body.style.overflow = previousOverflow
+        }
+    }, [isFullscreen])
+
     const handleBlur = () => {
         setIsEditing(false)
         props.updateAttributes({ code })
@@ -59,11 +112,22 @@ export const MermaidComponent = (props: any) => {
 
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault()
-        const delta = e.deltaY > 0 ? 0.9 : 1.1
-        setScale(s => Math.min(Math.max(0.1, s * delta), 5))
+        e.stopPropagation()
+
+        if (e.ctrlKey || e.metaKey) {
+            const zoomDelta = Math.exp(-e.deltaY * FULLSCREEN_ZOOM_SENSITIVITY)
+            setScale(s => Math.min(Math.max(MIN_FULLSCREEN_SCALE, s * zoomDelta), MAX_FULLSCREEN_SCALE))
+            return
+        }
+
+        setPosition(prev => ({
+            x: prev.x - e.deltaX,
+            y: prev.y - e.deltaY
+        }))
     }
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation()
         if (e.button === 0) {
             setIsDragging(true)
             setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
@@ -71,24 +135,32 @@ export const MermaidComponent = (props: any) => {
     }
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        e.stopPropagation()
         if (isDragging) {
             setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
         }
     }
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e?: React.MouseEvent) => {
+        e?.stopPropagation()
         setIsDragging(false)
     }
 
     const openFullscreen = () => {
-        setScale(2)
+        setScale(1)
         setPosition({ x: 0, y: 0 })
         setIsFullscreen(true)
     }
 
+    const diagramViewportStyle = {
+        maxHeight: `${MERMAID_MAX_VIEWPORT_HEIGHT}px`,
+    }
+
+    const diagramContentClassName = 'inline-block min-w-full w-max'
+
     return (
         <>
-            <NodeViewWrapper className="mermaid-block my-6 border border-gray-100 rounded-lg overflow-hidden bg-white group shadow-sm transition-shadow hover:shadow-md relative">
+            <NodeViewWrapper className="mermaid-block my-6 max-w-full border border-gray-100 rounded-lg overflow-hidden bg-white group shadow-sm transition-shadow hover:shadow-md relative">
                 {isEditing ? (
                     <div className="flex flex-col">
                         <textarea
@@ -100,23 +172,30 @@ export const MermaidComponent = (props: any) => {
                             spellCheck={false}
                             placeholder="输入 Mermaid 代码..."
                         />
-                        <div className="p-4 flex justify-center bg-white min-h-[120px] items-center">
+                        <div className="p-4 bg-white overflow-auto max-w-full" style={diagramViewportStyle}>
                             {error ? (
                                 <div className="text-red-500 text-sm whitespace-pre-wrap">{error}</div>
                             ) : (
-                                <div dangerouslySetInnerHTML={{ __html: svg }} />
+                                <div
+                                    className={diagramContentClassName}
+                                    dangerouslySetInnerHTML={{ __html: svg }}
+                                />
                             )}
                         </div>
                     </div>
                 ) : (
                     <div
-                        className="p-6 cursor-pointer flex justify-center min-h-[120px] items-center bg-gray-50/50"
+                        className="p-6 cursor-pointer bg-gray-50/50 overflow-auto max-w-full"
+                        style={diagramViewportStyle}
                         onDoubleClick={handleDoubleClick}
                     >
                         {error ? (
                             <div className="text-red-400 text-sm">解析异常: 双击以编辑修复。</div>
                         ) : svg ? (
-                            <div dangerouslySetInnerHTML={{ __html: svg }} />
+                            <div
+                                className={diagramContentClassName}
+                                dangerouslySetInnerHTML={{ __html: svg }}
+                            />
                         ) : (
                             <div className="text-gray-400 text-sm italic">双击编辑图表</div>
                         )}
@@ -143,7 +222,7 @@ export const MermaidComponent = (props: any) => {
 
             {isFullscreen && createPortal(
                 <div
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"
+                    className="fixed inset-0 bg-black/80 z-50 overflow-hidden"
                     onClick={() => setIsFullscreen(false)}
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
@@ -153,17 +232,26 @@ export const MermaidComponent = (props: any) => {
                     style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 >
                     <div
-                        className="select-none bg-white p-6 rounded-lg shadow-2xl"
+                        className="select-none bg-white p-6 rounded-lg shadow-2xl absolute top-1/2 left-1/2"
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                            transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${scale})`,
                             transformOrigin: 'center',
+                            width: 'max-content',
+                            height: 'max-content',
+                            minWidth: 'fit-content',
+                            minHeight: 'fit-content',
+                            touchAction: 'none',
                         }}
                     >
                         {error ? (
                             <div className="text-red-500 text-sm">{error}</div>
                         ) : (
-                            <div dangerouslySetInnerHTML={{ __html: svg }} />
+                            <div
+                                className="inline-block"
+                                style={{ backgroundColor: '#fff' }}
+                                dangerouslySetInnerHTML={{ __html: svg }}
+                            />
                         )}
                     </div>
                 </div>,
