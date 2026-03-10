@@ -4,7 +4,7 @@ import { Maximize2, Edit3 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import mermaid from 'mermaid'
 
-const MERMAID_FONT_SIZE = 24
+const MERMAID_SCALE = 0.8
 const MERMAID_MAX_VIEWPORT_HEIGHT = 1080
 const MIN_FULLSCREEN_SCALE = 0.2
 const MAX_FULLSCREEN_SCALE = 4
@@ -14,7 +14,6 @@ mermaid.initialize({
     startOnLoad: false,
     theme: 'default',
     themeVariables: {
-        fontSize: `${MERMAID_FONT_SIZE}px`,
         fontFamily: 'arial'
     }
 })
@@ -31,9 +30,17 @@ const normalizeMermaidSvg = (rawSvg: string) => {
         const height = svgEl.getAttribute('height')
         const viewBox = svgEl.getAttribute('viewBox')?.split(/\s+/).map(Number)
 
-        if ((!width || !height) && viewBox && viewBox.length === 4) {
-            svgEl.setAttribute('width', String(viewBox[2]))
-            svgEl.setAttribute('height', String(viewBox[3]))
+        let svgWidth = width ? Number.parseFloat(width) : NaN
+        let svgHeight = height ? Number.parseFloat(height) : NaN
+
+        if ((!Number.isFinite(svgWidth) || !Number.isFinite(svgHeight)) && viewBox && viewBox.length === 4) {
+            svgWidth = viewBox[2]
+            svgHeight = viewBox[3]
+        }
+
+        if (Number.isFinite(svgWidth) && Number.isFinite(svgHeight)) {
+            svgEl.setAttribute('width', String(svgWidth * MERMAID_SCALE))
+            svgEl.setAttribute('height', String(svgHeight * MERMAID_SCALE))
         }
 
         svgEl.style.maxWidth = 'none'

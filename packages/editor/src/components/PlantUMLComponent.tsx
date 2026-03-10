@@ -36,7 +36,7 @@ export const PlantUMLComponent = (props: any) => {
             if (!res.ok) throw new Error(`PlantUML 服务返回 ${res.status}`)
             const svg = await res.text()
             if (svg.includes('<svg')) {
-                // 放大 SVG 3 倍
+                // 放大 SVG 2 倍
                 try {
                     const parser = new DOMParser()
                     const doc = parser.parseFromString(svg, 'image/svg+xml')
@@ -45,8 +45,8 @@ export const PlantUMLComponent = (props: any) => {
                         const width = parseFloat(svgEl.getAttribute('width') || '0')
                         const height = parseFloat(svgEl.getAttribute('height') || '0')
                         if (width > 0 && height > 0) {
-                            svgEl.setAttribute('width', String(width * 3))
-                            svgEl.setAttribute('height', String(height * 3))
+                            svgEl.setAttribute('width', String(width * 2))
+                            svgEl.setAttribute('height', String(height * 2))
                             setSvgUrl(new XMLSerializer().serializeToString(svgEl))
                         } else {
                             setSvgUrl(svg)
