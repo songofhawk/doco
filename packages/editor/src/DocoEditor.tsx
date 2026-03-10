@@ -40,6 +40,7 @@ import { DocSettings } from './components/DocSettings'
 import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
+import { ListNormalizationExtension } from './components/ListNormalizationExtension'
 import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 
 const lowlight = createLowlight(common)
@@ -197,6 +198,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             }),
             TaskList,
             TaskItem.configure({ nested: true }),
+            ListNormalizationExtension,
             Markdown,
             MermaidBlock,
             PlantUMLBlock,

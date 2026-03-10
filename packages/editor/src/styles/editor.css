@@ -70,14 +70,24 @@
 
   /* 标题多级编号样式由 JS 动态注入（见 index.tsx doco-heading-numbering） */
 
+  ul, ol {
+    padding-left: 1.5rem;
+  }
+
   ul {
     list-style-type: disc;
-    padding-left: 1.5rem;
   }
 
   ol {
     list-style-type: decimal;
-    padding-left: 1.5rem;
+  }
+
+  ul > li, ol > li {
+    margin-top: 0;
+  }
+
+  ul > li > p, ol > li > p {
+    margin: 0;
   }
 
   ul[data-type="taskList"] {
@@ -87,7 +97,6 @@
     li {
       display: flex;
       align-items: flex-start;
-      margin-top: 0.5em;
 
       >label {
         flex: 0 0 auto;
