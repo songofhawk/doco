@@ -52,7 +52,7 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
       docId={id}
       key={id}
       initialMeta={meta}
-      collaboration={{ websocketUrl: 'ws://127.0.0.1:8000/ws' }}
+      collaboration={{ websocketUrl: import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000/ws' }}
       onTitleChange={(docId, title) => {
         fetch(`${API_BASE}/docs/${docId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },

@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "cd packages/editor && pnpm run build && cd ../.. && tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "pnpm run build && wrangler pages deploy dist --project-name=doco",
+    "deploy:worker": "wrangler deploy"
   },
   "dependencies": {
     "@doco/editor": "workspace:*",

@@ -171,7 +171,7 @@ export const MermaidComponent = (props: any) => {
                 {isEditing ? (
                     <div className="flex flex-col">
                         <textarea
-                            className="w-full h-40 p-4 font-mono text-sm bg-gray-50 border-b border-gray-200 outline-none resize-y text-gray-700"
+                            className="w-full h-96 p-4 font-mono text-sm bg-gray-50 border-b border-gray-200 outline-none resize-y text-gray-700"
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
                             onBlur={handleBlur}

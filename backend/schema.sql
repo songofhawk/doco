@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS knowledge_bases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS folders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  kb_id INTEGER NOT NULL,
+  parent_id INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (kb_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
+  FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  kb_id INTEGER NOT NULL,
+  folder_id INTEGER,
+  heading_numbered BOOLEAN DEFAULT 0,
+  bg_color TEXT DEFAULT '#ffffff',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (kb_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_docs_kb ON documents(kb_id);
+CREATE INDEX IF NOT EXISTS idx_docs_folder ON documents(folder_id);
+CREATE INDEX IF NOT EXISTS idx_folders_kb ON folders(kb_id);

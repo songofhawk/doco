@@ -1,0 +1,17 @@
+name = "doco-backend"
+main = "backend/worker.js"
+compatibility_date = "2024-01-01"
+
+[durable_objects]
+bindings = [
+  { name = "ROOMS", class_name = "YjsRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["YjsRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "doco"
+database_id = "83f38be6-ce42-4e91-94d8-e5a3b81e2561"

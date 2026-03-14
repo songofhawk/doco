@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  doco:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/doco.db:/app/backend/doco.db
+      - ./exports:/app/exports
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
