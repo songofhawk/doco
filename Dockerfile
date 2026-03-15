@@ -2,10 +2,8 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-COPY packages ./packages
 RUN npm install -g pnpm && pnpm install --frozen-lockfile
 COPY . .
-RUN cd packages/editor && pnpm run build
 RUN pnpm run build
 
 # 后端运行阶段

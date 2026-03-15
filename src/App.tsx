@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
-import { DocoEditor } from '@doco/editor'
-import '@doco/editor/style.css'
+import { DocoEditor } from './editor'
 import { Sidebar } from './components/Sidebar'
 import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown } from 'lucide-react'
 import mammoth from 'mammoth'

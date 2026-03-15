@@ -32,7 +32,6 @@ docker-compose up -d
 
 ```bash
 # 1. 构建前端
-cd packages/editor && pnpm run build && cd ../..
 pnpm run build
 
 # 2. 启动后端

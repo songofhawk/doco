@@ -136,7 +136,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         return () => window.removeEventListener('editor-link-edit', handler)
     }, [])
 
-    // 监听 Cmd+Shift+N 快捷键切换标题编号
+    // 监听 Cmd+Alt+Shift+J 快捷键切换标题编号
     useEffect(() => {
         const handler = () => setHeadingNumbered(v => {
             const next = !v

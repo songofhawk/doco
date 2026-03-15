@@ -1,6 +1,6 @@
 # Doco Editor
 
-基于 Tiptap v3 + React 18 + Vite 的富文本协同编辑器，支持多端实时同步（Yjs CRDT），可嵌入到其他项目中使用。
+基于 Tiptap v3 + React 18 + Vite 的富文本协同编辑器，编辑器能力已直接集成在当前项目内，支持多端实时同步（Yjs CRDT）。
 
 ## 功能特性
 
@@ -69,23 +69,23 @@ cd backend
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## 项目引入
+## 编辑器位置
 
-Doco Editor 的核心组件位于 `src/components/Editor/`，可作为 React 组件引入到其他项目：
+Doco Editor 的核心组件位于 `src/editor/`，主应用直接从项目内部模块引用：
 
 ```tsx
-import Editor from './components/Editor'
+import { DocoEditor } from './editor'
 
-// Editor 通过 forwardRef 暴露以下方法：
+// DocoEditor 通过 forwardRef 暴露以下方法：
 // - exportMarkdown()  导出 Markdown
 // - exportPDF()       导出 PDF
 // - exportWord()      导出 Word
 const editorRef = useRef(null)
 
-<Editor ref={editorRef} />
+<DocoEditor ref={editorRef} docId="doc-001" />
 ```
 
-引入时需确保宿主项目安装了 `package.json` 中列出的依赖，并配置好后端 WebSocket 服务地址。
+使用时只需要配置好后端 WebSocket 服务地址，不再需要额外构建或发布独立 editor 包。
 
 ## 目录结构
 
@@ -94,20 +94,24 @@ doco/
 ├── src/
 │   ├── App.tsx                          # 根组件
 │   ├── main.tsx                         # 入口
-│   └── components/
-│       ├── Sidebar.tsx                  # 侧边栏
-│       └── Editor/
-│           ├── index.tsx                # 编辑器主组件（Yjs 初始化 + 扩展注册）
-│           ├── BubbleMenu.tsx           # 选区浮动工具栏
-│           ├── BlockHandle.tsx          # 块级操作手柄
-│           ├── CodeBlockComponent.tsx   # 代码块（语法高亮 + 复制）
-│           ├── MermaidBlock.ts          # Mermaid 节点定义
-│           ├── MermaidComponent.tsx     # Mermaid 渲染
-│           ├── PlantUMLBlock.ts         # PlantUML 节点定义
-│           ├── PlantUMLComponent.tsx    # PlantUML 渲染
-│           ├── SlashCommand.ts          # / 命令扩展
-│           ├── suggestions.ts           # / 菜单数据
-│           └── CommandList.tsx          # / 菜单 UI
+│   ├── components/
+│   │   └── Sidebar.tsx                  # 侧边栏
+│   └── editor/
+│       ├── index.ts                     # 编辑器入口
+│       ├── DocoEditor.tsx               # 编辑器主组件（Yjs 初始化 + 扩展注册）
+│       ├── components/
+│       │   ├── BubbleMenu.tsx           # 选区浮动工具栏
+│       │   ├── BlockHandle.tsx          # 块级操作手柄
+│       │   ├── CodeBlockComponent.tsx   # 代码块（语法高亮 + 复制）
+│       │   ├── MermaidBlock.ts          # Mermaid 节点定义
+│       │   ├── MermaidComponent.tsx     # Mermaid 渲染
+│       │   ├── PlantUMLBlock.ts         # PlantUML 节点定义
+│       │   ├── PlantUMLComponent.tsx    # PlantUML 渲染
+│       │   ├── SlashCommand.ts          # / 命令扩展
+│       │   ├── suggestions.ts           # / 菜单数据
+│       │   └── CommandList.tsx          # / 菜单 UI
+│       └── styles/
+│           └── editor.css               # 编辑器样式
 ├── backend/
 │   ├── main.py                          # FastAPI 服务入口
 │   ├── models.py                        # 数据模型

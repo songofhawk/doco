@@ -128,8 +128,8 @@ export const KeyboardShortcuts = Extension.create({
                 return false
             },
 
-            // Cmd+Shift+J: 切换标题多级编号
-            'Mod-Shift-j': () => {
+            // Cmd+Alt+Shift+J: 切换标题多级编号
+            'Mod-Alt-Shift-j': () => {
                 window.dispatchEvent(new CustomEvent('toggle-heading-numbered'))
                 return true
             },

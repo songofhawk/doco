@@ -9,19 +9,15 @@ if ! command -v wrangler &> /dev/null; then
     npm install -g wrangler
 fi
 
-# 1. 构建编辑器包
-echo "📦 构建编辑器包..."
-cd packages/editor && pnpm run build && cd ../..
-
-# 2. 构建前端
+# 1. 构建前端
 echo "🎨 构建前端..."
 pnpm run build
 
-# 3. 部署后端到 Workers
+# 2. 部署后端到 Workers
 echo "☁️  部署后端到 Cloudflare Workers..."
 wrangler deploy
 
-# 4. 部署前端到 Pages
+# 3. 部署前端到 Pages
 echo "📄 部署前端到 Cloudflare Pages..."
 wrangler pages deploy dist --project-name=doco
 

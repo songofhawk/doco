@@ -52,7 +52,6 @@ VITE_WS_URL=wss://doco-backend.your-account.workers.dev/ws
 ### 5. 部署前端到 Pages
 
 ```bash
-cd packages/editor && pnpm run build && cd ../..
 pnpm run build
 wrangler pages deploy dist --project-name=doco
 ```

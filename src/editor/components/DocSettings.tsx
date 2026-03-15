@@ -67,7 +67,7 @@ export function DocSettings({ docId, headingNumbered, onToggleNumbered, bgColor,
                         <div className="flex-1 text-left">
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-700">标题多级编号</span>
-                                <kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-400 font-mono text-[10px]">⌘ Shift J</kbd>
+                                <kbd className="px-1 py-0.5 bg-gray-100 rounded text-gray-400 font-mono text-[10px]">⌘ ⌥ ⇧ J</kbd>
                             </div>
                         </div>
                         <div className={`w-8 h-[18px] rounded-full transition-colors relative ${headingNumbered ? 'bg-blue-500' : 'bg-gray-300'}`}>

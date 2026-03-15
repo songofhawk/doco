@@ -22,10 +22,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    /* Paths */
-    "paths": {
-      "@doco/editor": ["./packages/editor/src/index.ts"]
-    }
   },
-  "include": ["src", "packages/editor/src"]
+  "include": ["src"]
 }
