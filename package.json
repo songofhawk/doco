@@ -8,11 +8,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "pnpm run build && wrangler pages deploy dist --project-name=doco",
-    "deploy:worker": "wrangler deploy"
+    "deploy": "vite build --mode production && wrangler pages deploy dist --project-name=doco-editor --branch=main --commit-dirty=true"
   },
   "dependencies": {
+    "@hocuspocus/provider": "^4.3.0",
     "@radix-ui/react-popover": "^1.1.15",
+    "@tiptap/core": "^3.20.0",
     "@tiptap/extension-bubble-menu": "^3.20.0",
     "@tiptap/extension-code-block-lowlight": "^3.20.0",
     "@tiptap/extension-collaboration": "^3.20.0",
@@ -38,8 +39,8 @@
     "highlight.js": "^11.11.1",
     "html-to-docx": "^1.8.0",
     "html2pdf.js": "^0.14.0",
-    "lucide-react": "^0.575.0",
     "lowlight": "^3.3.0",
+    "lucide-react": "^0.575.0",
     "mammoth": "^1.11.0",
     "mermaid": "^11.12.3",
     "pdfjs-dist": "^5.4.624",
@@ -50,7 +51,6 @@
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.9.0",
     "y-indexeddb": "^9.0.12",
-    "y-websocket": "^3.0.0",
     "yjs": "^13.6.29"
   },
   "devDependencies": {

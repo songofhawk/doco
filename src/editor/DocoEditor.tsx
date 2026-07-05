@@ -11,7 +11,7 @@ import { PlantUMLBlock } from './components/PlantUMLBlock'
 import { getSuggestionItems, renderItems } from './components/suggestions'
 import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import * as Y from 'yjs'
-import { WebsocketProvider } from 'y-websocket'
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import Collaboration from '@tiptap/extension-collaboration'
 import { Table } from '@tiptap/extension-table'
@@ -46,7 +46,7 @@ import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
-    docId, initialMeta, collaboration, onTitleChange, onSettingsChange, onExport,
+    docId, initialMeta, collaboration, onTitleChange, onSettingsChange,
     externalTitle, extraExtensions, placeholder: placeholderText, className, style
 }, ref) => {
     const [title, setTitle] = useState('')
@@ -65,45 +65,38 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     }, [docId, onSettingsChange])
 
     const ydoc = useMemo(() => new Y.Doc(), [docId])
-    const provider = useMemo(() => {
+    // Hocuspocus 的文档名走协议消息而非 URL；socket 与 provider 分开持有，
+    // StrictMode 下只做 connect/disconnect，不 destroy（保持实例可复用）
+    const collab = useMemo(() => {
         if (!collaboration) return null
-        return new WebsocketProvider(
-            collaboration.websocketUrl,
-            collaboration.roomName || docId,
-            ydoc,
-            { connect: false }
-        )
+        const socket = new HocuspocusProviderWebsocket({
+            url: collaboration.websocketUrl,
+            connect: false,
+        })
+        const provider = new HocuspocusProvider({
+            websocketProvider: socket,
+            name: collaboration.roomName || docId,
+            document: ydoc,
+        })
+        // 显式传入 websocketProvider 时不会自动 attach，必须手动调用
+        provider.attach()
+        return { socket, provider }
     }, [ydoc, docId, collaboration])
 
     useEffect(() => {
         const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
-        if (!provider) return () => { idb.destroy() }
+        if (!collab) return () => { idb.destroy() }
 
-        let syncHandler: ((isSynced: boolean) => void) | null = null
-
+        // IndexedDB 主存储先加载，再连服务器；初始状态互补由 SyncStep1/2 协议双向完成
         idb.once('synced', () => {
-            provider.connect()
-
-            // 连接同步后，主动触发一次文档更新以推送完整状态
-            syncHandler = (isSynced: boolean) => {
-                if (isSynced) {
-                    // 触发一个空事务，让 Yjs 重新同步状态
-                    ydoc.transact(() => {})
-                    if (syncHandler) {
-                        provider.off('sync', syncHandler)
-                        syncHandler = null
-                    }
-                }
-            }
-            provider.on('sync', syncHandler)
+            collab.socket.connect()
         })
 
         return () => {
-            if (syncHandler) provider.off('sync', syncHandler)
-            provider.disconnect()
+            collab.socket.disconnect()
             idb.destroy()
         }
-    }, [provider, ydoc, docId])
+    }, [collab, ydoc, docId])
 
     // 从 props 加载文档元数据
     useEffect(() => {
@@ -169,12 +162,12 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         const exts: any[] = [
             (StarterKit as any).configure({
                 codeBlock: false,
-                undoRedo: !provider,
+                undoRedo: !collab,
             }),
         ]
 
         // Collaboration 必须在自定义节点之前注册
-        if (provider) {
+        if (collab) {
             exts.push(Collaboration.configure({ document: ydoc, field: 'default' }))
         }
 
@@ -221,7 +214,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
         if (extraExtensions) exts.push(...extraExtensions)
         return exts
-    }, [ydoc, provider, placeholderText, extraExtensions, handleCollapseChange])
+    }, [ydoc, collab, placeholderText, extraExtensions, handleCollapseChange])
 
     const editor = useEditor({
         extensions,
@@ -323,32 +316,6 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         editor.on('update', update)
         return () => { editor.off('update', update) }
     }, [editor])
-
-    // 自动导出 Markdown（停止编辑 5 秒后）
-    useEffect(() => {
-        if (!editor || !onExport) return
-
-        let timer: any
-        let lastContent = ''
-
-        const handleUpdate = () => {
-            clearTimeout(timer)
-            timer = setTimeout(async () => {
-                const markdown = (editor.storage as any).markdown?.getMarkdown?.() || ''
-                if (markdown && markdown !== lastContent) {
-                    lastContent = markdown
-                    await onExport(docId, markdown)
-                }
-            }, 5000)
-        }
-
-        editor.on('update', handleUpdate)
-        return () => {
-            clearTimeout(timer)
-            editor.off('update', handleUpdate)
-        }
-    }, [editor, docId, onExport])
-
 
     // 同步标题编号：动态生成 CSS counter 规则适配最小标题级别
     const [minHeadingLevel, setMinHeadingLevel] = useState(1)

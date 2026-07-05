@@ -37,4 +37,15 @@ export const CalloutBlock = Node.create({
     addNodeView() {
         return ReactNodeViewRenderer(CalloutComponent)
     },
+
+    addStorage() {
+        return {
+            markdown: {
+                // 导出为带 emoji 的引用块（Markdown 无 callout 语法，导入时会变为普通引用）
+                serialize(state: any, node: any) {
+                    state.wrapBlock('> ', `> ${node.attrs.emoji} `, node, () => state.renderContent(node))
+                },
+            },
+        }
+    },
 })

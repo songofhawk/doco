@@ -1,0 +1,6 @@
+# Doco 后端反向代理：自动申请/续期 Let's Encrypt 证书
+# sslip.io 会把 doco-124-156-169-69.sslip.io 自动解析到 124.156.169.69
+doco-124-156-169-69.sslip.io {
+	# WebSocket 与 REST 都走同一个后端，Caddy 自动处理 WS 升级
+	reverse_proxy 127.0.0.1:8000
+}

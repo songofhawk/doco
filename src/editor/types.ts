@@ -27,7 +27,6 @@ export interface DocoEditorProps {
   collaboration?: CollaborationConfig
   onTitleChange?(docId: string, title: string): void
   onSettingsChange?(docId: string, settings: Partial<DocMeta>): void
-  onExport?(docId: string, markdown: string): Promise<void>
   externalTitle?: string
   extraExtensions?: Extensions
   placeholder?: string

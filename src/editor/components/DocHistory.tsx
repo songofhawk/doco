@@ -14,6 +14,8 @@ interface DocHistoryProps {
   onRestore: () => void;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api';
+
 export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
   const [versions, setVersions] = useState<HistoryVersion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
 
   const loadVersions = () => {
     setLoading(true);
-    fetch(`http://127.0.0.1:8000/api/docs/${docId}/history`)
+    fetch(`${API_BASE}/docs/${docId}/history`)
       .then(res => res.json())
       .then(data => {
         setVersions(data);
@@ -39,7 +41,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
   const handleRestore = async (updateId: number) => {
     if (!confirm('确定要恢复到此版本吗？当前内容将被覆盖。')) return;
 
-    await fetch(`http://127.0.0.1:8000/api/docs/${docId}/restore/${updateId}`, {
+    await fetch(`${API_BASE}/docs/${docId}/restore/${updateId}`, {
       method: 'POST'
     });
 
@@ -51,7 +53,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
     if (!confirm('压缩会合并所有历史记录为一个快照，确定继续？')) return;
     setCompacting(true);
     try {
-      await fetch(`http://127.0.0.1:8000/api/docs/${docId}/compact`, { method: 'POST' });
+      await fetch(`${API_BASE}/docs/${docId}/compact`, { method: 'POST' });
       loadVersions();
     } finally {
       setCompacting(false);

@@ -28,7 +28,7 @@ const EmptyState = () => (
   </div>
 )
 
-const API_BASE = 'http://127.0.0.1:8000/api'
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api'
 
 const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitle?: string }) => {
   const { id } = useParams<{ id: string }>()
@@ -75,13 +75,6 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
         fetch(`${API_BASE}/docs/${docId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        }).catch(() => {})
-      }}
-      onExport={async (docId, markdown) => {
-        await fetch(`${API_BASE}/export/markdown`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ doc_id: docId, markdown })
         }).catch(() => {})
       }}
       externalTitle={externalTitle}

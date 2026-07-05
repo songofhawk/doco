@@ -1,0 +1,22 @@
+[Unit]
+Description=Doco collaborative editor backend (Node.js + Hocuspocus)
+After=network.target
+
+[Service]
+Type=simple
+User=doco
+Group=doco
+WorkingDirectory=/opt/doco/backend
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+Environment=PORT=8000
+# 只绑本机回环，公网入口由 Caddy (443, TLS) 反代
+Environment=HOST=127.0.0.1
+Restart=always
+RestartSec=3
+# SIGTERM 触发 server.js 里的优雅退出（flush 待写文档后自行 exit）
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

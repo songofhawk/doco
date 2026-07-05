@@ -3,6 +3,9 @@ import tippy from 'tippy.js'
 import CommandList from './CommandList'
 import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb } from 'lucide-react'
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api'
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '')
+
 export const getSuggestionItems = ({ query }: { query: string }) => {
     return [
         {
@@ -86,12 +89,13 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                     const formData = new FormData()
                     formData.append('file', file)
                     try {
-                        const res = await fetch('http://127.0.0.1:8000/api/attachments/upload', {
+                        const res = await fetch(`${API_BASE}/attachments/upload`, {
                             method: 'POST',
                             body: formData
                         })
                         const data = await res.json()
-                        editor.chain().focus().setImage({ src: `http://127.0.0.1:8000${data.url}` }).run()
+                        const src = new URL(data.url, `${API_ORIGIN}/`).toString()
+                        editor.chain().focus().setImage({ src }).run()
                     } catch (err) {
                         console.error('Upload failed:', err)
                     } finally {

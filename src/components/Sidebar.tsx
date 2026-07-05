@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api';
 
 /* ---- 右键菜单 ---- */
 type MenuItem = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean } | 'divider';
