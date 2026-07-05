@@ -27,7 +27,6 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import { Highlight } from '@tiptap/extension-highlight'
 import { TextAlign } from '@tiptap/extension-text-align'
-import Link from '@tiptap/extension-link'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { CodeBlockComponent } from './components/CodeBlockComponent'
 import { FloatingToolbar } from './components/BubbleMenu'
@@ -58,6 +57,9 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const collapseTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
     const pasteDialog = usePasteMarkdownDialog()
+    const isCollaborative = Boolean(collaboration?.websocketUrl)
+    const websocketUrl = collaboration?.websocketUrl
+    const roomName = collaboration?.roomName || docId
 
     // 保存文档设置
     const patchDocSettings = useCallback((patch: Partial<DocMeta>) => {
@@ -65,38 +67,46 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     }, [docId, onSettingsChange])
 
     const ydoc = useMemo(() => new Y.Doc(), [docId])
-    // Hocuspocus 的文档名走协议消息而非 URL；socket 与 provider 分开持有，
-    // StrictMode 下只做 connect/disconnect，不 destroy（保持实例可复用）
-    const collab = useMemo(() => {
-        if (!collaboration) return null
-        const socket = new HocuspocusProviderWebsocket({
-            url: collaboration.websocketUrl,
-            connect: false,
+
+    useEffect(() => {
+        const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
+        let disposed = false
+        let connectTimer: ReturnType<typeof setTimeout> | undefined
+        let socket: HocuspocusProviderWebsocket | null = null
+        let provider: HocuspocusProvider | null = null
+
+        if (!websocketUrl) return () => { idb.destroy() }
+
+        // Hocuspocus 的文档名走协议消息而非 URL；socket 与 provider 分开持有。
+        // provider/socket 的创建有事件监听副作用，必须放在 effect 生命周期里。
+        socket = new HocuspocusProviderWebsocket({
+            url: websocketUrl,
+            autoConnect: false,
         })
-        const provider = new HocuspocusProvider({
+        provider = new HocuspocusProvider({
             websocketProvider: socket,
-            name: collaboration.roomName || docId,
+            name: roomName,
             document: ydoc,
         })
         // 显式传入 websocketProvider 时不会自动 attach，必须手动调用
         provider.attach()
-        return { socket, provider }
-    }, [ydoc, docId, collaboration])
-
-    useEffect(() => {
-        const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
-        if (!collab) return () => { idb.destroy() }
 
         // IndexedDB 主存储先加载，再连服务器；初始状态互补由 SyncStep1/2 协议双向完成
         idb.once('synced', () => {
-            collab.socket.connect()
+            if (disposed || !socket) return
+            connectTimer = setTimeout(() => {
+                if (!disposed) socket?.connect()
+            }, 0)
         })
 
         return () => {
-            collab.socket.disconnect()
+            disposed = true
+            if (connectTimer) clearTimeout(connectTimer)
+            provider?.destroy()
+            socket?.destroy()
             idb.destroy()
         }
-    }, [collab, ydoc, docId])
+    }, [ydoc, docId, websocketUrl, roomName])
 
     // 从 props 加载文档元数据
     useEffect(() => {
@@ -162,12 +172,16 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         const exts: any[] = [
             (StarterKit as any).configure({
                 codeBlock: false,
-                undoRedo: !collab,
+                undoRedo: !isCollaborative,
+                link: {
+                    openOnClick: false,
+                    HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+                },
             }),
         ]
 
         // Collaboration 必须在自定义节点之前注册
-        if (collab) {
+        if (isCollaborative) {
             exts.push(Collaboration.configure({ document: ydoc, field: 'default' }))
         }
 
@@ -181,10 +195,6 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             Color,
             Highlight,
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
-            Link.configure({
-                openOnClick: false,
-                HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
-            }),
             ResizableImage.configure({ inline: false, allowBase64: true }),
             Placeholder.configure({
                 placeholder: placeholderText || '输入 / 唤起菜单，或直接开始写作...',
@@ -214,7 +224,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
         if (extraExtensions) exts.push(...extraExtensions)
         return exts
-    }, [ydoc, collab, placeholderText, extraExtensions, handleCollapseChange])
+    }, [ydoc, isCollaborative, placeholderText, extraExtensions, handleCollapseChange])
 
     const editor = useEditor({
         extensions,
@@ -278,7 +288,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 return false
             },
         },
-    }, [ydoc])
+    }, [extensions])
 
     // 从后端恢复折叠状态（需等 Yjs 文档同步完成后再执行）
     useEffect(() => {

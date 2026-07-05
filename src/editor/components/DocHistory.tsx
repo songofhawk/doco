@@ -68,23 +68,11 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
     const [year, month, day] = date.split('-').map(Number);
     const targetDate = new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
 
-    console.log('选择日期:', date);
-    console.log('目标时间戳:', targetDate, new Date(targetDate));
-    console.log('版本时间:', versions.slice(0, 3).map(v => ({
-      id: v.id,
-      time: new Date(v.created_at).getTime(),
-      date: new Date(v.created_at)
-    })));
-
     const idx = versions.findIndex(v => new Date(v.created_at).getTime() <= targetDate);
-    console.log('找到索引:', idx);
-    console.log('listRef.current:', listRef.current);
-    console.log('children 数量:', listRef.current?.children.length);
 
     if (idx >= 0 && listRef.current) {
       const container = listRef.current.querySelector('.space-y-3');
       const item = container?.children[idx] as HTMLElement;
-      console.log('目标元素:', item);
       item?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       item?.classList.add('ring-2', 'ring-blue-500');
       setTimeout(() => item?.classList.remove('ring-2', 'ring-blue-500'), 2000);
