@@ -11,6 +11,18 @@ import { stateToMarkdown } from './markdown.js';
 const PORT = Number(process.env.PORT) || 8000;
 // 生产环境由反向代理（Caddy）对外，服务本身只绑 127.0.0.1（systemd 里设 HOST）
 const HOST = process.env.HOST || '0.0.0.0';
+const DEFAULT_ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
+  ? ['https://doco-editor.pages.dev']
+  : [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+    ];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 const selectState = db.prepare('SELECT state FROM ydoc_state WHERE doc_id = ?');
 const upsertState = db.prepare(`
@@ -65,7 +77,25 @@ function sanitizeFilename(name) {
 }
 
 const app = express();
-app.use(cors());
+
+function isOriginAllowed(origin) {
+  // curl、健康检查、同源反代等请求通常没有 Origin；只拦浏览器跨源来源。
+  if (!origin) return true;
+  return allowedOrigins.includes(origin);
+}
+
+function rejectDisallowedOrigin(req, res, next) {
+  const origin = req.get('origin');
+  if (isOriginAllowed(origin)) return next();
+  res.status(403).json({ error: 'Forbidden origin' });
+}
+
+app.use(rejectDisallowedOrigin);
+app.use(cors({
+  origin(origin, callback) {
+    callback(null, isOriginAllowed(origin) ? origin || false : false);
+  },
+}));
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/api/docs/:id/export.md', (req, res) => {
@@ -132,6 +162,11 @@ const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
   if (!request.url.startsWith('/ws')) {
+    socket.destroy();
+    return;
+  }
+  if (!isOriginAllowed(request.headers.origin)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;
   }

@@ -12,6 +12,8 @@ Environment=NODE_ENV=production
 Environment=PORT=8000
 # 只绑本机回环，公网入口由 Caddy (443, TLS) 反代
 Environment=HOST=127.0.0.1
+# 浏览器 REST/WebSocket 请求只允许指定前端 Origin；多个地址用英文逗号分隔
+Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev
 Restart=always
 RestartSec=3
 # SIGTERM 触发 server.js 里的优雅退出（flush 待写文档后自行 exit）

@@ -69,6 +69,23 @@ systemctl status doco-backend --no-pager
 curl -s http://127.0.0.1:8000/api/kb   # 应返回 []
 ```
 
+生产服务默认只接受指定前端的浏览器请求：
+
+```ini
+Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev
+```
+
+若前端域名变化，或需要临时允许 Cloudflare Pages 预览域名，修改
+`/etc/systemd/system/doco-backend.service` 中的 `ALLOWED_ORIGINS`，多个 Origin 用英文逗号分隔，
+然后执行：
+
+```bash
+systemctl daemon-reload
+systemctl restart doco-backend
+```
+
+无 `Origin` 的本机健康检查和服务端调用仍允许；带 `Origin` 的 REST 与 WebSocket 请求必须命中白名单。
+
 ## 5. TLS 入口（Caddy）
 
 前端托管在 HTTPS 的 Cloudflare Pages 上，浏览器禁止混合内容，
