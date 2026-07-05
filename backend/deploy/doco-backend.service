@@ -14,6 +14,9 @@ Environment=PORT=8000
 Environment=HOST=127.0.0.1
 # 浏览器 REST/WebSocket 请求只允许指定前端 Origin；多个地址用英文逗号分隔
 Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev
+Environment=GOOGLE_CLIENT_ID=321174610881-tv7v2e0e1u0300pqkk0t9dv2v4esl7f2.apps.googleusercontent.com
+Environment=COOKIE_SAMESITE=none
+Environment=COOKIE_SECURE=true
 Restart=always
 RestartSec=3
 # SIGTERM 触发 server.js 里的优雅退出（flush 待写文档后自行 exit）

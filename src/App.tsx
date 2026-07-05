@@ -2,9 +2,10 @@ import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor } from './editor'
 import { Sidebar } from './components/Sidebar'
-import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown } from 'lucide-react'
+import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown, LogOut } from 'lucide-react'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
+import { AuthProvider, apiFetch, type CurrentUser, useAuth } from './auth'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
@@ -28,14 +29,95 @@ const EmptyState = () => (
   </div>
 )
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api'
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
-const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitle?: string }) => {
+const LoadingScreen = () => (
+  <div className="h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-400">
+    正在载入...
+  </div>
+)
+
+const LoginPage = () => {
+  const { signInWithGoogleCredential } = useAuth()
+  const buttonRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) {
+      setError('未配置 VITE_GOOGLE_CLIENT_ID')
+      return
+    }
+
+    let cancelled = false
+    const renderButton = () => {
+      if (cancelled || !buttonRef.current || !window.google) return
+      buttonRef.current.innerHTML = ''
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response) => {
+          if (!response.credential) return
+          try {
+            setError('')
+            await signInWithGoogleCredential(response.credential)
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Google 登录失败')
+          }
+        },
+      })
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: 'outline',
+        size: 'large',
+        type: 'standard',
+        shape: 'rectangular',
+        text: 'signin_with',
+        width: 280,
+      })
+    }
+
+    if (window.google) {
+      renderButton()
+      return () => { cancelled = true }
+    }
+
+    let script = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]')
+    if (!script) {
+      script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      document.head.appendChild(script)
+    }
+    script.addEventListener('load', renderButton)
+    script.addEventListener('error', () => setError('Google 登录脚本加载失败'))
+
+    return () => {
+      cancelled = true
+      script?.removeEventListener('load', renderButton)
+    }
+  }, [signInWithGoogleCredential])
+
+  return (
+    <div className="h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm px-8 py-9 flex flex-col items-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-5">
+          <FileText size={26} className="text-blue-500" />
+        </div>
+        <h1 className="text-xl font-semibold text-gray-800 tracking-tight">Doco</h1>
+        <p className="text-sm text-gray-500 mt-2 mb-7 leading-relaxed">你的知识库与协同写作空间<br />使用 Google 账号登录即可开始</p>
+        <div ref={buttonRef} className="min-h-[44px]" />
+        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      </div>
+      <p className="mt-6 text-xs text-gray-400">多端实时同步 · 富文本协同编辑</p>
+    </div>
+  )
+}
+
+const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; externalTitle?: string; user: CurrentUser }) => {
   const { id } = useParams<{ id: string }>()
   const [meta, setMeta] = useState<any>(undefined)
   useEffect(() => {
     if (!id) return
-    fetch(`${API_BASE}/docs/${id}`).then(r => r.ok ? r.json() : null).then(d => {
+    apiFetch(`/docs/${id}`).then(r => r.ok ? r.json() : null).then(d => {
       if (d) setMeta({
             title: d.title,
             headingNumbered: d.heading_numbered,
@@ -49,11 +131,12 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
     <DocoEditor
       ref={exportRef}
       docId={id}
-      key={id}
+      userId={user.id}
+      key={`${user.id}:${id}`}
       initialMeta={meta}
-      collaboration={{ websocketUrl: import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000/ws' }}
+      collaboration={{ websocketUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws' }}
       onTitleChange={(docId, title) => {
-        fetch(`${API_BASE}/docs/${docId}`, {
+        apiFetch(`/docs/${docId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title })
         }).catch(() => {})
@@ -72,7 +155,7 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
           payload.bg_color = settings.bgColor
           delete payload.bgColor
         }
-        fetch(`${API_BASE}/docs/${docId}`, {
+        apiFetch(`/docs/${docId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         }).catch(() => {})
@@ -84,7 +167,8 @@ const EditorPage = ({ exportRef, externalTitle }: { exportRef: any; externalTitl
 
 const COLLAPSE_BREAKPOINT = 768
 
-function App() {
+function AppShell() {
+  const { user, loading, signOut } = useAuth()
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [externalTitle, setExternalTitle] = useState<string | undefined>()
@@ -155,6 +239,9 @@ function App() {
     setSidebarCollapsed(v => !v)
   }, [])
 
+  if (loading) return <LoadingScreen />
+  if (!user) return <LoginPage />
+
   return (
     <BrowserRouter>
       <div className="h-screen bg-white flex flex-col overflow-hidden">
@@ -168,6 +255,14 @@ function App() {
           </button>
           <h1 className="text-base font-semibold text-gray-800 tracking-tight">Doco</h1>
           <div className="ml-auto text-sm text-gray-500 flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 text-gray-600">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gray-200" />
+              )}
+              <span className="max-w-[180px] truncate">{user.name || user.email}</span>
+            </div>
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt,.docx,.pdf" onChange={handleFileChange} className="hidden" />
             <button onClick={handleImport} className="hover:text-blue-600 transition-colors flex items-center gap-1" title="导入文档">
               <Upload size={14} />导入
@@ -197,19 +292,31 @@ function App() {
                 </div>
               )}
             </div>
+            <span className="text-gray-300">|</span>
+            <button onClick={signOut} className="hover:text-blue-600 transition-colors flex items-center gap-1" title="退出登录">
+              <LogOut size={14} />退出
+            </button>
           </div>
         </header>
         <div className="flex flex-1 overflow-hidden">
           <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
           <main className="flex-1 overflow-y-auto bg-gray-50">
             <Routes>
-              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} />} />
-              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} />} />
+              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
+              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
             </Routes>
           </main>
         </div>
       </div>
     </BrowserRouter>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   )
 }
 

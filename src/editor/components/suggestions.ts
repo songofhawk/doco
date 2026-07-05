@@ -2,8 +2,8 @@ import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
 import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb } from 'lucide-react'
+import { API_BASE, apiFetch } from '../../auth'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api'
 const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '')
 
 export const getSuggestionItems = ({ query }: { query: string }) => {
@@ -89,7 +89,7 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                     const formData = new FormData()
                     formData.append('file', file)
                     try {
-                        const res = await fetch(`${API_BASE}/attachments/upload`, {
+                        const res = await apiFetch('/attachments/upload', {
                             method: 'POST',
                             body: formData
                         })

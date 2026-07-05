@@ -23,6 +23,7 @@ export interface DocoEditorRef {
 
 export interface DocoEditorProps {
   docId: string
+  userId?: string
   initialMeta?: DocMeta
   collaboration?: CollaborationConfig
   onTitleChange?(docId: string, title: string): void

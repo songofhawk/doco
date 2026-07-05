@@ -45,7 +45,7 @@ import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
-    docId, initialMeta, collaboration, onTitleChange, onSettingsChange,
+    docId, userId, initialMeta, collaboration, onTitleChange, onSettingsChange,
     externalTitle, extraExtensions, placeholder: placeholderText, className, style
 }, ref) => {
     const [title, setTitle] = useState('')
@@ -69,7 +69,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const ydoc = useMemo(() => new Y.Doc(), [docId])
 
     useEffect(() => {
-        const idb = new IndexeddbPersistence(`doco-${docId}`, ydoc)
+        const idb = new IndexeddbPersistence(`doco-${userId || 'anonymous'}-${docId}`, ydoc)
         let disposed = false
         let connectTimer: ReturnType<typeof setTimeout> | undefined
         let socket: HocuspocusProviderWebsocket | null = null
@@ -106,7 +106,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             socket?.destroy()
             idb.destroy()
         }
-    }, [ydoc, docId, websocketUrl, roomName])
+    }, [ydoc, docId, userId, websocketUrl, roomName])
 
     // 从 props 加载文档元数据
     useEffect(() => {

@@ -145,12 +145,20 @@ NODE_BIN="$(command -v node)"
 cp deploy/doco-backend.service /etc/systemd/system/
 sed -i "s|^ExecStart=.*|ExecStart=${NODE_BIN} server.js|" /etc/systemd/system/doco-backend.service
 systemctl daemon-reload
-systemctl enable --now doco-backend >/dev/null 2>&1 || systemctl restart doco-backend
+systemctl enable doco-backend >/dev/null 2>&1 || true
+systemctl restart doco-backend
 sleep 2
 systemctl is-active doco-backend
 
 echo "== 5/5 本机自检 =="
-curl -sf http://127.0.0.1:8000/api/kb && echo " <- /api/kb OK"
+if [ "$(curl -s -o /tmp/doco-auth-check.json -w '%{http_code}' http://127.0.0.1:8000/api/auth/me)" = "401" ]; then
+  cat /tmp/doco-auth-check.json
+  echo " <- /api/auth/me OK"
+else
+  cat /tmp/doco-auth-check.json >&2 || true
+  echo "后端自检失败：/api/auth/me 未返回预期 401" >&2
+  exit 1
+fi
 
 echo "== 备份 cron =="
 systemctl enable --now crond >/dev/null 2>&1 || systemctl enable --now cron >/dev/null 2>&1 || true

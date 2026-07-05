@@ -4,8 +4,7 @@ import {
     Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api';
+import { apiFetch } from '../auth';
 
 /* ---- 右键菜单 ---- */
 type MenuItem = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean } | 'divider';
@@ -138,7 +137,7 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
     const loadFolders = async (kbId: number) => {
         if (folders[kbId]) return;
         try {
-            const res = await fetch(`${API_BASE}/kb/${kbId}/folders`);
+            const res = await apiFetch(`/kb/${kbId}/folders`);
             if (res.ok) {
                 const data = await res.json();
                 setFolders(prev => ({ ...prev, [kbId]: data }));
@@ -219,21 +218,21 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
         let cancelled = false;
         const expandToDoc = async () => {
             try {
-                const pathRes = await fetch(`${API_BASE}/docs/${currentDocId}/path`);
+                const pathRes = await apiFetch(`/docs/${currentDocId}/path`);
                 if (!pathRes.ok || cancelled) return;
                 const { folder_id, kb_id } = await pathRes.json();
                 if (!kb_id || cancelled) return;
 
                 // 加载知识库的顶层文件夹和直属文档
                 const fetches: Promise<Response>[] = [
-                    fetch(`${API_BASE}/kb/${kb_id}/folders`),
-                    fetch(`${API_BASE}/kb/${kb_id}/docs`),
+                    apiFetch(`/kb/${kb_id}/folders`),
+                    apiFetch(`/kb/${kb_id}/docs`),
                 ];
                 // 如果文档在文件夹内，也加载该文件夹的内容
                 if (folder_id) {
                     fetches.push(
-                        fetch(`${API_BASE}/folders/${folder_id}/docs`),
-                        fetch(`${API_BASE}/folders/${folder_id}/subfolders`),
+                        apiFetch(`/folders/${folder_id}/docs`),
+                        apiFetch(`/folders/${folder_id}/subfolders`),
                     );
                 }
 
@@ -264,7 +263,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
         clearTimeout(searchTimerRef.current);
         searchTimerRef.current = setTimeout(async () => {
             try {
-                const res = await fetch(`${API_BASE}/search/docs?q=${encodeURIComponent(searchQuery)}`);
+                const res = await apiFetch(`/search/docs?q=${encodeURIComponent(searchQuery)}`);
                 if (res.ok) setSearchResults(await res.json());
             } catch { setSearchResults([]); }
         }, 300);
@@ -290,7 +289,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
 
     const fetchKbs = async () => {
         try {
-            const res = await fetch(`${API_BASE}/kb`);
+            const res = await apiFetch(`/kb`);
             if (res.ok) setKbs(await res.json());
         } catch (e) { console.error('[Sidebar] fetch KBs failed:', e); }
     };
@@ -300,8 +299,8 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
         if (!content[`kb_${kbId}_folders`]) {
             try {
                 const [foldersRes, docsRes] = await Promise.all([
-                    fetch(`${API_BASE}/kb/${kbId}/folders`),
-                    fetch(`${API_BASE}/kb/${kbId}/docs`),
+                    apiFetch(`/kb/${kbId}/folders`),
+                    apiFetch(`/kb/${kbId}/docs`),
                 ]);
                 const updates: Record<string, any[]> = {};
                 if (foldersRes.ok) updates[`kb_${kbId}_folders`] = await foldersRes.json();
@@ -316,8 +315,8 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
         if (!content[`folder_${folderId}_docs`]) {
             try {
                 const [docsRes, subfoldersRes] = await Promise.all([
-                    fetch(`${API_BASE}/folders/${folderId}/docs`),
-                    fetch(`${API_BASE}/folders/${folderId}/subfolders`),
+                    apiFetch(`/folders/${folderId}/docs`),
+                    apiFetch(`/folders/${folderId}/subfolders`),
                 ]);
                 const updates: Record<string, any[]> = {};
                 if (docsRes.ok) updates[`folder_${folderId}_docs`] = await docsRes.json();
@@ -333,7 +332,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
             title: '新建知识库', placeholder: '请输入知识库名称',
             onConfirm: async (name) => {
                 try {
-                    const res = await fetch(`${API_BASE}/kb`, {
+                    const res = await apiFetch(`/kb`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name })
                     });
@@ -350,20 +349,20 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                 try {
                     const body: any = { name, kb_id: kbId };
                     if (parentId) body.parent_id = parentId;
-                    const res = await fetch(`${API_BASE}/folders`, {
+                    const res = await apiFetch(`/folders`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(body)
                     });
                     if (res.ok) {
                         if (parentId) {
-                            const r2 = await fetch(`${API_BASE}/folders/${parentId}/subfolders`);
+                            const r2 = await apiFetch(`/folders/${parentId}/subfolders`);
                             if (r2.ok) {
                                 const subfolders = await r2.json();
                                 setContent(prev => ({ ...prev, [`folder_${parentId}_subfolders`]: subfolders }));
                             }
                             setExpandedFolders(prev => ({ ...prev, [parentId]: true }));
                         } else {
-                            const r2 = await fetch(`${API_BASE}/kb/${kbId}/folders`);
+                            const r2 = await apiFetch(`/kb/${kbId}/folders`);
                             if (r2.ok) {
                                 const folders = await r2.json();
                                 setContent(prev => ({ ...prev, [`kb_${kbId}_folders`]: folders }));
@@ -385,20 +384,20 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                     const body: any = { id: docId, title };
                     if (folderId) body.folder_id = folderId;
                     if (kbId) body.kb_id = kbId;
-                    const res = await fetch(`${API_BASE}/docs`, {
+                    const res = await apiFetch(`/docs`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(body)
                     });
                     if (res.ok) {
                         if (folderId) {
-                            const r2 = await fetch(`${API_BASE}/folders/${folderId}/docs`);
+                            const r2 = await apiFetch(`/folders/${folderId}/docs`);
                             if (r2.ok) {
                                 const docs = await r2.json();
                                 setContent(prev => ({ ...prev, [`folder_${folderId}_docs`]: docs }));
                             }
                             setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
                         } else if (kbId) {
-                            const r2 = await fetch(`${API_BASE}/kb/${kbId}/docs`);
+                            const r2 = await apiFetch(`/kb/${kbId}/docs`);
                             if (r2.ok) {
                                 const docs = await r2.json();
                                 setContent(prev => ({ ...prev, [`kb_${kbId}_docs`]: docs }));
@@ -415,7 +414,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     // ---- 重命名 ----
     const renameKb = async (kbId: number, newName: string) => {
         try {
-            await fetch(`${API_BASE}/kb/${kbId}`, {
+            await apiFetch(`/kb/${kbId}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newName })
             });
@@ -426,7 +425,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
 
     const renameFolder = async (folderId: number, newName: string) => {
         try {
-            await fetch(`${API_BASE}/folders/${folderId}`, {
+            await apiFetch(`/folders/${folderId}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newName })
             });
@@ -444,7 +443,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
 
     const renameDoc = async (docId: string, newTitle: string) => {
         try {
-            await fetch(`${API_BASE}/docs/${docId}`, {
+            await apiFetch(`/docs/${docId}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: newTitle })
             });
@@ -466,7 +465,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     const deleteKb = async (kbId: number) => {
         if (!confirm('确定删除此知识库？其下所有文件夹和文档将一并删除。')) return;
         try {
-            await fetch(`${API_BASE}/kb/${kbId}`, { method: 'DELETE' });
+            await apiFetch(`/kb/${kbId}`, { method: 'DELETE' });
             setKbs(prev => prev.filter(kb => kb.id !== kbId));
         } catch {}
     };
@@ -474,7 +473,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     const deleteFolder = async (folderId: number, kbId: number, parentId?: number) => {
         if (!confirm('确定删除此文件夹？其下所有文档将一并删除。')) return;
         try {
-            await fetch(`${API_BASE}/folders/${folderId}`, { method: 'DELETE' });
+            await apiFetch(`/folders/${folderId}`, { method: 'DELETE' });
             if (parentId) {
                 setContent(prev => ({
                     ...prev,
@@ -492,7 +491,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     const deleteDoc = async (docId: string, folderId?: number, kbId?: number) => {
         if (!confirm('确定删除此文档？')) return;
         try {
-            await fetch(`${API_BASE}/docs/${docId}`, { method: 'DELETE' });
+            await apiFetch(`/docs/${docId}`, { method: 'DELETE' });
             if (folderId) {
                 setContent(prev => ({
                     ...prev,
@@ -518,7 +517,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
         try {
             const body: any = { folder_id: targetFolderId || null };
             if (targetKbId && !targetFolderId) body.kb_id = targetKbId;
-            await fetch(`${API_BASE}/docs/${movingDoc.docId}`, {
+            await apiFetch(`/docs/${movingDoc.docId}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
@@ -536,13 +535,13 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
             }
             // 刷新目标位置
             if (targetFolderId) {
-                const r = await fetch(`${API_BASE}/folders/${targetFolderId}/docs`);
+                const r = await apiFetch(`/folders/${targetFolderId}/docs`);
                 if (r.ok) {
                     const docs = await r.json();
                     setContent(prev => ({ ...prev, [`folder_${targetFolderId}_docs`]: docs }));
                 }
             } else if (targetKbId) {
-                const r = await fetch(`${API_BASE}/kb/${targetKbId}/docs`);
+                const r = await apiFetch(`/kb/${targetKbId}/docs`);
                 if (r.ok) {
                     const docs = await r.json();
                     setContent(prev => ({ ...prev, [`kb_${targetKbId}_docs`]: docs }));

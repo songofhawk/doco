@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, RotateCcw, Archive } from 'lucide-react';
+import { apiFetch } from '../../auth';
 
 interface HistoryVersion {
   id: number;
@@ -14,8 +15,6 @@ interface DocHistoryProps {
   onRestore: () => void;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000/api';
-
 export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
   const [versions, setVersions] = useState<HistoryVersion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +25,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
 
   const loadVersions = () => {
     setLoading(true);
-    fetch(`${API_BASE}/docs/${docId}/history`)
+    apiFetch(`/docs/${docId}/history`)
       .then(res => res.json())
       .then(data => {
         setVersions(data);
@@ -41,7 +40,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
   const handleRestore = async (updateId: number) => {
     if (!confirm('确定要恢复到此版本吗？当前内容将被覆盖。')) return;
 
-    await fetch(`${API_BASE}/docs/${docId}/restore/${updateId}`, {
+    await apiFetch(`/docs/${docId}/restore/${updateId}`, {
       method: 'POST'
     });
 
@@ -53,7 +52,7 @@ export function DocHistory({ docId, onClose, onRestore }: DocHistoryProps) {
     if (!confirm('压缩会合并所有历史记录为一个快照，确定继续？')) return;
     setCompacting(true);
     try {
-      await fetch(`${API_BASE}/docs/${docId}/compact`, { method: 'POST' });
+      await apiFetch(`/docs/${docId}/compact`, { method: 'POST' });
       loadVersions();
     } finally {
       setCompacting(false);

@@ -6,7 +6,17 @@ import * as Y from 'yjs';
 import JSZip from 'jszip';
 import { db, hasLegacyUpdatesTable } from './database.js';
 import { api } from './api.js';
+import { getSessionUserFromCookieHeader, requireAuth } from './auth.js';
 import { stateToMarkdown } from './markdown.js';
+import {
+  getDocumentForUser,
+  getKnowledgeBaseForUser,
+  listFolderDocsForUser,
+  listRootDocsForUser,
+  listRootFoldersForUser,
+  listSubfoldersForUser,
+  userCanAccessDocument,
+} from './permissions.js';
 
 const PORT = Number(process.env.PORT) || 8000;
 // 生产环境由反向代理（Caddy）对外，服务本身只绑 127.0.0.1（systemd 里设 HOST）
@@ -41,7 +51,17 @@ function loadLegacyState(docName) {
 export const hocuspocus = new Hocuspocus({
   quiet: true,
 
-  async onLoadDocument({ document, documentName }) {
+  async onAuthenticate({ context, documentName }) {
+    if (!context?.user || !userCanAccessDocument(context.user.id, documentName)) {
+      throw new Error('Not authorized');
+    }
+  },
+
+  async onLoadDocument({ context, document, documentName }) {
+    if (!context?.user || !userCanAccessDocument(context.user.id, documentName)) {
+      throw new Error('Not authorized');
+    }
+
     const row = selectState.get(documentName);
     let state = row?.state;
     if (!state) {
@@ -57,7 +77,11 @@ export const hocuspocus = new Hocuspocus({
   },
 
   // Hocuspocus 内置防抖（debounce 2s / maxDebounce 10s），断开最后一个连接时也会触发
-  async onStoreDocument({ document, documentName }) {
+  async onStoreDocument({ context, document, documentName }) {
+    if (context?.user && !userCanAccessDocument(context.user.id, documentName)) {
+      throw new Error('Not authorized');
+    }
+
     const state = Buffer.from(Y.encodeStateAsUpdate(document));
     upsertState.run(documentName, state);
     console.log(`[YDoc] Stored ${documentName}: ${state.length} bytes`);
@@ -95,11 +119,15 @@ app.use(cors({
   origin(origin, callback) {
     callback(null, isOriginAllowed(origin) ? origin || false : false);
   },
+  credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 
-app.get('/api/docs/:id/export.md', (req, res) => {
-  const state = getLatestDocState(req.params.id);
+app.get('/api/docs/:id/export.md', requireAuth, (req, res) => {
+  const doc = getDocumentForUser(req.user.id, req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+
+  const state = getLatestDocState(doc.id);
   if (!state) return res.status(404).json({ error: 'Not found' });
   try {
     res.set('Content-Type', 'text/markdown; charset=utf-8');
@@ -109,8 +137,8 @@ app.get('/api/docs/:id/export.md', (req, res) => {
   }
 });
 
-app.get('/api/kb/:id/export.zip', async (req, res) => {
-  const kb = db.prepare('SELECT * FROM knowledge_bases WHERE id = ?').get(req.params.id);
+app.get('/api/kb/:id/export.zip', requireAuth, async (req, res) => {
+  const kb = getKnowledgeBaseForUser(req.user.id, req.params.id);
   if (!kb) return res.status(404).json({ error: 'Not found' });
 
   const zip = new JSZip();
@@ -131,18 +159,18 @@ app.get('/api/kb/:id/export.zip', async (req, res) => {
   };
 
   const walkFolder = (folderId, prefix) => {
-    for (const doc of db.prepare('SELECT * FROM documents WHERE folder_id = ?').all(folderId)) {
+    for (const doc of listFolderDocsForUser(req.user.id, folderId)) {
       addDoc(doc, prefix);
     }
-    for (const sub of db.prepare('SELECT * FROM folders WHERE parent_id = ?').all(folderId)) {
+    for (const sub of listSubfoldersForUser(req.user.id, folderId)) {
       walkFolder(sub.id, `${prefix}${sanitizeFilename(sub.name)}/`);
     }
   };
 
-  for (const doc of db.prepare('SELECT * FROM documents WHERE kb_id = ? AND folder_id IS NULL').all(kb.id)) {
+  for (const doc of listRootDocsForUser(req.user.id, kb.id)) {
     addDoc(doc, '');
   }
-  for (const folder of db.prepare('SELECT * FROM folders WHERE kb_id = ? AND parent_id IS NULL').all(kb.id)) {
+  for (const folder of listRootFoldersForUser(req.user.id, kb.id)) {
     walkFolder(folder.id, `${sanitizeFilename(folder.name)}/`);
   }
 
@@ -170,7 +198,14 @@ server.on('upgrade', (request, socket, head) => {
     socket.destroy();
     return;
   }
+  const user = getSessionUserFromCookieHeader(request.headers.cookie || '');
+  if (!user) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
   wss.handleUpgrade(request, socket, head, (ws) => {
+    request.user = user;
     wss.emit('connection', ws, request);
   });
 });
@@ -180,7 +215,7 @@ wss.on('connection', (ws, request) => {
     Object.entries(request.headers).filter(([, v]) => typeof v === 'string')
   );
   const fetchRequest = new Request(`http://localhost:${PORT}${request.url}`, { headers });
-  const connection = hocuspocus.handleConnection(ws, fetchRequest);
+  const connection = hocuspocus.handleConnection(ws, fetchRequest, { user: request.user });
 
   ws.on('message', (data) => connection.handleMessage(new Uint8Array(data)));
   ws.on('close', () => connection.handleClose());
