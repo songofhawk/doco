@@ -189,7 +189,7 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
 };
 
 /* ---- 主侧边栏 ---- */
-export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { collapsed?: boolean; onToggle?: () => void; onDocRenamed?: (docId: string, title: string) => void }) => {
+export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boolean; onToggle?: () => void; onDocRenamed?: (docId: string, title: string) => void }) => {
     const location = useLocation();
     const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
@@ -207,6 +207,11 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     } | null>(null);
     const navigate = useNavigate();
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+    const navigateToDoc = (docId: string) => {
+        navigate(`/doc/${docId}`);
+        if (window.innerWidth < 768) onToggle?.();
+    };
 
     // 加载知识库列表
     useEffect(() => { fetchKbs(); }, []);
@@ -404,7 +409,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                             }
                             setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
                         }
-                        navigate(`/doc/${docId}`);
+                        navigateToDoc(docId);
                     }
                 } catch {}
             }
@@ -599,7 +604,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
             className={`flex items-center px-2 py-1.5 rounded-md transition-colors cursor-pointer group ${
                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-100'
             }`}
-            onClick={() => navigate(`/doc/${doc.id}`)}
+            onClick={() => navigateToDoc(doc.id)}
             onContextMenu={e => showDocMenu(e, doc, folderId, kbId)}>
             <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />
             {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
@@ -614,7 +619,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                     const rect = (e.target as HTMLElement).getBoundingClientRect();
                     setCtxMenu({ x: rect.left, y: rect.bottom + 2, items: buildDocMenuItems(doc, folderId, kbId) });
                 }}
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                 <MoreHorizontal size={12} />
             </button>
         </div>
@@ -648,7 +653,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                             ]
                         });
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                    className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                     <Plus size={12} />
                 </button>
                 <button onClick={e => {
@@ -665,7 +670,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                             ]
                         });
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                    className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                     <MoreHorizontal size={12} />
                 </button>
             </div>
@@ -685,7 +690,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
     if (collapsed) return null;
 
     return (
-        <div className="w-64 bg-[#fafafa] border-r border-gray-200 h-full flex flex-col select-none">
+        <aside className="absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col border-r border-gray-200 bg-[#fafafa] shadow-xl select-none md:static md:w-64 md:shadow-none">
             {/* 搜索栏 */}
             <div className="px-3 pt-3 pb-2">
                 <div className="relative">
@@ -713,7 +718,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                     </div>
                     {searchResults.map(doc => (
                         <button key={doc.id}
-                            onClick={() => { navigate(`/doc/${doc.id}`); setSearchQuery(''); }}
+                            onClick={() => { navigateToDoc(doc.id); setSearchQuery(''); }}
                             className={`flex items-center px-3 py-2 w-full text-left text-sm rounded-md transition-colors ${
                                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                             }`}>
@@ -760,7 +765,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                                             ]
                                         });
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                                    className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                                     <Plus size={14} />
                                 </button>
                                 <button onClick={e => {
@@ -777,7 +782,7 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                                             ]
                                         });
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-200 rounded text-gray-400 transition-opacity">
+                                    className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                                     <MoreHorizontal size={14} />
                                 </button>
                             </div>
@@ -823,6 +828,6 @@ export const Sidebar = ({ collapsed, onToggle: _onToggle, onDocRenamed }: { coll
                     onClose={() => setInputDialog(null)}
                 />
             )}
-        </div>
+        </aside>
     );
 };

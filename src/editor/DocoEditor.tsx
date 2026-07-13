@@ -422,13 +422,13 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     }))
 
     return (
-        <div className={`doco-editor-root w-full max-w-4xl mx-auto min-h-[80vh] shadow-sm rounded-lg mt-6 p-10 px-14 border border-gray-100 relative group transition-colors ${className || ''}`}
+        <div className={`doco-editor-root w-full max-w-4xl mx-auto min-h-[80vh] border border-gray-100 p-4 shadow-sm sm:mt-6 sm:rounded-lg sm:p-10 sm:px-14 relative group transition-colors ${className || ''}`}
             style={{ backgroundColor: bgColor, ...style }}
         >
             {/* 左侧目录导航 */}
             {editor && <TableOfContents editor={editor} headingNumbered={headingNumbered} />}
             {/* 文档设置按钮 */}
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-4 right-4 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 <DocSettings
                     docId={docId}
                     headingNumbered={headingNumbered}
@@ -453,7 +453,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start') } }}
                 placeholder="无标题"
                 rows={1}
-                className="w-full text-3xl font-bold text-gray-900 border-none outline-none resize-none bg-transparent placeholder:text-gray-300 mb-4 leading-snug"
+                className="mb-4 w-full resize-none border-none bg-transparent pr-10 text-2xl font-bold leading-snug text-gray-900 outline-none placeholder:text-gray-300 sm:pr-0 sm:text-3xl"
             />
 
             <div className="tiptap-editor-container relative">

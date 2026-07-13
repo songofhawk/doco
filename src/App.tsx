@@ -248,13 +248,14 @@ function AppShell() {
         <header className="bg-white border-b border-gray-200 h-12 flex items-center px-4 shrink-0 z-10">
           <button
             onClick={toggleSidebar}
-            className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500 transition-colors mr-3"
+            aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 sm:mr-3"
             title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
           >
             {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
           </button>
           <h1 className="text-base font-semibold text-gray-800 tracking-tight">Doco</h1>
-          <div className="ml-auto text-sm text-gray-500 flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2 text-sm text-gray-500 sm:gap-4">
             <div className="hidden sm:flex items-center gap-2 text-gray-600">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
@@ -264,16 +265,17 @@ function AppShell() {
               <span className="max-w-[180px] truncate">{user.name || user.email}</span>
             </div>
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt,.docx,.pdf" onChange={handleFileChange} className="hidden" />
-            <button onClick={handleImport} className="hover:text-blue-600 transition-colors flex items-center gap-1" title="导入文档">
-              <Upload size={14} />导入
+            <button onClick={handleImport} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="导入文档">
+              <Upload size={16} /><span className="hidden sm:inline">导入</span>
             </button>
-            <span className="text-gray-300">|</span>
+            <span className="hidden text-gray-300 sm:inline">|</span>
             <div className="relative" ref={exportMenuRef}>
               <button
                 onClick={() => setExportOpen(v => !v)}
-                className="hover:text-blue-600 transition-colors flex items-center gap-1"
+                className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent"
+                title="导出文档"
               >
-                <Download size={14} />导出<ChevronDown size={12} />
+                <Download size={16} /><span className="hidden sm:inline">导出</span><ChevronDown size={12} className="hidden sm:block" />
               </button>
               {exportOpen && (
                 <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[120px] z-50">
@@ -292,15 +294,23 @@ function AppShell() {
                 </div>
               )}
             </div>
-            <span className="text-gray-300">|</span>
-            <button onClick={signOut} className="hover:text-blue-600 transition-colors flex items-center gap-1" title="退出登录">
-              <LogOut size={14} />退出
+            <span className="hidden text-gray-300 sm:inline">|</span>
+            <button onClick={signOut} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="退出登录">
+              <LogOut size={16} /><span className="hidden sm:inline">退出</span>
             </button>
           </div>
         </header>
-        <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex flex-1 overflow-hidden">
+          {!sidebarCollapsed && (
+            <button
+              type="button"
+              aria-label="关闭侧边栏"
+              onClick={toggleSidebar}
+              className="absolute inset-0 z-20 bg-black/20 md:hidden"
+            />
+          )}
           <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
-          <main className="flex-1 overflow-y-auto bg-gray-50">
+          <main className="min-w-0 flex-1 overflow-y-auto bg-gray-50">
             <Routes>
               <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
               <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
