@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor } from './editor'
 import { Sidebar } from './components/Sidebar'
@@ -112,6 +113,68 @@ const LoginPage = () => {
   )
 }
 
+const LogoutConfirmDialog = ({ onConfirm, onClose }: {
+  onConfirm: () => Promise<void>
+  onClose: () => void
+}) => {
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting) onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose, submitting])
+
+  const handleConfirm = async () => {
+    setSubmitting(true)
+    await onConfirm()
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !submitting) onClose()
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="logout-dialog-title"
+        aria-describedby="logout-dialog-description"
+        className="w-full max-w-sm rounded-xl border border-[#e8e6dc] bg-[#faf9f5] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
+      >
+        <h2 id="logout-dialog-title" className="text-lg font-medium text-[#141413]">确认退出登录？</h2>
+        <p id="logout-dialog-description" className="mt-2 text-sm leading-6 text-[#5e5d59]">
+          退出后，需要重新使用 Google 账号登录才能访问你的知识库。
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            autoFocus
+            className="min-h-11 rounded-lg bg-[#e8e6dc] px-4 py-2 text-sm text-[#4d4c48] shadow-[0_0_0_1px_#d1cfc5] transition-colors hover:bg-[#dedcd2] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={submitting}
+            className="min-h-11 rounded-lg bg-[#c96442] px-4 py-2 text-sm text-[#faf9f5] shadow-[0_0_0_1px_#c96442] transition-colors hover:bg-[#b95b3b] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? '正在退出...' : '确认退出'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; externalTitle?: string; user: CurrentUser }) => {
   const { id } = useParams<{ id: string }>()
   const [meta, setMeta] = useState<any>(undefined)
@@ -169,6 +232,7 @@ const COLLAPSE_BREAKPOINT = 768
 
 function AppShell() {
   const { user, loading, signOut } = useAuth()
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [externalTitle, setExternalTitle] = useState<string | undefined>()
@@ -295,7 +359,7 @@ function AppShell() {
               )}
             </div>
             <span className="hidden text-gray-300 sm:inline">|</span>
-            <button onClick={signOut} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="退出登录">
+            <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="退出登录">
               <LogOut size={16} /><span className="hidden sm:inline">退出</span>
             </button>
           </div>
@@ -317,6 +381,12 @@ function AppShell() {
             </Routes>
           </main>
         </div>
+        {logoutConfirmOpen && (
+          <LogoutConfirmDialog
+            onClose={() => setLogoutConfirmOpen(false)}
+            onConfirm={signOut}
+          />
+        )}
       </div>
     </BrowserRouter>
   )
