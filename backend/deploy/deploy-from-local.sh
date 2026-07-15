@@ -5,12 +5,19 @@ set -euo pipefail
 TARGET="${1:?用法: deploy-from-local.sh user@host /path/to/key.pem}"
 KEY="${2:?缺少私钥路径}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"   # backend/
+ROOT_DIR="$(cd "$DIR/.." && pwd)"
 
 echo "== 上传 backend 到 $TARGET:/opt/doco/backend/ =="
 rsync -az --delete \
   -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
   --exclude node_modules --exclude 'doco.db*' --exclude '*.backup-*' \
   "$DIR/" "$TARGET:/opt/doco/backend/" --rsync-path="mkdir -p /opt/doco/backend && rsync"
+
+echo "== 上传 OpenAPI 规范到 $TARGET:/opt/doco/docs/openapi/ =="
+rsync -az --delete \
+  -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
+  "$ROOT_DIR/docs/openapi/" "$TARGET:/opt/doco/docs/openapi/" \
+  --rsync-path="mkdir -p /opt/doco/docs/openapi && rsync"
 
 echo "== 执行远端初始化 =="
 if ssh -i "$KEY" -o StrictHostKeyChecking=accept-new "$TARGET" 'bash /opt/doco/backend/deploy/remote-setup.sh'; then

@@ -151,12 +151,18 @@ sleep 2
 systemctl is-active doco-backend
 
 echo "== 5/5 本机自检 =="
-if [ "$(curl -s -o /tmp/doco-auth-check.json -w '%{http_code}' http://127.0.0.1:8000/api/auth/me)" = "401" ]; then
+AUTH_STATUS=""
+for _ in $(seq 1 20); do
+  AUTH_STATUS="$(curl -s -o /tmp/doco-auth-check.json -w '%{http_code}' http://127.0.0.1:8000/app-api/v1/auth/me || true)"
+  [ "$AUTH_STATUS" = "401" ] && break
+  sleep 1
+done
+if [ "$AUTH_STATUS" = "401" ]; then
   cat /tmp/doco-auth-check.json
-  echo " <- /api/auth/me OK"
+  echo " <- /app-api/v1/auth/me OK"
 else
   cat /tmp/doco-auth-check.json >&2 || true
-  echo "后端自检失败：/api/auth/me 未返回预期 401" >&2
+  echo "后端自检失败：/app-api/v1/auth/me 未返回预期 401（实际 $AUTH_STATUS）" >&2
   exit 1
 fi
 
