@@ -29,7 +29,14 @@ __pycache__/
 backend/uploads/*
 backend/attachments/*
 backend/*.db
+backend/*.db-*
+backend/*.db.backup-*
 exports/
 secret/
 test-results/
 playwright-report/
+.claude/
+.agents/
+.pnpm-store/
+.playwright-mcp/
+.wrangler/
