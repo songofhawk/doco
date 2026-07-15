@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { Editor } from '@tiptap/react'
 import { BubbleMenu as TiptapBubbleMenu } from '@tiptap/react/menus'
 import * as Popover from '@radix-ui/react-popover'
@@ -97,6 +97,17 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
     const isSingleBlock = selectionRange?.count === 1
     const singleBlockReason = '跨块选择时不可用'
 
+    const shouldShowBubbleMenu = useCallback(({ editor, state }: {
+        editor: Editor
+        state: Editor['state']
+    }) => {
+        const { from, to } = state.selection
+        return (from !== to || editor.isActive('image'))
+            && !editor.isActive('codeBlock')
+            && !editor.isActive('mermaidBlock')
+            && !editor.isActive('plantUMLBlock')
+    }, [])
+
     const refocusEditorAfterMenuClose = () => {
         requestAnimationFrame(() => editor.commands.focus())
     }
@@ -193,13 +204,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
             )}
             <TiptapBubbleMenu
                 editor={editor}
-                shouldShow={({ editor, state }) => {
-                    const { from, to } = state.selection
-                    return (from !== to || editor.isActive('image'))
-                        && !editor.isActive('codeBlock')
-                        && !editor.isActive('mermaidBlock')
-                        && !editor.isActive('plantUMLBlock')
-                }}
+                shouldShow={shouldShowBubbleMenu}
                 className="flex overflow-visible border border-[#e8e6dc] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] bg-[#faf9f5] z-50"
             >
                 <div ref={toolbarRef} className="flex px-1 items-center outline-none">
