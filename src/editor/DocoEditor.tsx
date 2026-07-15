@@ -56,7 +56,11 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const [bgColor, setBgColor] = useState('#ffffff')
     const titleTimerRef = useRef<ReturnType<typeof setTimeout>>()
     const collapseTimerRef = useRef<ReturnType<typeof setTimeout>>()
+    const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout>>()
+    const collaborationProviderRef = useRef<HocuspocusProvider | null>(null)
+    const saveRequestRef = useRef<string | null>(null)
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const pasteDialog = usePasteMarkdownDialog()
     const isCollaborative = Boolean(collaboration?.websocketUrl)
     const websocketUrl = collaboration?.websocketUrl
@@ -88,9 +92,23 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             websocketProvider: socket,
             name: roomName,
             document: ydoc,
+            onStateless: ({ payload }) => {
+                let message: { type?: string; requestId?: string; ok?: boolean }
+                try {
+                    message = JSON.parse(payload)
+                } catch {
+                    return
+                }
+                if (message.type !== 'doco:save-result' || message.requestId !== saveRequestRef.current) return
+                saveRequestRef.current = null
+                clearTimeout(saveStatusTimerRef.current)
+                setSaveStatus(message.ok ? 'saved' : 'error')
+                saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+            },
         })
         // 显式传入 websocketProvider 时不会自动 attach，必须手动调用
         provider.attach()
+        collaborationProviderRef.current = provider
 
         // IndexedDB 主存储先加载，再连服务器；初始状态互补由 SyncStep1/2 协议双向完成
         idb.once('synced', () => {
@@ -103,11 +121,45 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         return () => {
             disposed = true
             if (connectTimer) clearTimeout(connectTimer)
+            if (collaborationProviderRef.current === provider) collaborationProviderRef.current = null
             provider?.destroy()
             socket?.destroy()
             idb.destroy()
         }
     }, [ydoc, docId, userId, websocketUrl, roomName])
+
+    // Cmd/Ctrl+S：拦截浏览器“保存网页”，通过当前协同连接要求后端立即持久化。
+    useEffect(() => {
+        const handleSaveShortcut = (event: KeyboardEvent) => {
+            if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 's') return
+            event.preventDefault()
+
+            const provider = collaborationProviderRef.current
+            clearTimeout(saveStatusTimerRef.current)
+            if (!provider?.synced) {
+                setSaveStatus('error')
+                saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+                return
+            }
+
+            const requestId = crypto.randomUUID()
+            saveRequestRef.current = requestId
+            setSaveStatus('saving')
+            provider.sendStateless(JSON.stringify({ type: 'doco:save', requestId }))
+            saveStatusTimerRef.current = setTimeout(() => {
+                if (saveRequestRef.current !== requestId) return
+                saveRequestRef.current = null
+                setSaveStatus('error')
+                saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+            }, 5000)
+        }
+
+        window.addEventListener('keydown', handleSaveShortcut)
+        return () => {
+            window.removeEventListener('keydown', handleSaveShortcut)
+            clearTimeout(saveStatusTimerRef.current)
+        }
+    }, [])
 
     // 从 props 加载文档元数据
     useEffect(() => {
@@ -490,6 +542,13 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             {/* 底部状态栏 */}
             <div className="mt-6 pt-4 border-t border-gray-100 flex items-center text-xs text-gray-400">
                 <span>{wordCount} 字</span>
+                {saveStatus !== 'idle' && (
+                    <span className={`ml-auto ${saveStatus === 'error' ? 'text-red-500' : ''}`} role="status">
+                        {saveStatus === 'saving' && '正在保存…'}
+                        {saveStatus === 'saved' && '已保存到后端'}
+                        {saveStatus === 'error' && '保存失败，请检查连接'}
+                    </span>
+                )}
             </div>
         </div>
     )

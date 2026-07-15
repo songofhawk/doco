@@ -80,6 +80,44 @@ export const hocuspocus = new Hocuspocus({
     const state = persistYDoc(documentName, document);
     console.log(`[YDoc] Stored ${documentName}: ${state.length} bytes`);
   },
+
+  async onStateless({ connection, document, documentName, payload }) {
+    let message;
+    try {
+      message = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (message?.type !== 'doco:save' || typeof message.requestId !== 'string') return;
+
+    if (!connection.context?.user || !userCanAccessDocument(connection.context.user.id, documentName)) {
+      connection.sendStateless(JSON.stringify({
+        type: 'doco:save-result',
+        requestId: message.requestId,
+        ok: false,
+        error: 'Not authorized',
+      }));
+      return;
+    }
+
+    try {
+      // Stateless 指令与该连接之前的 Yjs 更新有序处理，此处快照包含快捷键前的最新编辑。
+      const state = persistYDoc(documentName, document);
+      console.log(`[YDoc] Manually stored ${documentName}: ${state.length} bytes`);
+      connection.sendStateless(JSON.stringify({
+        type: 'doco:save-result',
+        requestId: message.requestId,
+        ok: true,
+      }));
+    } catch (error) {
+      connection.sendStateless(JSON.stringify({
+        type: 'doco:save-result',
+        requestId: message.requestId,
+        ok: false,
+        error: error instanceof Error ? error.message : 'Save failed',
+      }));
+    }
+  },
 });
 registerHocuspocus(hocuspocus);
 

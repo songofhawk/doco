@@ -108,8 +108,30 @@ test('真实 Hocuspocus 链路双向同步、在线优先与响应前持久化',
   assert.equal(liveRead.response.status, 200);
   assert.equal(liveRead.body.data.document.content[0].content[0].text, '页面尚未防抖落库');
 
+  clientDoc.transact(() => {
+    prosemirrorJSONToYXmlFragment(documentSchema, {
+      type: 'doc', content: [{ type: 'paragraph', attrs: { id: 'block_01ARZ3NDEKTSV4RRFFQ69G5FAV' }, content: [{ type: 'text', text: '快捷键手动保存已落库' }] }],
+    }, clientDoc.getXmlFragment('default'));
+  }, 'test-client');
+  await waitFor(() => yDocToProsemirrorJSON(hocuspocus.documents.get('collab-doc'), 'default').content?.[0]?.content?.[0]?.text === '快捷键手动保存已落库');
+
+  let saveResult;
+  const onStateless = ({ payload }) => {
+    const message = JSON.parse(payload);
+    if (message.type === 'doco:save-result' && message.requestId === 'test-save') saveResult = message;
+  };
+  provider.on('stateless', onStateless);
+  provider.sendStateless(JSON.stringify({ type: 'doco:save', requestId: 'test-save' }));
+  await waitFor(() => saveResult);
+  provider.off('stateless', onStateless);
+  assert.equal(saveResult.ok, true);
+  const manuallyPersisted = db.prepare('SELECT state FROM ydoc_state WHERE doc_id = ?').get('collab-doc');
+  const persistedDoc = new Y.Doc();
+  Y.applyUpdate(persistedDoc, new Uint8Array(manuallyPersisted.state));
+  assert.equal(yDocToProsemirrorJSON(persistedDoc, 'default').content[0].content[0].text, '快捷键手动保存已落库');
+
   provider.destroy(); socketProvider.destroy();
   await waitFor(() => !hocuspocus.documents.has('collab-doc'));
   const offlineRead = await api('/documents/collab-doc/content');
-  assert.equal(offlineRead.body.data.document.content[0].content[0].text, '页面尚未防抖落库');
+  assert.equal(offlineRead.body.data.document.content[0].content[0].text, '快捷键手动保存已落库');
 });
