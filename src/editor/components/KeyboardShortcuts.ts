@@ -1,4 +1,8 @@
 import { Extension } from '@tiptap/core'
+import { convertSelectedBlocks, getTopLevelSelection, toggleCurrentBlockCollapse } from '../editorBlockCommands'
+import { EDITOR_SHORTCUTS } from '../editorShortcuts'
+
+type MarkdownStorage = { getMarkdown?: () => string }
 
 /**
  * 获取当前光标所在的顶层块节点位置
@@ -20,7 +24,7 @@ export const KeyboardShortcuts = Extension.create({
     addKeyboardShortcuts() {
         return {
             // Alt+Up: 向上移动当前块
-            'Alt-ArrowUp': ({ editor }) => {
+            [EDITOR_SHORTCUTS.moveUp]: ({ editor }) => {
                 const block = getCursorBlockPos(editor.state)
                 if (!block || block.index === 0) return false
                 const { pos, node, index } = block
@@ -34,7 +38,7 @@ export const KeyboardShortcuts = Extension.create({
             },
 
             // Alt+Down: 向下移动当前块
-            'Alt-ArrowDown': ({ editor }) => {
+            [EDITOR_SHORTCUTS.moveDown]: ({ editor }) => {
                 const block = getCursorBlockPos(editor.state)
                 if (!block) return false
                 const { pos, node, index } = block
@@ -49,7 +53,7 @@ export const KeyboardShortcuts = Extension.create({
             },
 
             // Cmd+D: 复制当前块
-            'Mod-d': ({ editor }) => {
+            [EDITOR_SHORTCUTS.duplicate]: ({ editor }) => {
                 const block = getCursorBlockPos(editor.state)
                 if (!block) return false
                 const { pos, node } = block
@@ -60,7 +64,7 @@ export const KeyboardShortcuts = Extension.create({
             },
 
             // Cmd+Enter: 在当前块下方插入新段落
-            'Mod-Enter': ({ editor }) => {
+            [EDITOR_SHORTCUTS.addBelow]: ({ editor }) => {
                 const block = getCursorBlockPos(editor.state)
                 if (!block) return false
                 const { pos, node } = block
@@ -72,52 +76,124 @@ export const KeyboardShortcuts = Extension.create({
                 return true
             },
 
+            [EDITOR_SHORTCUTS.bold]: ({ editor }) => {
+                editor.chain().focus().toggleBold().run()
+                return true
+            },
+
+            [EDITOR_SHORTCUTS.italic]: ({ editor }) => {
+                editor.chain().focus().toggleItalic().run()
+                return true
+            },
+
+            [EDITOR_SHORTCUTS.underline]: ({ editor }) => {
+                editor.chain().focus().toggleUnderline().run()
+                return true
+            },
+
+            [EDITOR_SHORTCUTS.strike]: ({ editor }) => {
+                editor.chain().focus().toggleStrike().run()
+                return true
+            },
+
+            [EDITOR_SHORTCUTS.inlineCode]: ({ editor }) => {
+                editor.chain().focus().toggleCode().run()
+                return true
+            },
+
             // Cmd+Shift+H: 切换高亮
-            'Mod-Shift-h': ({ editor }) => {
+            [EDITOR_SHORTCUTS.highlight]: ({ editor }) => {
                 (editor.chain().focus() as any).toggleHighlight().run()
                 return true
             },
 
             // Cmd+Shift+L: 左对齐
-            'Mod-Shift-l': ({ editor }) => {
+            [EDITOR_SHORTCUTS.alignLeft]: ({ editor }) => {
                 (editor.chain().focus() as any).setTextAlign('left').run()
                 return true
             },
 
             // Cmd+Shift+e: 居中对齐
-            'Mod-Shift-e': ({ editor }) => {
+            [EDITOR_SHORTCUTS.alignCenter]: ({ editor }) => {
                 (editor.chain().focus() as any).setTextAlign('center').run()
                 return true
             },
 
             // Cmd+Shift+r: 右对齐
-            'Mod-Shift-r': ({ editor }) => {
+            [EDITOR_SHORTCUTS.alignRight]: ({ editor }) => {
                 (editor.chain().focus() as any).setTextAlign('right').run()
                 return true
             },
 
             // Cmd+Alt+1/2/3: 标题快捷键
-            'Mod-Alt-1': ({ editor }) => {
-                editor.chain().focus().toggleHeading({ level: 1 }).run()
-                return true
-            },
-            'Mod-Alt-2': ({ editor }) => {
-                editor.chain().focus().toggleHeading({ level: 2 }).run()
-                return true
-            },
-            'Mod-Alt-3': ({ editor }) => {
-                editor.chain().focus().toggleHeading({ level: 3 }).run()
-                return true
-            },
+            [EDITOR_SHORTCUTS.heading1]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'heading', 1),
+            [EDITOR_SHORTCUTS.heading2]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'heading', 2),
+            [EDITOR_SHORTCUTS.heading3]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'heading', 3),
 
             // Cmd+Alt+0: 转为正文
-            'Mod-Alt-0': ({ editor }) => {
-                editor.chain().focus().setParagraph().run()
+            [EDITOR_SHORTCUTS.paragraph]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'paragraph'),
+
+            [EDITOR_SHORTCUTS.bulletList]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'bulletList'),
+
+            [EDITOR_SHORTCUTS.orderedList]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'orderedList'),
+
+            [EDITOR_SHORTCUTS.taskList]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'taskList'),
+
+            [EDITOR_SHORTCUTS.blockquote]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'blockquote'),
+
+            [EDITOR_SHORTCUTS.codeBlock]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'codeBlock'),
+
+            [EDITOR_SHORTCUTS.calloutBlock]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'calloutBlock'),
+
+            [EDITOR_SHORTCUTS.horizontalRule]: ({ editor }) =>
+                convertSelectedBlocks(editor, 'horizontalRule'),
+
+            [EDITOR_SHORTCUTS.copyAsText]: ({ editor }) => {
+                const selection = editor.state.selection
+                const blockRange = getTopLevelSelection(editor)
+                const from = selection.empty ? blockRange?.from : selection.from
+                const to = selection.empty ? blockRange?.to : selection.to
+                if (from === undefined || to === undefined) return false
+                const text = editor.state.doc.textBetween(from, to, '\n')
+                if (!text) return false
+                void navigator.clipboard.writeText(text)
                 return true
             },
 
+            [EDITOR_SHORTCUTS.copyAsMarkdown]: ({ editor }) => {
+                const selection = editor.state.selection
+                const blockRange = getTopLevelSelection(editor)
+                const from = selection.empty ? blockRange?.from : selection.from
+                const to = selection.empty ? blockRange?.to : selection.to
+                if (from === undefined || to === undefined) return false
+                const text = editor.state.doc.textBetween(from, to, '\n')
+                if (!text) return false
+                const markdownStorage = editor.storage.markdown as MarkdownStorage | undefined
+                const markdown = markdownStorage?.getMarkdown?.() || text
+                const lines = markdown.split('\n')
+                const firstLine = text.split('\n')[0]?.slice(0, 20)
+                const matched = firstLine
+                    ? lines.filter((line: string) => line.includes(firstLine))
+                    : []
+                void navigator.clipboard.writeText(matched.length ? matched.join('\n') : text)
+                return true
+            },
+
+            [EDITOR_SHORTCUTS.collapse]: ({ editor }) =>
+                toggleCurrentBlockCollapse(editor),
+
             // Delete / Backspace 删除选中的块节点
-            'Delete': ({ editor }) => {
+            [EDITOR_SHORTCUTS.delete]: ({ editor }) => {
                 const { selection } = editor.state
                 if ((selection as any).node) {
                     const { tr } = editor.state
@@ -135,7 +211,7 @@ export const KeyboardShortcuts = Extension.create({
             },
 
             // Cmd+K: 添加/编辑链接（通过自定义事件触发弹层）
-            'Mod-k': ({ editor }) => {
+            [EDITOR_SHORTCUTS.link]: ({ editor }) => {
                 const coords = editor.view.coordsAtPos(editor.state.selection.from)
                 const existingHref = editor.getAttributes('link').href || ''
                 window.dispatchEvent(new CustomEvent('editor-link-edit', {

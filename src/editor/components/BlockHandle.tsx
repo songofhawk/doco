@@ -9,28 +9,37 @@ import {
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
+import { actionTooltip, shortcutLabel, type EditorShortcutId } from '../editorShortcuts'
 
-const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: string; onClick: () => void; focused?: boolean }) => (
+const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: EditorShortcutId; onClick: () => void; focused?: boolean }) => (
     <button
         className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
         onClick={onClick}
         data-focused={focused || undefined}
+        aria-label={actionTooltip(label, shortcut)}
     >
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
-        {shortcut && <span className="ml-auto text-xs text-gray-300">{shortcut}</span>}
+        {shortcut && (
+            <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#5e5d59]">
+                {shortcutLabel(shortcut)}
+            </kbd>
+        )}
     </button>
 )
 
-const ConvertItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: string; onClick: () => void; focused?: boolean }) => (
+const ConvertItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut: EditorShortcutId; onClick: () => void; focused?: boolean }) => (
     <button
         className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
         onClick={onClick}
         data-focused={focused || undefined}
+        aria-label={actionTooltip(label, shortcut)}
     >
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
-        {shortcut && <span className="ml-auto text-xs text-gray-300">{shortcut}</span>}
+        <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#5e5d59]">
+            {shortcutLabel(shortcut)}
+        </kbd>
     </button>
 )
 
@@ -59,6 +68,17 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         }
     }
 
+    const selectionSpansMultipleTextBlocks = useCallback(() => {
+        const { selection, doc } = editor.state
+        if (selection.empty) return false
+
+        let textBlockCount = 0
+        doc.nodesBetween(selection.from, selection.to, node => {
+            if (node.isTextblock) textBlockCount += 1
+        })
+        return textBlockCount > 1
+    }, [editor])
+
     useEffect(() => {
         if (!editor || !editor.view) return
 
@@ -69,6 +89,13 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             if (isOpen) return
 
             if (containerRef.current?.contains(e.target as Node)) return
+
+            // 行操作只属于单个文本块；跨段落或跨列表项选择时由浮动工具栏接管。
+            if (selectionSpansMultipleTextBlocks()) {
+                setHandlePos({ top: -999, left: -999 })
+                setHoveredNode(null)
+                return
+            }
 
             const view = editor.view
 
@@ -147,15 +174,24 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         }
 
         const onLeave = () => { if (!isOpen) scheduleHide() }
+        const onSelectionUpdate = () => {
+            if (!selectionSpansMultipleTextBlocks()) return
+            setHandlePos({ top: -999, left: -999 })
+            setHoveredNode(null)
+            setIsOpen(false)
+            setShowConvertMenu(false)
+        }
 
         container.addEventListener('mousemove', updateHandlePosition)
         container.addEventListener('mouseleave', onLeave)
+        editor.on('selectionUpdate', onSelectionUpdate)
 
         return () => {
             container.removeEventListener('mousemove', updateHandlePosition)
             container.removeEventListener('mouseleave', onLeave)
+            editor.off('selectionUpdate', onSelectionUpdate)
         }
-    }, [editor, isOpen])
+    }, [editor, isOpen, selectionSpansMultipleTextBlocks])
 
     // posAtDOM 返回的是块内部文本位置，需要 resolve 后回溯到顶层块节点
     const getNodePos = (): number | null => {
@@ -536,7 +572,11 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
         >
             <Popover.Root open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) setShowConvertMenu(false) }}>
                 <Popover.Trigger asChild>
-                    <button className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing outline-none">
+                    <button
+                        className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing outline-none"
+                        title="块操作"
+                        aria-label="打开块操作菜单"
+                    >
                         <GripVertical className="w-5 h-5" />
                     </button>
                 </Popover.Trigger>
@@ -546,6 +586,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                         sideOffset={5}
                         align="start"
                         onOpenAutoFocus={e => e.preventDefault()}
+                        onCloseAutoFocus={e => e.preventDefault()}
                     >
                         {/* 主菜单 */}
                         <div
@@ -559,6 +600,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                                 className={`flex items-center justify-between px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${fi === 0 ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                                 onMouseEnter={() => { setShowConvertMenu(true) }}
                                 onFocus={() => setFocusIndex(0)}
+                                aria-label="打开块类型转换菜单"
                             >
                                 <span className="flex items-center">
                                     <Type className="w-4 h-4 mr-3 text-gray-400" />
@@ -572,24 +614,24 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                             {/* 折叠/展开（仅多行块显示） */}
                             {showCollapse && (
                                 <>
-                                    <MenuItem icon={ChevronsUpDown} label={isCollapsed() ? '展开' : '折叠'} onClick={handleToggleCollapse} focused={fi === 1} />
+                                    <MenuItem icon={ChevronsUpDown} label={isCollapsed() ? '展开' : '折叠'} shortcut="collapse" onClick={handleToggleCollapse} focused={fi === 1} />
                                     <div className="h-px bg-gray-100 my-1" />
                                 </>
                             )}
 
                             {/* 剪切 / 复制 / 粘贴区 */}
-                            <MenuItem icon={Scissors} label="剪切" shortcut="⌘X" onClick={handleCut} focused={fi === 1 + o} />
-                            <MenuItem icon={Copy} label="复制" shortcut="⌘C" onClick={handleCopy} focused={fi === 2 + o} />
-                            <MenuItem icon={FileText} label="复制为纯文本" onClick={handleCopyAsText} focused={fi === 3 + o} />
-                            <MenuItem icon={Code} label="复制为 Markdown" onClick={handleCopyAsMarkdown} focused={fi === 4 + o} />
+                            <MenuItem icon={Scissors} label="剪切" shortcut="cut" onClick={handleCut} focused={fi === 1 + o} />
+                            <MenuItem icon={Copy} label="复制" shortcut="copy" onClick={handleCopy} focused={fi === 2 + o} />
+                            <MenuItem icon={FileText} label="复制为纯文本" shortcut="copyAsText" onClick={handleCopyAsText} focused={fi === 3 + o} />
+                            <MenuItem icon={Code} label="复制为 Markdown" shortcut="copyAsMarkdown" onClick={handleCopyAsMarkdown} focused={fi === 4 + o} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
                             {/* 块操作区 */}
-                            <MenuItem icon={CopyPlus} label="复制块" shortcut="⌘D" onClick={handleDuplicate} focused={fi === 5 + o} />
-                            <MenuItem icon={ArrowUpToLine} label="向上移动" shortcut="⌥↑" onClick={handleMoveUp} focused={fi === 6 + o} />
-                            <MenuItem icon={ArrowDownToLine} label="向下移动" shortcut="⌥↓" onClick={handleMoveDown} focused={fi === 7 + o} />
-                            <MenuItem icon={Plus} label="在下方插入" shortcut="⌘⏎" onClick={handleAddBelow} focused={fi === 8 + o} />
+                            <MenuItem icon={CopyPlus} label="复制块" shortcut="duplicate" onClick={handleDuplicate} focused={fi === 5 + o} />
+                            <MenuItem icon={ArrowUpToLine} label="向上移动" shortcut="moveUp" onClick={handleMoveUp} focused={fi === 6 + o} />
+                            <MenuItem icon={ArrowDownToLine} label="向下移动" shortcut="moveDown" onClick={handleMoveDown} focused={fi === 7 + o} />
+                            <MenuItem icon={Plus} label="在下方插入" shortcut="addBelow" onClick={handleAddBelow} focused={fi === 8 + o} />
 
                             <div className="h-px bg-gray-100 my-1" />
 
@@ -597,10 +639,13 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                             <button
                                 className={`flex items-center px-3 py-1.5 text-red-600 rounded-md transition-colors w-full text-left ${fi === 9 + o ? 'bg-red-50' : 'hover:bg-red-50'}`}
                                 onClick={handleDelete}
+                                aria-label={actionTooltip('删除', 'delete')}
                             >
                                 <Trash2 className="w-4 h-4 mr-3 text-red-400" />
                                 删除
-                                <span className="ml-auto text-xs text-red-300">Del</span>
+                                <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#b53333]">
+                                    {shortcutLabel('delete')}
+                                </kbd>
                             </button>
                         </div>
 
@@ -613,19 +658,19 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                                 onKeyDown={handleConvertKeyDown}
                                 onMouseLeave={() => setShowConvertMenu(false)}
                             >
-                                <ConvertItem icon={Pilcrow} label="正文" onClick={() => handleConvert('paragraph')} focused={ci === 0} />
-                                <ConvertItem icon={Heading1} label="一级标题" shortcut="⌘⌥1" onClick={() => handleConvert('heading', 1)} focused={ci === 1} />
-                                <ConvertItem icon={Heading2} label="二级标题" shortcut="⌘⌥2" onClick={() => handleConvert('heading', 2)} focused={ci === 2} />
-                                <ConvertItem icon={Heading3} label="三级标题" shortcut="⌘⌥3" onClick={() => handleConvert('heading', 3)} focused={ci === 3} />
+                                <ConvertItem icon={Pilcrow} label="正文" shortcut="paragraph" onClick={() => handleConvert('paragraph')} focused={ci === 0} />
+                                <ConvertItem icon={Heading1} label="一级标题" shortcut="heading1" onClick={() => handleConvert('heading', 1)} focused={ci === 1} />
+                                <ConvertItem icon={Heading2} label="二级标题" shortcut="heading2" onClick={() => handleConvert('heading', 2)} focused={ci === 2} />
+                                <ConvertItem icon={Heading3} label="三级标题" shortcut="heading3" onClick={() => handleConvert('heading', 3)} focused={ci === 3} />
                                 <div className="h-px bg-gray-100 my-1" />
-                                <ConvertItem icon={List} label="无序列表" onClick={() => handleConvert('bulletList')} focused={ci === 4} />
-                                <ConvertItem icon={ListOrdered} label="有序列表" onClick={() => handleConvert('orderedList')} focused={ci === 5} />
-                                <ConvertItem icon={ListChecks} label="待办列表" onClick={() => handleConvert('taskList')} focused={ci === 6} />
+                                <ConvertItem icon={List} label="无序列表" shortcut="bulletList" onClick={() => handleConvert('bulletList')} focused={ci === 4} />
+                                <ConvertItem icon={ListOrdered} label="有序列表" shortcut="orderedList" onClick={() => handleConvert('orderedList')} focused={ci === 5} />
+                                <ConvertItem icon={ListChecks} label="待办列表" shortcut="taskList" onClick={() => handleConvert('taskList')} focused={ci === 6} />
                                 <div className="h-px bg-gray-100 my-1" />
-                                <ConvertItem icon={Quote} label="引用" onClick={() => handleConvert('blockquote')} focused={ci === 7} />
-                                <ConvertItem icon={Code} label="代码块" onClick={() => handleConvert('codeBlock')} focused={ci === 8} />
-                                <ConvertItem icon={Lightbulb} label="高亮块" onClick={() => handleConvert('calloutBlock')} focused={ci === 9} />
-                                <ConvertItem icon={Minus} label="分隔线" onClick={() => handleConvert('horizontalRule')} focused={ci === 10} />
+                                <ConvertItem icon={Quote} label="引用" shortcut="blockquote" onClick={() => handleConvert('blockquote')} focused={ci === 7} />
+                                <ConvertItem icon={Code} label="代码块" shortcut="codeBlock" onClick={() => handleConvert('codeBlock')} focused={ci === 8} />
+                                <ConvertItem icon={Lightbulb} label="高亮块" shortcut="calloutBlock" onClick={() => handleConvert('calloutBlock')} focused={ci === 9} />
+                                <ConvertItem icon={Minus} label="分隔线" shortcut="horizontalRule" onClick={() => handleConvert('horizontalRule')} focused={ci === 10} />
                             </div>
                         )}
                     </Popover.Content>

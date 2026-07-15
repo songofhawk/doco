@@ -30,7 +30,7 @@ export const BlockIdExtension = Extension.create({
   addProseMirrorPlugins() {
     return [new Plugin({
       key: new PluginKey('docoBlockIdMigration'),
-      appendTransaction(_transactions, _oldState, newState) {
+      appendTransaction(transactions, _oldState, newState) {
         const seen = new Set<string>()
         const changes: Array<{ pos: number; attrs: Record<string, unknown> }> = []
         newState.doc.descendants((node, pos) => {
@@ -48,7 +48,14 @@ export const BlockIdExtension = Extension.create({
           const node = tr.doc.nodeAt(change.pos)
           if (node) tr.setNodeMarkup(change.pos, undefined, change.attrs, node.marks)
         }
-        return tr.setMeta('addToHistory', false).setMeta('docoBlockIdMigration', true)
+        // Yjs 会把原 transaction 与 appendTransaction 的最终文档状态一起同步。
+        // 如果这里无条件排除历史，创建新块的用户操作也会整个丢失撤销记录。
+        const followsUserEdit = transactions.some(transaction =>
+          transaction.docChanged && transaction.getMeta('addToHistory') !== false)
+
+        tr.setMeta('docoBlockIdMigration', true)
+        if (!followsUserEdit) tr.setMeta('addToHistory', false)
+        return tr
       },
     })]
   },
