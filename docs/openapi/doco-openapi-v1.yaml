@@ -1,0 +1,287 @@
+openapi: 3.1.0
+info:
+  title: Doco Open API
+  version: 1.0.0
+  description: Doco 知识库、文档正文、块和附件开放 API。标准正文格式为 Tiptap/ProseMirror JSON。
+servers:
+  - url: https://example.com/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Identity
+  - name: KnowledgeBases
+  - name: Folders
+  - name: Documents
+  - name: Content
+  - name: Blocks
+  - name: Attachments
+paths:
+  /me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentCaller
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/RateLimited' } }
+  /knowledge-bases:
+    get:
+      tags: [KnowledgeBases]
+      operationId: listKnowledgeBases
+      parameters: [{ $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }]
+      responses: { '200': { $ref: '#/components/responses/ListSuccess' }, '401': { $ref: '#/components/responses/Error' }, '403': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/RateLimited' } }
+    post:
+      tags: [KnowledgeBases]
+      operationId: createKnowledgeBase
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NameInput' } } } }
+      responses: { '201': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/RateLimited' } }
+  /knowledge-bases/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get: { tags: [KnowledgeBases], operationId: getKnowledgeBase, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [KnowledgeBases]
+      operationId: updateKnowledgeBase
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/NameInput' } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+    delete:
+      tags: [KnowledgeBases]
+      operationId: deleteKnowledgeBase
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [confirm_id], properties: { confirm_id: { type: string } } } } } }
+      responses: { '204': { description: 已删除 }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /knowledge-bases/{id}/tree:
+    get: { tags: [KnowledgeBases], operationId: getKnowledgeBaseTree, parameters: [{ $ref: '#/components/parameters/ResourceId' }], responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+  /knowledge-bases/{id}/export:
+    get:
+      tags: [KnowledgeBases]
+      operationId: exportKnowledgeBase
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+      responses: { '200': { description: ZIP 文件, content: { application/zip: { schema: { type: string, contentEncoding: binary } } } }, '404': { $ref: '#/components/responses/Error' } }
+  /folders:
+    post:
+      tags: [Folders]
+      operationId: createFolder
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FolderInput' } } } }
+      responses: { '201': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /folders/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get: { tags: [Folders], operationId: getFolder, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Folders]
+      operationId: updateFolder
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/FolderInput' } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Folders], operationId: deleteFolder, responses: { '204': { description: 已删除 }, '404': { $ref: '#/components/responses/Error' } } }
+  /folders/{id}/children:
+    get: { tags: [Folders], operationId: getFolderChildren, parameters: [{ $ref: '#/components/parameters/ResourceId' }], responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+  /documents:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: knowledge_base_id, schema: { type: string } }
+        - { in: query, name: folder_id, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/ListSuccess' }, '400': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/RateLimited' } }
+    post:
+      tags: [Documents]
+      operationId: createDocument
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DocumentCreateInput' } } } }
+      responses: { '201': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' } }
+  /documents/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get: { tags: [Documents], operationId: getDocument, responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Documents]
+      operationId: updateDocument
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DocumentUpdateInput' } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Documents], operationId: deleteDocument, responses: { '204': { description: 已删除 }, '404': { $ref: '#/components/responses/Error' } } }
+  /documents/{id}/path:
+    get: { tags: [Documents], operationId: getDocumentPath, parameters: [{ $ref: '#/components/parameters/ResourceId' }], responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+  /documents/{id}/content:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get:
+      tags: [Content]
+      operationId: getDocumentContent
+      parameters: [{ in: query, name: format, schema: { type: string, enum: [tiptap-json, markdown, html], default: tiptap-json } }]
+      responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '404': { $ref: '#/components/responses/Error' }, '415': { $ref: '#/components/responses/Error' } }
+    put:
+      tags: [Content]
+      operationId: replaceDocumentContent
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ContentInput' } }, application/vnd.doco.document+json: { schema: { $ref: '#/components/schemas/ContentInput' } } } }
+      responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '409': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' }, '428': { $ref: '#/components/responses/Error' } }
+  /documents/{id}/blocks:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get:
+      tags: [Blocks]
+      operationId: listBlocks
+      parameters: [{ in: query, name: recursive, schema: { type: boolean, default: false } }]
+      responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '404': { $ref: '#/components/responses/Error' } }
+    post:
+      tags: [Blocks]
+      operationId: insertBlocks
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BlockInsertInput' } } } }
+      responses: { '201': { $ref: '#/components/responses/ContentSuccess' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' } }
+  /documents/{id}/blocks/{blockId}:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }, { in: path, name: blockId, required: true, schema: { type: string, pattern: '^block_[0-9A-HJKMNP-TV-Z]{26}$' } }]
+    get: { tags: [Blocks], operationId: getBlock, responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Blocks]
+      operationId: updateBlock
+      parameters: [{ $ref: '#/components/parameters/IfMatch' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { node: { $ref: '#/components/schemas/TiptapNode' }, attrs: { type: object }, content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } } } } } } }
+      responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' } }
+    delete: { tags: [Blocks], operationId: deleteBlock, parameters: [{ $ref: '#/components/parameters/IfMatch' }], responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '404': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
+  /documents/{id}/batch:
+    post:
+      tags: [Blocks]
+      operationId: batchDocumentOperations
+      parameters: [{ $ref: '#/components/parameters/ResourceId' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BatchInput' } } } }
+      responses: { '200': { $ref: '#/components/responses/ContentSuccess' }, '400': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' }, '422': { $ref: '#/components/responses/Error' } }
+  /attachments:
+    post:
+      tags: [Attachments]
+      operationId: uploadAttachment
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { type: object, required: [document_id, file], properties: { document_id: { type: string }, file: { type: string, contentEncoding: binary } } }
+      responses: { '201': { $ref: '#/components/responses/Success' }, '413': { $ref: '#/components/responses/Error' }, '415': { $ref: '#/components/responses/Error' }, '429': { $ref: '#/components/responses/RateLimited' } }
+  /attachments/{id}:
+    parameters: [{ $ref: '#/components/parameters/ResourceId' }]
+    get: { tags: [Attachments], operationId: downloadAttachment, responses: { '200': { description: 附件二进制内容, content: { application/octet-stream: { schema: { type: string, contentEncoding: binary } } } }, '404': { $ref: '#/components/responses/Error' } } }
+    delete:
+      tags: [Attachments]
+      operationId: deleteAttachment
+      parameters: [{ in: query, name: force, schema: { type: boolean, default: false } }]
+      responses: { '204': { description: 已删除 }, '409': { $ref: '#/components/responses/Error' }, '404': { $ref: '#/components/responses/Error' } }
+  /attachments/{id}/metadata:
+    get: { tags: [Attachments], operationId: getAttachmentMetadata, parameters: [{ $ref: '#/components/parameters/ResourceId' }], responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/Error' } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: 'doco_<token_id>_<secret>' }
+  parameters:
+    ResourceId: { in: path, name: id, required: true, schema: { type: string } }
+    Cursor: { in: query, name: cursor, schema: { type: [string, 'null'] } }
+    Limit: { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+    IdempotencyKey: { in: header, name: Idempotency-Key, schema: { type: string, maxLength: 128 } }
+    IfMatch: { in: header, name: If-Match, schema: { type: string, examples: ['"sha256:abc"'] } }
+  headers:
+    RequestId: { schema: { type: string }, description: 服务端或调用方提供的请求 ID }
+    ETag: { schema: { type: string }, description: 当前 YDoc 完整状态版本 }
+    RateLimitLimit: { schema: { type: integer } }
+    RateLimitRemaining: { schema: { type: integer } }
+    RateLimitReset: { schema: { type: integer } }
+    RetryAfter: { schema: { type: integer } }
+  responses:
+    Success:
+      description: 成功
+      headers: { X-Request-Id: { $ref: '#/components/headers/RequestId' }, X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }, X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }, X-RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/SuccessEnvelope' } } }
+    ListSuccess:
+      description: 分页列表
+      headers: { X-Request-Id: { $ref: '#/components/headers/RequestId' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/ListEnvelope' } } }
+    ContentSuccess:
+      description: 正文或块操作成功
+      headers: { X-Request-Id: { $ref: '#/components/headers/RequestId' }, ETag: { $ref: '#/components/headers/ETag' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/SuccessEnvelope' } } }
+    Error:
+      description: 错误
+      headers: { X-Request-Id: { $ref: '#/components/headers/RequestId' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    RateLimited:
+      description: 超过限频
+      headers: { X-RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }, X-RateLimit-Remaining: { $ref: '#/components/headers/RateLimitRemaining' }, X-RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' }, Retry-After: { $ref: '#/components/headers/RetryAfter' } }
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+  schemas:
+    SuccessEnvelope: { type: object, required: [data, request_id], properties: { data: {}, request_id: { type: string } } }
+    ListEnvelope:
+      type: object
+      required: [data, page, request_id]
+      properties:
+        data: { type: array, items: {} }
+        page: { $ref: '#/components/schemas/Page' }
+        request_id: { type: string }
+    Page: { type: object, required: [cursor, next_cursor, has_more], properties: { cursor: { type: [string, 'null'] }, next_cursor: { type: [string, 'null'] }, has_more: { type: boolean } } }
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error: { type: object, required: [type, code, message], properties: { type: { type: string }, code: { type: string }, message: { type: string }, details: { type: object } } }
+        request_id: { type: string }
+    NameInput: { type: object, required: [name], properties: { name: { type: string, minLength: 1, maxLength: 200 } } }
+    FolderInput: { type: object, properties: { name: { type: string }, knowledge_base_id: { type: [string, integer] }, parent_id: { type: [string, integer, 'null'] } } }
+    DocumentCreateInput:
+      type: object
+      required: [title]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        knowledge_base_id: { type: [string, integer] }
+        folder_id: { type: [string, integer, 'null'] }
+        heading_numbered: { type: boolean }
+        background_color: { type: string }
+        collapsed_block_ids: { type: array, items: { type: string } }
+        content: { $ref: '#/components/schemas/ContentInput' }
+    DocumentUpdateInput:
+      type: object
+      properties:
+        title: { type: string }
+        knowledge_base_id: { type: [string, integer] }
+        folder_id: { type: [string, integer, 'null'] }
+        heading_numbered: { type: boolean }
+        background_color: { type: string }
+        collapsed_block_ids: { type: array, items: { type: string } }
+    ContentInput:
+      oneOf:
+        - { type: object, required: [format, document], properties: { format: { const: tiptap-json }, document: { $ref: '#/components/schemas/TiptapDocument' } } }
+        - { type: object, required: [format, content], properties: { format: { const: markdown }, content: { type: string, maxLength: 10485760 } } }
+        - { type: object, required: [format, content], properties: { format: { const: html }, content: { type: string, maxLength: 10485760 } } }
+    TiptapDocument: { type: object, required: [type], properties: { type: { const: doc }, content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } } } }
+    TiptapNode:
+      oneOf:
+        - { $ref: '#/components/schemas/TextNode' }
+        - { $ref: '#/components/schemas/ParagraphNode' }
+        - { $ref: '#/components/schemas/HeadingNode' }
+        - { $ref: '#/components/schemas/ImageNode' }
+        - { $ref: '#/components/schemas/GenericBlockNode' }
+      discriminator: { propertyName: type }
+    BlockAttrs: { type: object, required: [id], properties: { id: { type: string, pattern: '^block_[0-9A-HJKMNP-TV-Z]{26}$' }, textAlign: { type: [string, 'null'] } }, additionalProperties: true }
+    TextNode: { type: object, required: [type, text], properties: { type: { const: text }, text: { type: string }, marks: { type: array, items: { type: object, required: [type], properties: { type: { enum: [bold, italic, strike, code, underline, link, textStyle, highlight] }, attrs: { type: object } } } } } }
+    ParagraphNode: { type: object, required: [type], properties: { type: { const: paragraph }, attrs: { $ref: '#/components/schemas/BlockAttrs' }, content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } } } }
+    HeadingNode: { type: object, required: [type], properties: { type: { const: heading }, attrs: { allOf: [{ $ref: '#/components/schemas/BlockAttrs' }, { type: object, properties: { level: { type: integer, minimum: 1, maximum: 6 } } }] }, content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } } } }
+    ImageNode: { type: object, required: [type, attrs], properties: { type: { const: image }, attrs: { allOf: [{ $ref: '#/components/schemas/BlockAttrs' }, { type: object, properties: { attachmentId: { type: [string, 'null'] }, src: { type: string }, alt: { type: [string, 'null'] }, title: { type: [string, 'null'] }, width: { type: [integer, 'null'] }, height: { type: [integer, 'null'] }, align: { enum: [left, center, right] } } }] } } }
+    GenericBlockNode:
+      type: object
+      required: [type]
+      properties:
+        type: { enum: [blockquote, horizontalRule, hardBreak, codeBlock, bulletList, orderedList, listItem, taskList, taskItem, table, tableRow, tableHeader, tableCell, mermaidBlock, plantUMLBlock, calloutBlock] }
+        attrs: { $ref: '#/components/schemas/BlockAttrs' }
+        content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } }
+    Position:
+      type: object
+      oneOf:
+        - { required: [after_block_id], properties: { after_block_id: { type: string } } }
+        - { required: [before_block_id], properties: { before_block_id: { type: string } } }
+        - { required: [parent_block_id], properties: { parent_block_id: { type: string }, child_index: { type: integer, minimum: 0 } } }
+        - { required: [document_start], properties: { document_start: { const: true } } }
+        - { required: [document_end], properties: { document_end: { const: true } } }
+    BlockInsertInput: { type: object, required: [position, nodes], properties: { position: { $ref: '#/components/schemas/Position' }, nodes: { type: array, minItems: 1, items: { $ref: '#/components/schemas/TiptapNode' } } } }
+    BatchInput:
+      type: object
+      required: [base_version, operations]
+      properties:
+        base_version: { type: string }
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: object, required: [op], properties: { op: { enum: [insert, replace, delete] }, block_id: { type: string }, node: { $ref: '#/components/schemas/TiptapNode' }, nodes: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } } } }

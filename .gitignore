@@ -27,6 +27,9 @@ venv/
 __pycache__/
 
 backend/uploads/*
+backend/attachments/*
 backend/*.db
 exports/
 secret/
+test-results/
+playwright-report/

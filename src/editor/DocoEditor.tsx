@@ -40,6 +40,7 @@ import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
 import { ListNormalizationExtension } from './components/ListNormalizationExtension'
+import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
 import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 
 const lowlight = createLowlight(common)
@@ -157,20 +158,21 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     }, [])
 
     // 折叠状态变更防抖保存（用 ref 稳定引用，避免 extensions 重建）
-    const collapseChangeRef = useRef<(positions: number[]) => void>()
-    collapseChangeRef.current = (positions: number[]) => {
+    const collapseChangeRef = useRef<(ids: string[]) => void>()
+    collapseChangeRef.current = (ids: string[]) => {
         clearTimeout(collapseTimerRef.current)
         collapseTimerRef.current = setTimeout(() => {
-            onSettingsChange?.(docId, { collapsedBlocks: positions })
+            onSettingsChange?.(docId, { collapsedBlocks: ids })
         }, 800)
     }
-    const handleCollapseChange = useCallback((positions: number[]) => {
-        collapseChangeRef.current?.(positions)
+    const handleCollapseChange = useCallback((ids: string[]) => {
+        collapseChangeRef.current?.(ids)
     }, [])
 
     const extensions = useMemo(() => {
         const exts: any[] = [
             (StarterKit as any).configure({
+                document: false,
                 codeBlock: false,
                 undoRedo: !isCollaborative,
                 link: {
@@ -195,6 +197,8 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             Color,
             Highlight,
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
+            DocoDocument,
+            BlockIdExtension,
             ResizableImage.configure({ inline: false, allowBase64: true }),
             Placeholder.configure({
                 placeholder: placeholderText || '输入 / 唤起菜单，或直接开始写作...',
@@ -293,15 +297,18 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     // 从后端恢复折叠状态（需等 Yjs 文档同步完成后再执行）
     useEffect(() => {
         if (!editor || !initialMeta?.collapsedBlocks?.length) return
-        const positions = initialMeta.collapsedBlocks
-        const maxPos = Math.max(...positions)
-
         const tryRestore = () => {
-            if (editor.state.doc.content.size > maxPos) {
-                ;(editor.commands as any).setCollapsed(positions)
-                return true
+            const raw = initialMeta.collapsedBlocks || []
+            const ids = raw.map((value) => {
+                if (value.startsWith('block_')) return value
+                const position = Number(value)
+                return Number.isFinite(position) ? editor.state.doc.nodeAt(position)?.attrs?.id as string | undefined : undefined
+            }).filter((value): value is string => Boolean(value))
+            ;(editor.commands as any).setCollapsed(ids)
+            if (ids.length && ids.some((id, index) => id !== raw[index])) {
+                patchDocSettings({ collapsedBlocks: ids })
             }
-            return false
+            return true
         }
 
         // 文档可能已经加载好了（IndexedDB 离线缓存）
@@ -313,7 +320,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         }
         editor.on('update', onUpdate)
         return () => { editor.off('update', onUpdate) }
-    }, [editor, initialMeta])
+    }, [editor, initialMeta, patchDocSettings])
 
     // 字数统计
     useEffect(() => {

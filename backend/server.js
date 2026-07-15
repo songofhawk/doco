@@ -4,7 +4,8 @@ import { WebSocketServer } from 'ws';
 import { Hocuspocus } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import JSZip from 'jszip';
-import { db, hasLegacyUpdatesTable } from './database.js';
+import { fileURLToPath } from 'url';
+import { db } from './database.js';
 import { api } from './api.js';
 import { getSessionUserFromCookieHeader, requireAuth } from './auth.js';
 import { stateToMarkdown } from './markdown.js';
@@ -17,6 +18,10 @@ import {
   listSubfoldersForUser,
   userCanAccessDocument,
 } from './permissions.js';
+import { loadLegacyState, persistYDoc, registerHocuspocus, yDocService } from './ydoc-service.js';
+import { openApi } from './open-api/router.js';
+import { openApiErrorHandler, openApiNotFound, requestContext } from './open-api/errors.js';
+import { getOpenApiDocument } from './openapi.js';
 
 const PORT = Number(process.env.PORT) || 8000;
 // 生产环境由反向代理（Caddy）对外，服务本身只绑 127.0.0.1（systemd 里设 HOST）
@@ -35,19 +40,6 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.j
   .filter(Boolean);
 
 const selectState = db.prepare('SELECT state FROM ydoc_state WHERE doc_id = ?');
-const upsertState = db.prepare(`
-  INSERT INTO ydoc_state (doc_id, state, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
-  ON CONFLICT(doc_id) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP
-`);
-
-// 从旧版 ydoc_updates 增量表懒迁移（合并所有增量为单快照）
-function loadLegacyState(docName) {
-  if (!hasLegacyUpdatesTable) return null;
-  const rows = db.prepare('SELECT [update] FROM ydoc_updates WHERE doc_id = ? ORDER BY id').all(docName);
-  if (rows.length === 0) return null;
-  return Y.mergeUpdates(rows.map(r => new Uint8Array(r.update)));
-}
-
 export const hocuspocus = new Hocuspocus({
   quiet: true,
 
@@ -68,7 +60,10 @@ export const hocuspocus = new Hocuspocus({
       const legacy = loadLegacyState(documentName);
       if (legacy) {
         state = legacy;
-        upsertState.run(documentName, Buffer.from(legacy));
+        db.prepare(`
+          INSERT INTO ydoc_state (doc_id, state, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(doc_id) DO UPDATE SET state = excluded.state, updated_at = CURRENT_TIMESTAMP
+        `).run(documentName, Buffer.from(legacy));
         console.log(`[YDoc] Migrated legacy updates for ${documentName} (${legacy.length} bytes)`);
       }
     }
@@ -82,25 +77,22 @@ export const hocuspocus = new Hocuspocus({
       throw new Error('Not authorized');
     }
 
-    const state = Buffer.from(Y.encodeStateAsUpdate(document));
-    upsertState.run(documentName, state);
+    const state = persistYDoc(documentName, document);
     console.log(`[YDoc] Stored ${documentName}: ${state.length} bytes`);
   },
 });
+registerHocuspocus(hocuspocus);
 
 // 导出时优先取内存中的实时文档（可能比落库状态新 ≤10s）
 function getLatestDocState(docId) {
-  const live = hocuspocus.documents.get(docId);
-  if (live) return Y.encodeStateAsUpdate(live);
-  const row = selectState.get(docId);
-  return row?.state || loadLegacyState(docId);
+  return yDocService.loadRaw(docId).ydoc;
 }
 
 function sanitizeFilename(name) {
   return (name || '').replace(/[\\/:*?"<>|]/g, '_').trim() || 'untitled';
 }
 
-const app = express();
+export const app = express();
 
 function isOriginAllowed(origin) {
   // curl、健康检查、同源反代等请求通常没有 Origin；只拦浏览器跨源来源。
@@ -121,23 +113,30 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.use('/api/v1', requestContext);
 app.use(express.json({ limit: '10mb' }));
+app.use((error, req, res, next) => {
+  if (req.path.startsWith('/api/v1')) return openApiErrorHandler(error, req, res, next);
+  next(error);
+});
 
-app.get('/api/docs/:id/export.md', requireAuth, (req, res) => {
+const exportMarkdown = (req, res) => {
   const doc = getDocumentForUser(req.user.id, req.params.id);
   if (!doc) return res.status(404).json({ error: 'Not found' });
 
-  const state = getLatestDocState(doc.id);
-  if (!state) return res.status(404).json({ error: 'Not found' });
+  const ydoc = getLatestDocState(doc.id);
   try {
     res.set('Content-Type', 'text/markdown; charset=utf-8');
-    res.send(stateToMarkdown(state));
+    res.send(stateToMarkdown(Y.encodeStateAsUpdate(ydoc)));
   } catch (error) {
     res.status(500).json({ error: `导出失败: ${error.message}` });
   }
-});
+};
 
-app.get('/api/kb/:id/export.zip', requireAuth, async (req, res) => {
+app.get('/app-api/v1/docs/:id/export.md', requireAuth, exportMarkdown);
+app.get('/api/docs/:id/export.md', requireAuth, exportMarkdown); // 发布过渡期兼容路径
+
+const exportKnowledgeBase = async (req, res) => {
   const kb = getKnowledgeBaseForUser(req.user.id, req.params.id);
   if (!kb) return res.status(404).json({ error: 'Not found' });
 
@@ -145,14 +144,13 @@ app.get('/api/kb/:id/export.zip', requireAuth, async (req, res) => {
   const usedNames = new Set();
 
   const addDoc = (doc, prefix) => {
-    const state = getLatestDocState(doc.id);
-    if (!state) return;
+    const ydoc = getLatestDocState(doc.id);
     let base = prefix + sanitizeFilename(doc.title);
     let name = `${base}.md`;
     for (let i = 2; usedNames.has(name); i++) name = `${base}-${i}.md`;
     usedNames.add(name);
     try {
-      zip.file(name, stateToMarkdown(state));
+      zip.file(name, stateToMarkdown(Y.encodeStateAsUpdate(ydoc)));
     } catch (error) {
       zip.file(`${base}.error.txt`, `导出失败: ${error.message}`);
     }
@@ -178,17 +176,22 @@ app.get('/api/kb/:id/export.zip', requireAuth, async (req, res) => {
   res.set('Content-Type', 'application/zip');
   res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(sanitizeFilename(kb.name))}.zip`);
   res.send(buffer);
-});
+};
 
-app.use('/api', api);
+app.get('/app-api/v1/kb/:id/export.zip', requireAuth, exportKnowledgeBase);
+app.get('/api/kb/:id/export.zip', requireAuth, exportKnowledgeBase); // 发布过渡期兼容路径
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`Doco Backend (Node.js + Hocuspocus) running on http://${HOST}:${PORT}`);
-});
+app.get('/api/openapi.json', (_req, res) => res.json(getOpenApiDocument()));
+app.use('/api/v1', openApi, openApiNotFound, openApiErrorHandler);
+app.use('/app-api/v1', api);
+app.use('/api', (req, _res, next) => {
+  console.warn(`[Deprecated] ${req.method} /api${req.path} 请迁移到 /app-api/v1`);
+  next();
+}, api);
 
-const wss = new WebSocketServer({ noServer: true });
-
-server.on('upgrade', (request, socket, head) => {
+function attachWebsocketServer(server, port) {
+  const wss = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (request, socket, head) => {
   if (!request.url.startsWith('/ws')) {
     socket.destroy();
     return;
@@ -208,20 +211,27 @@ server.on('upgrade', (request, socket, head) => {
     request.user = user;
     wss.emit('connection', ws, request);
   });
-});
+  });
 
-wss.on('connection', (ws, request) => {
+  wss.on('connection', (ws, request) => {
   const headers = Object.fromEntries(
     Object.entries(request.headers).filter(([, v]) => typeof v === 'string')
   );
-  const fetchRequest = new Request(`http://localhost:${PORT}${request.url}`, { headers });
+  const fetchRequest = new Request(`http://localhost:${port}${request.url}`, { headers });
   const connection = hocuspocus.handleConnection(ws, fetchRequest, { user: request.user });
 
   ws.on('message', (data) => connection.handleMessage(new Uint8Array(data)));
   ws.on('close', () => connection.handleClose());
-});
+  });
+  return wss;
+}
 
-function shutdown() {
+export function startServer({ port = PORT, host = HOST, installSignalHandlers = true } = {}) {
+  const server = app.listen(port, host, () => {
+    console.log(`Doco Backend (Node.js + Hocuspocus) running on http://${host}:${port}`);
+  });
+  attachWebsocketServer(server, port);
+  const shutdown = () => {
   console.log('Shutting down, flushing pending stores...');
   hocuspocus.flushPendingStores();
   // onStoreDocument 是同步 SQLite 写入，微任务队列排空后即已落盘
@@ -229,7 +239,12 @@ function shutdown() {
     db.close();
     process.exit(0);
   }, 300);
+  };
+  if (installSignalHandlers) {
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  }
+  return server;
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+if (fileURLToPath(import.meta.url) === process.argv[1]) startServer();

@@ -4,7 +4,7 @@ import CommandList from './CommandList'
 import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb } from 'lucide-react'
 import { API_BASE, apiFetch } from '../../auth'
 
-const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '')
+const API_ORIGIN = API_BASE.replace(/\/app-api\/v1\/?$/, '')
 
 export const getSuggestionItems = ({ query }: { query: string }) => {
     return [

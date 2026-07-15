@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "vite build --mode production && wrangler pages deploy dist --project-name=doco-editor --branch=main --commit-dirty=true"
+    "deploy": "vite build --mode production && wrangler pages deploy dist --project-name=doco-editor --branch=main --commit-dirty=true",
+    "test:backend": "npm --prefix backend test",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hocuspocus/provider": "^4.3.0",
@@ -50,11 +52,13 @@
     "react-router-dom": "^7.13.0",
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.9.0",
+    "ulid": "^3.0.1",
     "y-indexeddb": "^9.0.12",
     "yjs": "^13.6.29"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/vite": "^4.2.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

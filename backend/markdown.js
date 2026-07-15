@@ -2,75 +2,9 @@
 // schema 与前端 DocoEditor 注册的扩展保持一致，保证导出所见即所得
 import * as Y from 'yjs';
 import { yDocToProsemirrorJSON } from 'y-prosemirror';
-import { getSchema, Node as TiptapNode } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { Highlight } from '@tiptap/extension-highlight';
-import { TextAlign } from '@tiptap/extension-text-align';
 import { Node as PMNode } from 'prosemirror-model';
 import { MarkdownSerializer, defaultMarkdownSerializer } from 'prosemirror-markdown';
-
-// 自定义节点只需 schema 定义（attrs/content），不需要 NodeView
-const MermaidBlock = TiptapNode.create({
-  name: 'mermaidBlock',
-  group: 'block',
-  atom: true,
-  addAttributes() {
-    return { code: { default: '' } };
-  },
-});
-
-const PlantUMLBlock = TiptapNode.create({
-  name: 'plantUMLBlock',
-  group: 'block',
-  atom: true,
-  addAttributes() {
-    return { code: { default: '' } };
-  },
-});
-
-const CalloutBlock = TiptapNode.create({
-  name: 'calloutBlock',
-  group: 'block',
-  content: 'block+',
-  addAttributes() {
-    return { emoji: { default: '💡' }, color: { default: 'blue' } };
-  },
-});
-
-const ResizableImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      width: { default: null },
-      align: { default: 'left' },
-    };
-  },
-});
-
-const schema = getSchema([
-  StarterKit,
-  TextStyle,
-  Highlight,
-  TextAlign.configure({ types: ['heading', 'paragraph'] }),
-  ResizableImage,
-  TaskList,
-  TaskItem.configure({ nested: true }),
-  Table,
-  TableRow,
-  TableHeader,
-  TableCell,
-  MermaidBlock,
-  PlantUMLBlock,
-  CalloutBlock,
-]);
+import { documentSchema as schema } from './document-schema.js';
 
 function fencedBlock(state, node, language) {
   const backticks = node.textContent ? node.textContent.match(/`{3,}/gm) : null;
@@ -193,4 +127,25 @@ export function stateToMarkdown(state) {
   const ydoc = new Y.Doc();
   Y.applyUpdate(ydoc, state instanceof Uint8Array ? state : new Uint8Array(state));
   return ydocToMarkdown(ydoc);
+}
+
+export function documentToMarkdown(document) {
+  const doc = PMNode.fromJSON(schema, document);
+  return serializer.serialize(doc, { tightLists: true });
+}
+
+export function markdownWarnings(document) {
+  const warnings = [];
+  const seen = new Set();
+  const add = (code, message) => { if (!seen.has(code)) { seen.add(code); warnings.push({ code, message }); } };
+  const visit = (node) => {
+    if (node.type === 'calloutBlock') add('callout_degraded', 'Callout 导出为引用块，颜色属性不会保留');
+    if (node.type === 'image' && (node.attrs?.width || node.attrs?.height || node.attrs?.align)) add('image_layout_lost', 'Markdown 无法完整保留图片尺寸和对齐');
+    if (node.type === 'table') add('table_attributes_lost', 'Markdown 表格无法保留合并单元格和列宽');
+    if (node.attrs?.textAlign && node.attrs.textAlign !== 'left') add('text_alignment_lost', 'Markdown 无法保留文本对齐');
+    for (const mark of node.marks || []) if (mark.type === 'textStyle' || mark.type === 'highlight') add('text_style_lost', 'Markdown 无法完整保留颜色和高亮样式');
+    node.content?.forEach(visit);
+  };
+  visit(document);
+  return warnings;
 }

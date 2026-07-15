@@ -6,6 +6,11 @@ export const ResizableImage = Image.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
+            attachmentId: {
+                default: null,
+                parseHTML: (el) => el.getAttribute('data-attachment-id'),
+                renderHTML: (attrs) => attrs.attachmentId ? { 'data-attachment-id': attrs.attachmentId } : {},
+            },
             width: {
                 default: null,
                 parseHTML: (el) => {
@@ -16,6 +21,11 @@ export const ResizableImage = Image.extend({
                     if (!attrs.width) return {}
                     return { width: attrs.width, style: `width: ${attrs.width}px` }
                 },
+            },
+            height: {
+                default: null,
+                parseHTML: (el) => el.getAttribute('height') ? parseInt(el.getAttribute('height')!, 10) : null,
+                renderHTML: (attrs) => attrs.height ? { height: attrs.height } : {},
             },
             align: {
                 default: 'left',

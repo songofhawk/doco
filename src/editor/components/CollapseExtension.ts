@@ -5,7 +5,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 const collapsePluginKey = new PluginKey('collapse')
 
 export interface CollapseOptions {
-    onCollapseChange?: (positions: number[]) => void
+    onCollapseChange?: (blockIds: string[]) => void
 }
 
 export const CollapseExtension = Extension.create<CollapseOptions>({
@@ -18,25 +18,27 @@ export const CollapseExtension = Extension.create<CollapseOptions>({
     },
 
     addStorage() {
-        return { collapsed: new Set<number>() }
+        return { collapsed: new Set<string>() }
     },
 
     addCommands(): any {
         return {
             toggleCollapse: (pos: number) => ({ tr, dispatch }: any) => {
                 if (dispatch) {
-                    const set = this.storage.collapsed as Set<number>
-                    if (set.has(pos)) set.delete(pos)
-                    else set.add(pos)
+                    const id = tr.doc.nodeAt(pos)?.attrs?.id as string | undefined
+                    if (!id) return false
+                    const set = this.storage.collapsed as Set<string>
+                    if (set.has(id)) set.delete(id)
+                    else set.add(id)
                     tr.setMeta(collapsePluginKey, true)
                     dispatch(tr)
                     this.options.onCollapseChange?.([...this.storage.collapsed])
                 }
                 return true
             },
-            setCollapsed: (positions: number[]) => ({ tr, dispatch }: any) => {
+            setCollapsed: (blockIds: string[]) => ({ tr, dispatch }: any) => {
                 if (dispatch) {
-                    this.storage.collapsed = new Set(positions)
+                    this.storage.collapsed = new Set(blockIds)
                     tr.setMeta(collapsePluginKey, true)
                     dispatch(tr)
                 }
@@ -55,25 +57,14 @@ export const CollapseExtension = Extension.create<CollapseOptions>({
                 state: {
                     init: () => DecorationSet.empty,
                     apply: (tr) => {
-                        if (tr.docChanged) {
-                            const newCollapsed = new Set<number>()
-                            for (const oldPos of storage.collapsed) {
-                                const mapped = tr.mapping.map(oldPos, 1)
-                                if (mapped >= 0 && mapped < tr.doc.content.size && tr.doc.nodeAt(mapped)) {
-                                    newCollapsed.add(mapped)
-                                }
-                            }
-                            storage.collapsed = newCollapsed
-                        }
                         const decos: Decoration[] = []
-                        for (const pos of storage.collapsed) {
-                            const node = tr.doc.nodeAt(pos)
-                            if (node) {
+                        tr.doc.descendants((node, pos) => {
+                            if (node.attrs?.id && storage.collapsed.has(node.attrs.id)) {
                                 decos.push(Decoration.node(pos, pos + node.nodeSize, {
                                     class: 'doco-collapsed',
                                 }))
                             }
-                        }
+                        })
                         return DecorationSet.create(tr.doc, decos)
                     },
                 },
@@ -95,10 +86,11 @@ export const CollapseExtension = Extension.create<CollapseOptions>({
                         const $pos = editorView.state.doc.resolve(domPos)
                         const depth = Math.max(1, $pos.depth)
                         const nodePos = $pos.before(depth)
-                        if (storage.collapsed.has(nodePos)) {
+                        const blockId = editorView.state.doc.nodeAt(nodePos)?.attrs?.id as string | undefined
+                        if (blockId && storage.collapsed.has(blockId)) {
                             e.preventDefault()
                             e.stopPropagation()
-                            storage.collapsed.delete(nodePos)
+                            storage.collapsed.delete(blockId)
                             const tr = editorView.state.tr.setMeta(collapsePluginKey, true)
                             editorView.dispatch(tr)
                             options.onCollapseChange?.([...storage.collapsed])

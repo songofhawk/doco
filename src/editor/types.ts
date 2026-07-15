@@ -4,7 +4,7 @@ export interface DocMeta {
   title?: string
   headingNumbered?: boolean
   bgColor?: string
-  collapsedBlocks?: number[]
+  collapsedBlocks?: string[]
 }
 
 export interface CollaborationConfig {

@@ -3,10 +3,11 @@ import { createPortal } from 'react-dom'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor } from './editor'
 import { Sidebar } from './components/Sidebar'
-import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown, LogOut } from 'lucide-react'
+import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown, LogOut, KeyRound } from 'lucide-react'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import { AuthProvider, apiFetch, type CurrentUser, useAuth } from './auth'
+import { ApiTokenDialog } from './components/ApiTokenDialog'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
@@ -185,7 +186,7 @@ const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; extern
             title: d.title,
             headingNumbered: d.heading_numbered,
             bgColor: d.bg_color,
-            collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean).map(Number) : [],
+            collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean) : [],
           })
     }).catch(() => {})
   }, [id])
@@ -233,6 +234,7 @@ const COLLAPSE_BREAKPOINT = 768
 function AppShell() {
   const { user, loading, signOut } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [apiTokenOpen, setApiTokenOpen] = useState(false)
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [externalTitle, setExternalTitle] = useState<string | undefined>()
@@ -359,6 +361,10 @@ function AppShell() {
               )}
             </div>
             <span className="hidden text-gray-300 sm:inline">|</span>
+            <button onClick={() => setApiTokenOpen(true)} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="开放 API Token">
+              <KeyRound size={16} /><span className="hidden sm:inline">API Token</span>
+            </button>
+            <span className="hidden text-gray-300 sm:inline">|</span>
             <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="退出登录">
               <LogOut size={16} /><span className="hidden sm:inline">退出</span>
             </button>
@@ -387,6 +393,7 @@ function AppShell() {
             onConfirm={signOut}
           />
         )}
+        {apiTokenOpen && <ApiTokenDialog onClose={() => setApiTokenOpen(false)} />}
       </div>
     </BrowserRouter>
   )

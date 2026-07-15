@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NodeViewWrapper, NodeViewProps } from '@tiptap/react'
 import { AlignLeft, AlignCenter, AlignRight, Trash2 } from 'lucide-react'
+import { API_BASE } from '../../auth'
 
 export const ImageComponent = ({ node, updateAttributes, selected, deleteNode, editor }: NodeViewProps) => {
-    const { src, alt, width, align } = node.attrs as any
+    const { src, alt, width, align, attachmentId } = node.attrs as any
+    const displaySrc = attachmentId ? `${API_BASE}/attachments/${attachmentId}` : src
     const imgRef = useRef<HTMLImageElement>(null)
     const [resizing, setResizing] = useState(false)
     const startX = useRef(0)
@@ -61,7 +63,7 @@ export const ImageComponent = ({ node, updateAttributes, selected, deleteNode, e
             <div className={`relative inline-block group ${selected ? 'image-selected' : ''}`}>
                 <img
                     ref={imgRef}
-                    src={src}
+                    src={displaySrc}
                     alt={alt || ''}
                     style={{ width: width ? `${width}px` : undefined }}
                     className="rounded-lg block max-w-full"

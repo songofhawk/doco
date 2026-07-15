@@ -1,0 +1,21 @@
+{
+  "format": "tiptap-json",
+  "document": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "id": "block_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          "level": 1
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "由开放 API 写入"
+          }
+        ]
+      }
+    ]
+  }
+}

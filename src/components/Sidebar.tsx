@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Folder, FileText, ChevronRight, ChevronDown, Plus, Library,
     Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy
@@ -23,7 +24,7 @@ const ContextMenu = ({ x, y, items, onClose }: {
         return () => document.removeEventListener('mousedown', handler);
     }, [onClose]);
 
-    return (
+    return createPortal(
         <div ref={ref} className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px] text-sm"
             style={{ top: y, left: x }}>
             {items.map((item, i) =>
@@ -37,7 +38,8 @@ const ContextMenu = ({ x, y, items, onClose }: {
                     </button>
                 )
             )}
-        </div>
+        </div>,
+        document.body,
     );
 };
 
@@ -86,7 +88,7 @@ const InputDialog = ({ title, placeholder, onConfirm, onClose }: {
         if (value.trim()) { onConfirm(value.trim()); onClose(); }
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
             <div ref={ref} className="bg-white rounded-xl shadow-2xl w-80 overflow-hidden">
                 <div className="px-5 pt-5 pb-3">
@@ -112,7 +114,8 @@ const InputDialog = ({ title, placeholder, onConfirm, onClose }: {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 };
 
@@ -150,7 +153,7 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
         loadFolders(kbId);
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
             <div ref={ref} className="bg-white rounded-xl shadow-2xl w-72 max-h-80 flex flex-col overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
@@ -184,7 +187,8 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
                     ))}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 };
 

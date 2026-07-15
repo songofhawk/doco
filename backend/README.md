@@ -13,7 +13,8 @@ npm start        # 或 npm run dev（文件变更自动重启）
 
 ## 认证配置
 
-后端只接受 Google 登录后的 ID token，并写入 httpOnly session cookie。前端 `VITE_GOOGLE_CLIENT_ID` 与后端
+页面登录接受 Google ID token 并写入 httpOnly Session Cookie；开放 API 使用独立、可撤销的 Bearer Token。
+两种凭证不可互换。前端 `VITE_GOOGLE_CLIENT_ID` 与后端
 `GOOGLE_CLIENT_ID` 必须使用同一个 Google OAuth Web Client ID。
 后端启动时会读取仓库根目录 `.env` 和 `backend/.env`；已有 shell 环境变量优先。
 
@@ -35,18 +36,23 @@ COOKIE_SECURE=true
 服务监听 `http://0.0.0.0:8000`：
 
 - WebSocket 协同：`ws://localhost:8000/ws`（文档名由 @hocuspocus/provider 在协议消息里传递，不走 URL 路径）
-- REST API：`http://localhost:8000/api/...`
+- 页面 API：`http://localhost:8000/app-api/v1/...`（Session Cookie）
+- 开放 API：`http://localhost:8000/api/v1/...`（Bearer Token）
+- OpenAPI 3.1：`http://localhost:8000/api/openapi.json`
 
 ## 文件说明
 
 | 文件 | 职责 |
 |---|---|
 | server.js | 入口：Express + Hocuspocus 集成、导出路由、优雅退出 |
-| database.js | better-sqlite3 初始化与建表（WAL 模式，写即落盘） |
+| database.js / migrations.js | better-sqlite3 初始化、WAL 与版本化迁移 |
 | auth.js | Google ID token 校验、session cookie、用户与默认工作区初始化 |
 | permissions.js | 当前用户到工作区/知识库/文件夹/文档的权限查询 |
-| api.js | 认证、知识库/文件夹/文档 REST 路由 |
-| markdown.js | YDoc → ProseMirror JSON → Markdown（schema 与前端一致） |
+| api.js | 页面认证、Token 管理、知识库/文件夹/文档路由 |
+| open-api/ | Bearer 鉴权、限频、统一错误、幂等、开放路由 |
+| resource-service.js | 页面与开放能力使用的资源业务规则 |
+| ydoc-service.js | 在线/离线 Y.Doc 统一加载、事务和立即持久化 |
+| document-schema.js / markdown.js | 共享 Schema、格式转换与 Markdown 序列化 |
 | migrate.js | 一次性迁移旧版 ydoc_updates 增量表 → ydoc_state 快照表 |
 | schema.sql | 表结构参考（实际建表由 database.js 完成） |
 
@@ -54,10 +60,10 @@ COOKIE_SECURE=true
 
 ```bash
 # 单文档，永远返回最新协同状态（内存实时文档优先于落库快照；需登录 cookie）
-curl -b cookies.txt http://localhost:8000/api/docs/{doc_id}/export.md
+curl -b cookies.txt http://localhost:8000/app-api/v1/docs/{doc_id}/export.md
 
 # 整个知识库打包（目录结构 = 文件夹结构；需登录 cookie）
-curl -b cookies.txt -O http://localhost:8000/api/kb/{kb_id}/export.zip
+curl -b cookies.txt -O http://localhost:8000/app-api/v1/kb/{kb_id}/export.zip
 ```
 
 ## 持久化模型
@@ -65,6 +71,7 @@ curl -b cookies.txt -O http://localhost:8000/api/kb/{kb_id}/export.zip
 - `users` / `sessions` / `workspaces` / `workspace_members`：Google 用户、登录态与多用户工作区边界
 - `knowledge_bases.workspace_id`：知识库归属的权限根；文件夹、文档通过所属知识库继承权限
 - `ydoc_state`：每文档一行合并快照，UPSERT 更新，表大小恒定
+- `api_tokens`：只保存 Token secret 的 SHA-256；`idempotency_keys` 默认保留 24 小时
 - 写入时机：Hocuspocus 内置防抖（编辑停顿 2s / 最长 10s），最后一个连接断开时、进程收到 SIGINT/SIGTERM 时强制落库
 - 旧版 `ydoc_updates` 增量表：`node migrate.js` 批量合并，或由 server.js 在文档首次加载时懒迁移；确认无误后可手动 DROP
 

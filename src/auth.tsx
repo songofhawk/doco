@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
+export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/app-api/v1'
 
 export type CurrentUser = {
   id: string
