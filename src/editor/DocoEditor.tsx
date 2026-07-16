@@ -38,6 +38,7 @@ import { LinkPopover } from './components/LinkPopover'
 import { DocSettings } from './components/DocSettings'
 import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
+import { SpreadsheetBlock } from './components/SpreadsheetBlock'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
 import { ListNormalizationExtension } from './components/ListNormalizationExtension'
 import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
@@ -262,6 +263,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             MermaidBlock,
             PlantUMLBlock,
             CalloutBlock,
+            SpreadsheetBlock,
             Table.configure({ resizable: true }),
             TableRow,
             TableHeader,

@@ -1,0 +1,183 @@
+import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+
+async function mockDocoApi(page: Page) {
+  await page.route('**/app-api/v1/**', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const path = url.pathname.replace('/app-api/v1', '')
+    const json = (body: unknown, status = 200) => route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+
+    if (path === '/auth/me') return json({ user: { id: 'spreadsheet-e2e', email: 'sheet@example.com', name: '表格测试用户' } })
+    if (path === '/kb' && request.method() === 'GET') return json([{ id: 1, name: '电子表格测试库' }])
+    if (path === '/kb/1/folders') return json([])
+    if (path === '/kb/1/docs') return json([{ id: 'doc_spreadsheet', title: '电子表格完整测试', kb_id: 1, document_type: 'spreadsheet' }])
+    if (path === '/docs/doc_spreadsheet/path') return json({ doc_id: 'doc_spreadsheet', folder_id: null, kb_id: 1 })
+    if (path === '/docs/doc_spreadsheet' && request.method() === 'GET') {
+      return json({ id: 'doc_spreadsheet', title: '电子表格完整测试', document_type: 'spreadsheet' })
+    }
+    if (path === '/docs/doc_spreadsheet' && request.method() === 'PATCH') return json({ status: 'ok' })
+    return json({ error: `未模拟 ${request.method()} ${path}` }, 404)
+  })
+}
+
+async function setCell(page: Page, index: number, value: string) {
+  const cells = page.getByRole('gridcell')
+  await cells.nth(index).click()
+  await page.getByRole('textbox', { name: '公式栏' }).fill(value)
+}
+
+test('独立电子表格文件的完整浏览器交互与本地持久化', async ({ page }) => {
+  test.setTimeout(90_000)
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  await mockDocoApi(page)
+  await page.goto('/doc/doc_spreadsheet')
+  const title = page.getByRole('textbox', { name: '电子表格标题' })
+  await expect(title).toHaveValue('电子表格完整测试')
+  await expect(title.locator('xpath=ancestor::*[contains(@class,"spreadsheet-titlebar")]')).toHaveCount(1)
+  await expect(page.locator('.standalone-spreadsheet-heading')).toHaveCount(0)
+  await expect(page.locator('.spreadsheet-block-standalone .spreadsheet-shell')).toHaveCSS('border-top-width', '0px')
+  await expect(page.locator('.ProseMirror')).toHaveCount(0)
+  await expect(page.getByText(/\d+ 字/)).toHaveCount(0)
+  const grid = page.getByRole('grid', { name: '电子表格' })
+  const cells = page.getByRole('gridcell')
+
+  // 基础输入与公式。
+  await setCell(page, 0, '项目')
+  await setCell(page, 1, '数量')
+  await setCell(page, 2, '单价')
+  await setCell(page, 3, '小计')
+  await setCell(page, 12, '设计')
+  await setCell(page, 13, '2')
+  await setCell(page, 14, '1200')
+  await setCell(page, 15, '=B2*C2')
+  await expect(cells.nth(15)).toHaveText('2400')
+
+  await setCell(page, 24, '开发')
+  await setCell(page, 25, '3')
+  await setCell(page, 26, '800')
+  await setCell(page, 27, '=B3*C3')
+  await expect(cells.nth(27)).toHaveText('2400')
+
+  await setCell(page, 36, '合计')
+  await setCell(page, 39, '=SUM(D2:D3)')
+  await expect(cells.nth(39)).toHaveText('4800')
+  await setCell(page, 40, '=IF(D4>=4000,"通过","未通过")')
+  await expect(cells.nth(40)).toHaveText('通过')
+
+  // 格式与选区。
+  await cells.nth(0).click()
+  await page.getByTitle('粗体').click()
+  await expect(cells.nth(0)).toHaveCSS('font-weight', '700')
+  await cells.nth(15).click()
+  await page.getByLabel('数字格式').selectOption('currency')
+  await expect(cells.nth(15)).toContainText('¥')
+
+  await cells.nth(13).click()
+  await cells.nth(27).click({ modifiers: ['Shift'] })
+  await expect(page.getByText(/已选择 \d+ 个单元格/)).toBeVisible()
+
+  // 图标按钮有明确名称和 tooltip；单选时合并不可用。
+  const mergeButton = page.getByRole('button', { name: '合并或取消合并单元格' })
+  await cells.nth(0).click()
+  await expect(mergeButton).toBeDisabled()
+  await expect(mergeButton).toHaveAttribute('data-tooltip', '请先拖选多个单元格')
+  const sortAscendingButton = page.getByRole('button', { name: '按 A 列升序排序' })
+  await expect(sortAscendingButton).toHaveAttribute('data-tooltip', '按 A 列升序排序')
+  await expect(page.getByRole('button', { name: '按 A 列降序排序' })).toHaveAttribute('data-tooltip', '按 A 列降序排序')
+  await sortAscendingButton.hover()
+  await expect.poll(() => sortAscendingButton.evaluate(element => getComputedStyle(element, '::after').opacity)).toBe('1')
+
+  // 排序：选择 A 列后降序，开发应移动到首个数据行。
+  await grid.locator('thead tr').first().locator('th').nth(1).click()
+  await page.getByRole('button', { name: '按 A 列降序排序' }).click()
+  await expect(cells.nth(0)).toHaveText('项目')
+  await expect(cells.nth(12)).toHaveText('设计')
+  await expect(cells.nth(24)).toHaveText('开发')
+  await expect(page.locator('.spreadsheet-action-status')).toContainText('已按 A 列降序排列')
+
+  // 筛选：只保留“开发”。
+  await page.getByTitle('筛选').click()
+  await page.getByRole('textbox', { name: '筛选 A 列' }).fill('开发')
+  await expect(grid).toContainText('开发')
+  await expect(grid).not.toContainText('设计')
+  await page.getByTitle('筛选').click()
+  await expect(grid).toContainText('设计')
+
+  // 合并与取消合并。
+  await cells.nth(48).click()
+  await cells.nth(49).click({ modifiers: ['Shift'] })
+  await expect(mergeButton).toBeEnabled()
+  await mergeButton.click()
+  await expect(grid.locator('td[colspan="2"]')).toHaveCount(1)
+  await mergeButton.click()
+  await expect(grid.locator('td[colspan="2"]')).toHaveCount(0)
+
+  // 行列、冻结。
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: '在上方插入行' }).click()
+  await expect(page.getByText('31 行 × 12 列')).toBeVisible()
+  await expect(page.locator('.spreadsheet-action-status')).toContainText('已插入第')
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: '在左侧插入列' }).click()
+  await expect(page.getByText('31 行 × 13 列')).toBeVisible()
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: '删除当前行' }).click()
+  await expect(page.getByText('30 行 × 13 列')).toBeVisible()
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: '删除当前列' }).click()
+  await expect(page.getByText('30 行 × 12 列')).toBeVisible()
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: '追加 10 行' }).click()
+  await expect(page.getByText('40 行 × 12 列')).toBeVisible()
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: /冻结到第 \d+ 行/ }).click()
+  await expect(page.locator('.spreadsheet-action-status')).toContainText('已冻结前')
+  await expect(cells.first()).toHaveCSS('position', 'sticky')
+  await page.getByRole('button', { name: /行列/ }).click()
+  await page.getByRole('button', { name: /冻结到第 \d+ 列/ }).click()
+  await expect(page.locator('.spreadsheet-action-status')).toContainText('已冻结前')
+  await expect(cells.first()).toHaveCSS('position', 'sticky')
+
+  // 粘贴矩阵。
+  await cells.nth(0).click()
+  await grid.evaluate((element) => {
+    const clipboardData = new DataTransfer()
+    clipboardData.setData('text/plain', '甲\t10\n乙\t20')
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+  })
+  await expect(grid).toContainText('甲')
+  await expect(grid).toContainText('乙')
+
+  // CSV 导入。
+  const csvInput = page.locator('input[type="file"][accept*=".csv"]')
+  await csvInput.setInputFiles({
+    name: 'sheet.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('名称,金额\n订阅,99\n服务,199'),
+  })
+  await expect(grid).toContainText('订阅')
+  await expect(grid).toContainText('199')
+
+  // CSV 导出。
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByTitle('导出 CSV').click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toBe('电子表格.csv')
+  const downloadPath = await download.path()
+  expect(downloadPath).toBeTruthy()
+  expect(await readFile(downloadPath!, 'utf8')).toContain('订阅,99')
+
+  // IndexedDB/Yjs 本地持久化：刷新后仍恢复电子表格数据。
+  await page.screenshot({ path: '/tmp/doco-spreadsheet-browser.png', fullPage: true })
+  await page.reload()
+  await expect(page.getByRole('grid', { name: '电子表格' })).toBeVisible()
+  await expect(page.getByRole('grid', { name: '电子表格' })).toContainText('订阅')
+  await expect(page.getByRole('grid', { name: '电子表格' })).toContainText('199')
+  expect(pageErrors).toEqual([])
+})

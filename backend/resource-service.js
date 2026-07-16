@@ -23,6 +23,7 @@ export function serializeDocument(doc) {
     title: doc.title,
     knowledge_base_id: doc.effective_kb_id ?? doc.kb_id,
     folder_id: doc.folder_id,
+    document_type: doc.document_type || 'document',
     heading_numbered: Boolean(doc.heading_numbered),
     background_color: doc.bg_color,
     collapsed_block_ids: String(doc.collapsed_blocks || '').split(',').filter(Boolean),
@@ -189,9 +190,10 @@ export const documents = {
     else kbId = knowledgeBases.get(userId, kbId).id;
     try {
       db.prepare(`
-        INSERT INTO documents (id, title, kb_id, folder_id, heading_numbered, bg_color, collapsed_blocks)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, title, folderId ? null : kbId, folderId, body.heading_numbered ? 1 : 0,
+        INSERT INTO documents (id, title, kb_id, folder_id, document_type, heading_numbered, bg_color, collapsed_blocks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, title, folderId ? null : kbId, folderId,
+        body.document_type === 'spreadsheet' ? 'spreadsheet' : 'document', body.heading_numbered ? 1 : 0,
         body.background_color || body.bg_color || '#ffffff', (body.collapsed_block_ids || []).join(','));
     } catch (error) {
       if (String(error.code).startsWith('SQLITE_CONSTRAINT')) throw new ApiError(409, 'document_id_conflict', '文档 ID 已存在');

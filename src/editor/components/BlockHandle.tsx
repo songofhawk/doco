@@ -118,8 +118,8 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 return
             }
 
-            // 表格有自己的行列操作手柄，不显示 BlockHandle
-            if (topNode.type.name === 'table') {
+            // 表格类节点有自己的操作界面，不显示 BlockHandle
+            if (topNode.type.name === 'table' || topNode.type.name === 'spreadsheetBlock') {
                 setHandlePos({ top: -999, left: -999 })
                 setHoveredNode(null)
                 return

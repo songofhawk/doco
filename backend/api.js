@@ -24,6 +24,7 @@ import {
 } from './permissions.js';
 import { createApiToken, listApiTokens, revokeApiToken } from './open-api/tokens.js';
 import { documents as documentService, folders as folderService, knowledgeBases as knowledgeBaseService } from './resource-service.js';
+import { initializeStandaloneSpreadsheet } from './ydoc-service.js';
 
 export const api = Router();
 
@@ -232,12 +233,17 @@ api.post('/docs', (req, res) => {
   }
 
   try {
+    const documentType = req.body?.document_type === 'spreadsheet' ? 'spreadsheet' : 'document';
     documentService.create(req.user.id, {
       id, title, folder_id: folderId, knowledge_base_id: kbId,
+      document_type: documentType,
       heading_numbered: req.body?.heading_numbered,
       background_color: req.body?.bg_color,
       collapsed_block_ids: String(req.body?.collapsed_blocks || '').split(',').filter(Boolean),
     });
+    if (documentType === 'spreadsheet') {
+      initializeStandaloneSpreadsheet(id);
+    }
     res.json(getDocumentForUser(req.user.id, id));
   } catch (error) { res.status(error.status || 400).json({ error: error.message }); }
 });

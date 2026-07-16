@@ -6,7 +6,7 @@ export const BLOCK_TYPES = [
   'paragraph', 'heading', 'blockquote', 'horizontalRule', 'codeBlock',
   'bulletList', 'orderedList', 'listItem', 'taskList', 'taskItem',
   'image', 'table', 'tableRow', 'tableHeader', 'tableCell',
-  'mermaidBlock', 'plantUMLBlock', 'calloutBlock',
+  'mermaidBlock', 'plantUMLBlock', 'calloutBlock', 'spreadsheetBlock',
 ]
 
 export const DocoDocument = Node.create({ name: 'doc', topNode: true, content: 'block*' })

@@ -622,6 +622,514 @@
   margin: 3px 4px;
 }
 
+/* ===== 电子表格块 ===== */
+.doco-editor-root .spreadsheet-block {
+  margin: 1.5rem -2rem;
+  max-width: calc(100% + 4rem);
+  color: #141413;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.doco-editor-root .spreadsheet-shell {
+  overflow: hidden;
+  border: 1px solid #dedcd2;
+  border-radius: 12px;
+  background: #faf9f5;
+  box-shadow: 0 4px 24px rgba(20, 20, 19, 0.05);
+}
+
+.doco-editor-root .spreadsheet-titlebar,
+.doco-editor-root .spreadsheet-toolbar,
+.doco-editor-root .spreadsheet-formula,
+.doco-editor-root .spreadsheet-status {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e8e6dc;
+}
+
+.doco-editor-root .spreadsheet-titlebar {
+  min-height: 42px;
+  justify-content: space-between;
+  padding: 0 10px 0 14px;
+  background: #f5f4ed;
+}
+
+.doco-editor-root .spreadsheet-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.doco-editor-root .spreadsheet-title-standalone {
+  flex: 1;
+}
+
+.doco-editor-root .spreadsheet-document-title {
+  width: min(460px, 60vw);
+  min-width: 80px;
+  border: 0;
+  background: transparent;
+  color: #141413;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.3;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-document-title::placeholder {
+  color: #b0aea5;
+}
+
+.doco-editor-root .spreadsheet-title-actions,
+.doco-editor-root .spreadsheet-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.doco-editor-root .spreadsheet-title-actions button,
+.doco-editor-root .spreadsheet-toolbar button,
+.doco-editor-root .spreadsheet-toolbar select {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5e5d59;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.doco-editor-root .spreadsheet-title-actions button:hover,
+.doco-editor-root .spreadsheet-toolbar button:hover,
+.doco-editor-root .spreadsheet-toolbar button.active {
+  background: #e8e6dc;
+  color: #141413;
+  box-shadow: inset 0 0 0 1px #d1cfc5;
+}
+
+.doco-editor-root .spreadsheet-toolbar button:disabled {
+  color: #b0aea5;
+  cursor: not-allowed;
+}
+
+.doco-editor-root .spreadsheet-toolbar button:disabled:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+.doco-editor-root .spreadsheet-tool-button {
+  position: relative;
+}
+
+.doco-editor-root .spreadsheet-tool-button::after {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 7px);
+  left: 50%;
+  width: max-content;
+  max-width: 220px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #30302e;
+  color: #faf9f5;
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.doco-editor-root .spreadsheet-tool-button:hover::after,
+.doco-editor-root .spreadsheet-tool-button:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.doco-editor-root .spreadsheet-title-actions button.danger:hover {
+  background: #f8e8e5;
+  color: #b53333;
+}
+
+.doco-editor-root .spreadsheet-toolbar {
+  min-height: 38px;
+  flex-wrap: wrap;
+  padding: 4px 9px;
+  background: #faf9f5;
+}
+
+.doco-editor-root .spreadsheet-toolbar select {
+  width: auto;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: #e8e6dc;
+}
+
+.doco-editor-root .spreadsheet-color-control {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: #4d4c48;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.doco-editor-root .spreadsheet-color-control:hover {
+  background: #e8e6dc;
+}
+
+.doco-editor-root .spreadsheet-color-control input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.doco-editor-root .spreadsheet-color-control.fill span {
+  width: 13px;
+  height: 11px;
+  border: 1px solid #87867f;
+  border-radius: 2px;
+  background: #d97757;
+}
+
+.doco-editor-root .spreadsheet-more {
+  position: relative;
+}
+
+.doco-editor-root .spreadsheet-menu {
+  position: absolute;
+  z-index: 30;
+  top: 32px;
+  right: 0;
+  width: 178px;
+  padding: 5px;
+  border: 1px solid #dedcd2;
+  border-radius: 9px;
+  background: #faf9f5;
+  box-shadow: 0 8px 28px rgba(20, 20, 19, 0.12);
+}
+
+.doco-editor-root .spreadsheet-menu button {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0 8px;
+}
+
+.doco-editor-root .spreadsheet-formula {
+  height: 34px;
+  background: #faf9f5;
+}
+
+.doco-editor-root .spreadsheet-name-box {
+  width: 70px;
+  flex: 0 0 70px;
+  border-right: 1px solid #e8e6dc;
+  color: #5e5d59;
+  font-size: 12px;
+  text-align: center;
+}
+
+.doco-editor-root .spreadsheet-fx {
+  padding: 0 10px;
+  color: #87867f;
+  font-family: Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.doco-editor-root .spreadsheet-formula input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #141413;
+  font-size: 13px;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-grid {
+  position: relative;
+  max-height: 560px;
+  overflow: auto;
+  background: #faf9f5;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-grid table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.doco-editor-root .spreadsheet-grid th,
+.doco-editor-root .spreadsheet-grid td {
+  height: 28px;
+  min-width: 0;
+  padding: 0 7px;
+  border: 0;
+  border-right: 1px solid #e8e6dc;
+  border-bottom: 1px solid #e8e6dc;
+  overflow: hidden;
+  background: #faf9f5;
+  color: #141413;
+  font-size: 12px;
+  line-height: 27px;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.doco-editor-root .spreadsheet-grid thead th {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  background: #f0eee6;
+  color: #5e5d59;
+  font-weight: 500;
+  text-align: center;
+  user-select: none;
+}
+
+.doco-editor-root .spreadsheet-grid .spreadsheet-corner {
+  left: 0;
+  z-index: 9;
+}
+
+.doco-editor-root .spreadsheet-grid tbody th {
+  position: sticky;
+  z-index: 5;
+  left: 0;
+  padding: 0;
+  background: #f0eee6;
+  color: #87867f;
+  font-weight: 400;
+  text-align: center;
+  user-select: none;
+}
+
+.doco-editor-root .spreadsheet-grid th.selected-header {
+  background: #e5ded5;
+  color: #c96442;
+}
+
+.doco-editor-root .spreadsheet-grid td {
+  position: relative;
+  cursor: cell;
+}
+
+.doco-editor-root .spreadsheet-grid td.selected {
+  background: #f3e9e4;
+}
+
+.doco-editor-root .spreadsheet-grid td.active {
+  overflow: visible;
+  box-shadow: inset 0 0 0 2px #c96442;
+}
+
+.doco-editor-root .spreadsheet-grid td span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doco-editor-root .spreadsheet-grid td input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 120px;
+  padding: 0 7px;
+  border: 2px solid #c96442;
+  background: #faf9f5;
+  color: #141413;
+  font: inherit;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+}
+
+.doco-editor-root .spreadsheet-filter-row th {
+  top: 28px;
+  height: 28px;
+  padding: 3px;
+}
+
+.doco-editor-root .spreadsheet-filter-row input {
+  width: 100%;
+  height: 21px;
+  padding: 0 5px;
+  border: 1px solid #d1cfc5;
+  border-radius: 4px;
+  background: #faf9f5;
+  color: #4d4c48;
+  font-size: 11px;
+  outline: none;
+}
+
+.doco-editor-root .spreadsheet-filter-row input:focus {
+  border-color: #3898ec;
+}
+
+.doco-editor-root .spreadsheet-status {
+  min-height: 30px;
+  gap: 16px;
+  border-bottom: 0;
+  padding: 0 12px;
+  background: #f5f4ed;
+  color: #87867f;
+  font-size: 11px;
+}
+
+.doco-editor-root .spreadsheet-action-status {
+  margin-left: auto;
+  color: #c96442;
+  font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .doco-editor-root .spreadsheet-block {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    max-width: calc(100% + 2rem);
+  }
+
+  .doco-editor-root .spreadsheet-titlebar {
+    align-items: flex-start;
+    gap: 6px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .doco-editor-root .spreadsheet-title-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .doco-editor-root .spreadsheet-grid {
+    max-height: 70vh;
+  }
+}
+
+.standalone-spreadsheet-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f4ed;
+}
+
+.standalone-spreadsheet-save {
+  flex: 0 0 auto;
+  min-width: 64px;
+  color: #87867f;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.doco-editor-root .spreadsheet-block-standalone {
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+}
+
+.doco-editor-root .spreadsheet-block-standalone .spreadsheet-shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.doco-editor-root .spreadsheet-block-standalone .spreadsheet-titlebar {
+  min-height: 56px;
+  flex: 0 0 auto;
+  padding: 7px 20px;
+  background: #faf9f5;
+}
+
+.doco-editor-root .spreadsheet-block-standalone .spreadsheet-grid {
+  max-height: none;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .doco-editor-root .spreadsheet-block-standalone {
+    margin: 0;
+    max-width: none;
+    padding: 0;
+  }
+
+  .doco-editor-root .spreadsheet-block-standalone .spreadsheet-shell {
+    border-radius: 0;
+  }
+
+  .doco-editor-root .spreadsheet-block-standalone .spreadsheet-titlebar {
+    min-height: 50px;
+    align-items: center;
+    padding: 7px 12px;
+  }
+
+  .doco-editor-root .spreadsheet-document-title {
+    width: 100%;
+    font-size: 17px;
+  }
+
+  .doco-editor-root .spreadsheet-title-standalone {
+    gap: 5px;
+  }
+
+  .doco-editor-root .spreadsheet-title-standalone > svg,
+  .doco-editor-root .standalone-spreadsheet-save {
+    display: none;
+  }
+}
+
 /* Markdown 粘贴提示弹窗 */
 .doco-editor-root .paste-md-dialog-overlay {
   position: fixed;

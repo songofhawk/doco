@@ -106,6 +106,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
             && !editor.isActive('codeBlock')
             && !editor.isActive('mermaidBlock')
             && !editor.isActive('plantUMLBlock')
+            && !editor.isActive('spreadsheetBlock')
     }, [])
 
     const refocusEditorAfterMenuClose = () => {

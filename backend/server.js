@@ -18,7 +18,7 @@ import {
   listSubfoldersForUser,
   userCanAccessDocument,
 } from './permissions.js';
-import { loadLegacyState, persistYDoc, registerHocuspocus, yDocService } from './ydoc-service.js';
+import { loadLegacyState, migrateStandaloneSpreadsheet, persistYDoc, registerHocuspocus, yDocService } from './ydoc-service.js';
 import { openApi } from './open-api/router.js';
 import { openApiErrorHandler, openApiNotFound, requestContext } from './open-api/errors.js';
 import { getOpenApiDocument } from './openapi.js';
@@ -68,6 +68,10 @@ export const hocuspocus = new Hocuspocus({
       }
     }
     if (state) Y.applyUpdate(document, state);
+    if (migrateStandaloneSpreadsheet(document, documentName)) {
+      persistYDoc(documentName, document);
+      console.log(`[Spreadsheet] Migrated standalone data for ${documentName}`);
+    }
     return document;
   },
 
@@ -131,6 +135,7 @@ function sanitizeFilename(name) {
 }
 
 export const app = express();
+app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
 
 function isOriginAllowed(origin) {
   // curl、健康检查、同源反代等请求通常没有 Origin；只拦浏览器跨源来源。

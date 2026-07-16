@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Folder, FileText, ChevronRight, ChevronDown, Plus, Library,
-    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy
+    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy, Sheet
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../auth';
@@ -384,13 +384,15 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
         });
     };
 
-    const addDoc = (folderId?: number, kbId?: number) => {
+    const addDoc = (folderId?: number, kbId?: number, documentType: 'document' | 'spreadsheet' = 'document') => {
+        const isSpreadsheet = documentType === 'spreadsheet';
         setInputDialog({
-            title: '新建文档', placeholder: '请输入文档标题',
+            title: isSpreadsheet ? '新建电子表格' : '新建文档',
+            placeholder: isSpreadsheet ? '请输入电子表格标题' : '请输入文档标题',
             onConfirm: async (title) => {
                 const docId = `doc_${Math.random().toString(36).substr(2, 9)}`;
                 try {
-                    const body: any = { id: docId, title };
+                    const body: any = { id: docId, title, document_type: documentType };
                     if (folderId) body.folder_id = folderId;
                     if (kbId) body.kb_id = kbId;
                     const res = await apiFetch(`/docs`, {
@@ -567,7 +569,8 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             x: e.clientX, y: e.clientY,
             items: [
                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(undefined, kb.id, 'spreadsheet') },
                 { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
             ]
@@ -580,7 +583,8 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             x: e.clientX, y: e.clientY,
             items: [
                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(folder.id) },
+                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
+                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(folder.id, undefined, 'spreadsheet') },
                 { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
             ]
@@ -589,7 +593,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
 
     const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
         { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/doc/${doc.id}`) },
-        { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId) },
+        { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId, doc.document_type || 'document') },
         'divider',
         { label: '移动到…', icon: <FolderInput size={14} />, onClick: () => startMoveDoc(doc.id, folderId, kbId) },
         { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'doc', id: doc.id }) },
@@ -610,7 +614,9 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             }`}
             onClick={() => navigateToDoc(doc.id)}
             onContextMenu={e => showDocMenu(e, doc, folderId, kbId)}>
-            <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />
+            {doc.document_type === 'spreadsheet'
+                ? <Sheet aria-label="电子表格" size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-[#c96442]' : 'text-[#87867f]'}`} />
+                : <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />}
             {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
                 <InlineEdit value={doc.title}
                     onSave={v => renameDoc(doc.id, v)}
@@ -653,6 +659,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                             x: rect.left, y: rect.bottom + 2,
                             items: [
                                 { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
+                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(folder.id, undefined, 'spreadsheet') },
                                 { label: '新建文件夹', icon: <Folder size={14} />, onClick: () => addFolder(kbId, folder.id) },
                             ]
                         });
@@ -667,7 +674,8 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                             x: rect.left, y: rect.bottom + 2,
                             items: [
                                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(folder.id) },
+                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
+                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(folder.id, undefined, 'spreadsheet') },
                                 { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
                                 'divider',
                                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
@@ -726,7 +734,9 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                             className={`flex items-center px-3 py-2 w-full text-left text-sm rounded-md transition-colors ${
                                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                             }`}>
-                            <FileText size={14} className="mr-2 shrink-0 text-gray-400" />
+                            {doc.document_type === 'spreadsheet'
+                                ? <Sheet aria-label="电子表格" size={14} className="mr-2 shrink-0 text-[#c96442]" />
+                                : <FileText size={14} className="mr-2 shrink-0 text-gray-400" />}
                             <span className="truncate">{doc.title}</span>
                         </button>
                     ))}
@@ -765,6 +775,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                                             x: rect.left, y: rect.bottom + 2,
                                             items: [
                                                 { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(undefined, kb.id, 'spreadsheet') },
                                                 { label: '新建文件夹', icon: <Folder size={14} />, onClick: () => addFolder(kb.id) },
                                             ]
                                         });
@@ -779,7 +790,8 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                                             x: rect.left, y: rect.bottom + 2,
                                             items: [
                                                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                                                { label: '新建文档', icon: <Plus size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
+                                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(undefined, kb.id, 'spreadsheet') },
                                                 { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
                                                 'divider',
                                                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },

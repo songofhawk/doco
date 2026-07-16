@@ -106,7 +106,7 @@ export function listFolderDocsForUser(userId, folderId) {
 
 export function searchDocsForUser(userId, query) {
   return db.prepare(`
-    SELECT d.id, d.title, d.folder_id, COALESCE(d.kb_id, f.kb_id) AS kb_id
+    SELECT d.id, d.title, d.folder_id, d.document_type, COALESCE(d.kb_id, f.kb_id) AS kb_id
     FROM documents d
     LEFT JOIN folders f ON f.id = d.folder_id
     JOIN knowledge_bases kb ON kb.id = COALESCE(d.kb_id, f.kb_id)

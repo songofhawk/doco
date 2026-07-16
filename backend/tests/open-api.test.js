@@ -165,6 +165,67 @@ test('OpenAPI 规范覆盖真实开放路由', async () => {
   assert.equal(response.body.openapi, '3.1.0');
 });
 
+test('电子表格节点通过 Schema 校验并可降级导入导出 CSV', async () => {
+  const { markdownToDocument, normalizeAndValidateDocument } = await import('../document-schema.js');
+  const { documentToMarkdown, markdownWarnings } = await import('../markdown.js');
+  const imported = markdownToDocument('```csv\n项目,金额\n设计,1200\n开发,=SUM(B2:B2)\n```');
+  assert.equal(imported.content[0].type, 'spreadsheetBlock');
+  assert.equal(imported.content[0].attrs.data.cells.A2, '设计');
+  assert.equal(imported.content[0].attrs.data.cells.B3, '=SUM(B2:B2)');
+  const normalized = normalizeAndValidateDocument(imported).document;
+  assert.match(normalized.content[0].attrs.id, /^block_/);
+  const markdown = documentToMarkdown(normalized);
+  assert.match(markdown, /```csv/);
+  assert.match(markdown, /开发,=SUM\(B2:B2\)/);
+  assert.ok(markdownWarnings(normalized).some((warning) => warning.code === 'spreadsheet_degraded'));
+});
+
+test('页面新建电子表格会记录文档类型并初始化电子表格正文', async () => {
+  const kb = await request(app).post('/app-api/v1/kb').set('Cookie', cookie1)
+    .send({ name: 'Spreadsheet KB' }).expect(200);
+  const created = await request(app).post('/app-api/v1/docs').set('Cookie', cookie1).send({
+    id: 'doc-sheet-entry',
+    title: '预算表',
+    kb_id: kb.body.id,
+    document_type: 'spreadsheet',
+  }).expect(200);
+  assert.equal(created.body.document_type, 'spreadsheet');
+  const listed = await request(app).get(`/app-api/v1/kb/${kb.body.id}/docs`).set('Cookie', cookie1).expect(200);
+  assert.equal(listed.body[0].document_type, 'spreadsheet');
+
+  const { yDocService } = await import('../ydoc-service.js');
+  const loaded = yDocService.loadRaw('doc-sheet-entry');
+  const data = loaded.ydoc.getMap('spreadsheet').get('data');
+  assert.equal(data.rows, 30);
+  assert.equal(data.cols, 12);
+  assert.deepEqual(data.cells, {});
+});
+
+test('旧模型的电子表格块可迁移为独立 Y.Map 数据', async () => {
+  const { documentSchema } = await import('../document-schema.js');
+  const { migrateStandaloneSpreadsheet } = await import('../ydoc-service.js');
+  const { prosemirrorJSONToYDoc } = await import('y-prosemirror');
+  const kb = db.prepare('INSERT INTO knowledge_bases (name, workspace_id) VALUES (?, ?)')
+    .run('Legacy Sheet', 'workspace-user-1').lastInsertRowid;
+  db.prepare('INSERT INTO documents (id, title, kb_id, document_type) VALUES (?, ?, ?, ?)')
+    .run('legacy-sheet-doc', '旧电子表格', kb, 'spreadsheet');
+  const ydoc = prosemirrorJSONToYDoc(documentSchema, {
+    type: 'doc',
+    content: [{
+      type: 'spreadsheetBlock',
+      attrs: {
+        data: {
+          version: 1, rows: 10, cols: 6, cells: { A1: '保留内容' }, styles: {},
+          colWidths: {}, merges: [], frozenRows: 0, frozenCols: 0, filters: {},
+        },
+      },
+    }],
+  }, 'default');
+  assert.equal(migrateStandaloneSpreadsheet(ydoc, 'legacy-sheet-doc'), true);
+  assert.equal(ydoc.getMap('spreadsheet').get('data').cells.A1, '保留内容');
+  assert.equal(migrateStandaloneSpreadsheet(ydoc, 'legacy-sheet-doc'), false);
+});
+
 test('四层限频桶和标准响应头', async () => {
   const { MemoryRateLimitStore, consumeLimit } = await import('../open-api/rate-limit.js');
   const store = new MemoryRateLimitStore();

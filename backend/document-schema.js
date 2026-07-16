@@ -22,7 +22,7 @@ export const BLOCK_TYPES = [
   'paragraph', 'heading', 'blockquote', 'horizontalRule', 'codeBlock',
   'bulletList', 'orderedList', 'listItem', 'taskList', 'taskItem',
   'image', 'table', 'tableRow', 'tableHeader', 'tableCell',
-  'mermaidBlock', 'plantUMLBlock', 'calloutBlock',
+  'mermaidBlock', 'plantUMLBlock', 'calloutBlock', 'spreadsheetBlock',
 ];
 
 export function createBlockId() {
@@ -71,6 +71,24 @@ const CalloutBlock = TiptapNode.create({
   renderHTML({ HTMLAttributes }) { return ['div', { ...HTMLAttributes, 'data-type': 'callout' }, 0]; },
 });
 
+const SpreadsheetBlock = TiptapNode.create({
+  name: 'spreadsheetBlock', group: 'block', atom: true,
+  addAttributes() {
+    return {
+      data: {
+        default: { version: 1, rows: 30, cols: 12, cells: {}, styles: {}, colWidths: {}, merges: [], frozenRows: 0, frozenCols: 0, filters: {} },
+        parseHTML: (el) => {
+          try { return JSON.parse(decodeURIComponent(el.getAttribute('data-sheet') || '')); }
+          catch { return { version: 1, rows: 30, cols: 12, cells: {}, styles: {}, colWidths: {}, merges: [], frozenRows: 0, frozenCols: 0, filters: {} }; }
+        },
+        renderHTML: (attrs) => ({ 'data-sheet': encodeURIComponent(JSON.stringify(attrs.data || {})) }),
+      },
+    };
+  },
+  parseHTML() { return [{ tag: 'div[data-type="spreadsheet"]' }]; },
+  renderHTML({ HTMLAttributes }) { return ['div', { ...HTMLAttributes, 'data-type': 'spreadsheet' }]; },
+});
+
 const DocoImage = Image.extend({
   addAttributes() {
     return {
@@ -101,6 +119,7 @@ export const documentExtensions = [
   MermaidBlock,
   PlantUMLBlock,
   CalloutBlock,
+  SpreadsheetBlock,
 ];
 
 export const documentSchema = getSchema(documentExtensions);
@@ -173,6 +192,38 @@ export function markdownToDocument(markdown) {
       node.type = 'mermaidBlock'; node.attrs = { code: node.content?.[0]?.text || '' }; delete node.content;
     } else if (language === 'plantuml') {
       node.type = 'plantUMLBlock'; node.attrs = { code: node.content?.[0]?.text || '' }; delete node.content;
+    } else if (language === 'csv') {
+      const text = node.content?.[0]?.text || '';
+      const rows = [];
+      let row = [], cell = '', quoted = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+        if (char === '"') {
+          if (quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+          else quoted = !quoted;
+        } else if (char === ',' && !quoted) { row.push(cell); cell = ''; }
+        else if (char === '\n' && !quoted) { row.push(cell); rows.push(row); row = []; cell = ''; }
+        else cell += char;
+      }
+      row.push(cell);
+      if (row.some(Boolean) || !rows.length) rows.push(row);
+      const cells = {};
+      const columnName = (column) => {
+        let result = '', value = column + 1;
+        while (value > 0) { value -= 1; result = String.fromCharCode(65 + (value % 26)) + result; value = Math.floor(value / 26); }
+        return result;
+      };
+      rows.forEach((values, rowIndex) => values.forEach((value, colIndex) => {
+        if (value) cells[`${columnName(colIndex)}${rowIndex + 1}`] = value;
+      }));
+      node.type = 'spreadsheetBlock';
+      node.attrs = {
+        data: {
+          version: 1, rows: Math.max(10, rows.length), cols: Math.max(6, ...rows.map(values => values.length)),
+          cells, styles: {}, colWidths: {}, merges: [], frozenRows: 0, frozenCols: 0, filters: {},
+        },
+      };
+      delete node.content;
     }
   });
   return normalizeAndValidateDocument(json).document;
@@ -186,7 +237,7 @@ export function htmlToDocument(html) {
       'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div',
     ],
     allowedAttributes: {
-      '*': ['data-block-id', 'data-type', 'data-code', 'data-emoji', 'data-color', 'style'],
+      '*': ['data-block-id', 'data-type', 'data-code', 'data-emoji', 'data-color', 'data-sheet', 'style'],
       a: ['href', 'title', 'target', 'rel'],
       img: ['src', 'alt', 'title', 'width', 'height', 'data-align', 'data-attachment-id'],
       td: ['colspan', 'rowspan', 'colwidth'], th: ['colspan', 'rowspan', 'colwidth'],

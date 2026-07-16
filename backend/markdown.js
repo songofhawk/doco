@@ -28,6 +28,25 @@ function cellText(cell) {
   return cell.textContent.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
+function spreadsheetCsv(data) {
+  const rows = Math.max(1, Number(data?.rows) || 1);
+  const cols = Math.max(1, Number(data?.cols) || 1);
+  const columnName = (index) => {
+    let result = '';
+    let value = index + 1;
+    while (value > 0) {
+      value -= 1;
+      result = String.fromCharCode(65 + (value % 26)) + result;
+      value = Math.floor(value / 26);
+    }
+    return result;
+  };
+  const escape = (value) => /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  return Array.from({ length: rows }, (_, row) =>
+    Array.from({ length: cols }, (_, col) => escape(String(data?.cells?.[`${columnName(col)}${row + 1}`] || ''))).join(',')
+  ).join('\n');
+}
+
 const d = defaultMarkdownSerializer.nodes;
 
 const nodes = {
@@ -102,6 +121,14 @@ const nodes = {
   calloutBlock: (state, node) => {
     state.wrapBlock('> ', `> ${node.attrs.emoji} `, node, () => state.renderContent(node));
   },
+
+  spreadsheetBlock: (state, node) => {
+    state.write('```csv\n');
+    state.text(spreadsheetCsv(node.attrs.data), false);
+    state.ensureNewLine();
+    state.write('```');
+    state.closeBlock(node);
+  },
 };
 
 const marks = {
@@ -142,6 +169,7 @@ export function markdownWarnings(document) {
     if (node.type === 'calloutBlock') add('callout_degraded', 'Callout 导出为引用块，颜色属性不会保留');
     if (node.type === 'image' && (node.attrs?.width || node.attrs?.height || node.attrs?.align)) add('image_layout_lost', 'Markdown 无法完整保留图片尺寸和对齐');
     if (node.type === 'table') add('table_attributes_lost', 'Markdown 表格无法保留合并单元格和列宽');
+    if (node.type === 'spreadsheetBlock') add('spreadsheet_degraded', '电子表格导出为 CSV 代码块，公式、格式、筛选和冻结设置不会保留');
     if (node.attrs?.textAlign && node.attrs.textAlign !== 'left') add('text_alignment_lost', 'Markdown 无法保留文本对齐');
     for (const mark of node.marks || []) if (mark.type === 'textStyle' || mark.type === 'highlight') add('text_style_lost', 'Markdown 无法完整保留颜色和高亮样式');
     node.content?.forEach(visit);

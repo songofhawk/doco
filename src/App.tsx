@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
-import { DocoEditor } from './editor'
+import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
 import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown, LogOut, KeyRound } from 'lucide-react'
 import mammoth from 'mammoth'
@@ -180,17 +180,37 @@ const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; extern
   const { id } = useParams<{ id: string }>()
   const [meta, setMeta] = useState<any>(undefined)
   useEffect(() => {
+    setMeta(undefined)
     if (!id) return
     apiFetch(`/docs/${id}`).then(r => r.ok ? r.json() : null).then(d => {
       if (d) setMeta({
-            title: d.title,
-            headingNumbered: d.heading_numbered,
-            bgColor: d.bg_color,
-            collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean) : [],
-          })
+        title: d.title,
+        documentType: d.document_type || 'document',
+        headingNumbered: d.heading_numbered,
+        bgColor: d.bg_color,
+        collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean) : [],
+      })
     }).catch(() => {})
   }, [id])
   if (!id) return <EmptyState />
+  if (!meta) return <LoadingScreen />
+  if (meta.documentType === 'spreadsheet') {
+    return (
+      <StandaloneSpreadsheetPage
+        key={`${user.id}:${id}:spreadsheet`}
+        docId={id}
+        userId={user.id}
+        title={externalTitle ?? meta.title}
+        websocketUrl={import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}
+        onTitleChange={(title) => {
+          apiFetch(`/docs/${id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title }),
+          }).catch(() => {})
+        }}
+      />
+    )
+  }
   return (
     <DocoEditor
       ref={exportRef}

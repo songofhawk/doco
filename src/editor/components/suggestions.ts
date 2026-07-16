@@ -1,7 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
-import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb, Sheet } from 'lucide-react'
 import { API_BASE, apiFetch } from '../../auth'
 
 const API_ORIGIN = API_BASE.replace(/\/app-api\/v1\/?$/, '')
@@ -142,6 +142,17 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                 editor.chain().focus().deleteRange(range)
                     .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
                     .run()
+            },
+        },
+        {
+            title: '嵌入式电子表格',
+            description: '插入支持公式、筛选和 CSV 的电子表格',
+            keywords: ['spreadsheet', 'sheet', 'excel', 'dzbg'],
+            icon: Sheet,
+            command: ({ editor, range }: any) => {
+                editor.chain().focus().deleteRange(range).insertContent({
+                    type: 'spreadsheetBlock',
+                }).run()
             },
         },
         {

@@ -13,7 +13,7 @@ import { authenticatedRateLimits, consumeLimit, limits } from './rate-limit.js';
 import { idempotent } from './idempotency.js';
 import { audit } from './audit.js';
 import { documents, folders, knowledgeBases } from '../resource-service.js';
-import { yDocService, quoteEtag } from '../ydoc-service.js';
+import { initializeStandaloneSpreadsheet, yDocService, quoteEtag } from '../ydoc-service.js';
 import {
   collectAttachmentIds, documentToHtml, findNodeById, htmlToDocument,
   markdownToDocument, normalizeAndValidateDocument,
@@ -97,6 +97,8 @@ openApi.post('/documents', requireScopes('documents:write'), idempotent(asyncRou
       const initial = parseContentInput(req.body.content);
       canonicalizeAttachmentImages(req.user.id, doc.id, initial);
       await yDocService.transact(doc.id, req.user, () => initial, { origin: 'doco:open-api:create' });
+    } else if (doc.document_type === 'spreadsheet') {
+      initializeStandaloneSpreadsheet(doc.id);
     }
   } catch (error) { documents.remove(req.user.id, doc.id); throw error; }
   res.status(201); sendData(res, doc);

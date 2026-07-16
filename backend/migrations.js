@@ -130,6 +130,15 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_attachments_doc_id ON attachments(doc_id);
     `,
   },
+  {
+    version: 4,
+    name: 'document_types',
+    up: `
+      ALTER TABLE documents ADD COLUMN document_type TEXT NOT NULL DEFAULT 'document'
+        CHECK (document_type IN ('document', 'spreadsheet'));
+      CREATE INDEX idx_documents_document_type ON documents(document_type);
+    `,
+  },
 ];
 
 function columnExists(db, table, column) {

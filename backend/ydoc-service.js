@@ -49,6 +49,34 @@ function setJson(ydoc, json) {
   prosemirrorJSONToYXmlFragment(documentSchema, json, fragment);
 }
 
+export function defaultSpreadsheetData() {
+  return {
+    version: 1, rows: 30, cols: 12, cells: {}, styles: {}, colWidths: {},
+    merges: [], frozenRows: 0, frozenCols: 0, filters: {},
+  };
+}
+
+export function initializeStandaloneSpreadsheet(documentId, data = defaultSpreadsheetData()) {
+  const ydoc = new Y.Doc();
+  ydoc.getMap('spreadsheet').set('data', data);
+  persistYDoc(documentId, ydoc);
+  return ydoc;
+}
+
+export function migrateStandaloneSpreadsheet(ydoc, documentId) {
+  const doc = db.prepare('SELECT document_type FROM documents WHERE id = ?').get(documentId);
+  if (doc?.document_type !== 'spreadsheet') return false;
+  const sheetMap = ydoc.getMap('spreadsheet');
+  if (sheetMap.has('data')) return false;
+  const legacy = currentJson(ydoc);
+  const block = legacy.content?.find((node) => node.type === 'spreadsheetBlock');
+  ydoc.transact(() => {
+    sheetMap.set('data', block?.attrs?.data || defaultSpreadsheetData());
+    setJson(ydoc, { type: 'doc', content: [] });
+  }, 'doco:migrate-standalone-spreadsheet');
+  return true;
+}
+
 async function serialized(documentId, operation) {
   const previous = queues.get(documentId) || Promise.resolve();
   let release;

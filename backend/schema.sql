@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS documents (
   title TEXT NOT NULL,
   folder_id INTEGER,
   kb_id INTEGER,
+  document_type TEXT NOT NULL DEFAULT 'document'
+    CHECK (document_type IN ('document', 'spreadsheet')),
   heading_numbered INTEGER DEFAULT 0,
   bg_color TEXT DEFAULT '#ffffff',
   collapsed_blocks TEXT DEFAULT ''
@@ -133,6 +135,7 @@ CREATE INDEX IF NOT EXISTS idx_folders_kb_id ON folders(kb_id);
 CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_documents_kb_id ON documents(kb_id);
 CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents(folder_id);
+CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_idempotency_created_at ON idempotency_keys(created_at);
 CREATE INDEX IF NOT EXISTS idx_api_audit_created_at ON api_audit_logs(created_at);
