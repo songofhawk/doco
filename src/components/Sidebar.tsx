@@ -44,8 +44,8 @@ const ContextMenu = ({ x, y, items, onClose }: {
 };
 
 /* ---- 内联编辑 ---- */
-const InlineEdit = ({ value, onSave, onCancel }: {
-    value: string; onSave: (v: string) => void; onCancel: () => void;
+const InlineEdit = ({ value, onSave, onCancel, textSize = 'text-base' }: {
+    value: string; onSave: (v: string) => void; onCancel: () => void; textSize?: string;
 }) => {
     const [text, setText] = useState(value);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +59,7 @@ const InlineEdit = ({ value, onSave, onCancel }: {
                 if (e.key === 'Escape') onCancel();
             }}
             onBlur={() => { if (text.trim()) onSave(text.trim()); else onCancel(); }}
-            className="flex-1 text-base bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
+            className={`flex-1 ${textSize} bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 min-w-0`}
             onClick={e => e.stopPropagation()} />
     );
 };
@@ -202,7 +202,7 @@ type SidebarProps = {
 /* ---- 主侧边栏 ---- */
 export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBaseChange }: SidebarProps) => {
     const location = useLocation();
-    const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
+    const currentDocId = location.pathname.startsWith('/app/doc/') ? location.pathname.slice(9) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
     const [activeKbId, setActiveKbId] = useState<number | null>(null);
     const [expandedKbs, setExpandedKbs] = useState<Record<number, boolean>>({});
@@ -221,7 +221,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
     const navigateToDoc = (docId: string) => {
-        navigate(`/doc/${docId}`);
+        navigate(`/app/doc/${docId}`);
         if (window.innerWidth < 768) onToggle?.();
     };
 
@@ -537,7 +537,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                     [`kb_${kbId}_docs`]: (prev[`kb_${kbId}_docs`] || []).filter((d: any) => d.id !== docId)
                 }));
             }
-            if (currentDocId === docId) navigate('/');
+            if (currentDocId === docId) navigate('/app');
         } catch {}
     };
 
@@ -611,7 +611,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     };
 
     const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
-        { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/doc/${doc.id}`) },
+        { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/app/doc/${doc.id}`) },
         { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId, doc.document_type || 'document') },
         'divider',
         { label: '移动到…', icon: <FolderInput size={14} />, onClick: () => startMoveDoc(doc.id, folderId, kbId) },
@@ -639,9 +639,10 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
                 <InlineEdit value={doc.title}
                     onSave={v => renameDoc(doc.id, v)}
-                    onCancel={() => setEditingItem(null)} />
+                    onCancel={() => setEditingItem(null)}
+                    textSize="text-sm" />
             ) : (
-                <span className="flex-1 truncate text-base">{doc.title}</span>
+                <span className="flex-1 truncate text-sm">{doc.title}</span>
             )}
             <button onClick={e => {
                     e.stopPropagation();
@@ -750,7 +751,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                     {searchResults.map(doc => (
                         <button key={doc.id}
                             onClick={() => { navigateToDoc(doc.id); setSearchQuery(''); }}
-                            className={`flex items-center px-3 py-2 w-full text-left text-base rounded-md transition-colors ${
+                            className={`flex items-center px-3 py-2 w-full text-left text-sm rounded-md transition-colors ${
                                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                             }`}>
                             {doc.document_type === 'spreadsheet'
