@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, FileDown, FolderTree, LoaderCircle, Mail, Users, Workflow } from 'lucide-react'
+import { ArrowLeft, FileDown, FolderTree, LoaderCircle, Mail, MonitorSmartphone, Workflow } from 'lucide-react'
 import { useAuth } from '../auth'
 import { DocoLogo, DocoWordmark } from './DocoLogo'
 
@@ -197,7 +197,7 @@ const LoginPanel = () => {
 }
 
 const FEATURES = [
-  { icon: Users, title: '多人实时协同', desc: '基于 Yjs CRDT，多端同时编辑自动合并' },
+  { icon: MonitorSmartphone, title: '多端实时同步', desc: '基于 Yjs CRDT，手机电脑随时续写，编辑自动合并' },
   { icon: FolderTree, title: '知识库管理', desc: '知识库、文件夹、文档层级组织，随取随用' },
   { icon: Workflow, title: '图表与代码', desc: 'Mermaid、PlantUML、代码高亮，技术写作一步到位' },
   { icon: FileDown, title: '自由导入导出', desc: 'Markdown / Word / PDF 导入，单文档或整库导出' },
@@ -210,7 +210,7 @@ export const HomePage = () => {
   const from = (location.state as { from?: string } | null)?.from
 
   useEffect(() => {
-    document.title = 'Doco · 知识库与协同写作空间'
+    document.title = 'Doco · 知识库与写作空间'
   }, [])
 
   if (user) {
@@ -238,11 +238,11 @@ export const HomePage = () => {
             <h1 className="text-3xl font-bold leading-snug tracking-tight sm:text-4xl">
               你的知识库
               <br />
-              与协同写作空间
+              与多端写作空间
             </h1>
             <p className="mt-4 max-w-md text-sm leading-7 text-gray-500 sm:text-base">
-              富文本编辑、多人实时同步、图表与代码块、Markdown 自由导出——
-              把团队的文档和知识沉淀在一处。
+              富文本编辑、多端实时同步、图表与代码块、Markdown 自由导出——
+              把你的文档和知识沉淀在一处。
             </p>
             <ul className="mt-9 grid gap-5 sm:grid-cols-2">
               {FEATURES.map(({ icon: Icon, title, desc }) => (
@@ -269,7 +269,7 @@ export const HomePage = () => {
       </main>
 
       <footer className="shrink-0 px-6 pb-6 text-center text-xs text-gray-400 sm:px-10">
-        多端实时同步 · 富文本协同编辑 · 数据本地优先
+        多端实时同步 · 富文本编辑 · 数据本地优先
       </footer>
     </div>
   )
