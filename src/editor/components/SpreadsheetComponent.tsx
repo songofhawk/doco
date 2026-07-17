@@ -1,17 +1,30 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import {
-    AlignCenter, AlignLeft, AlignRight, Bold, ChevronDown, Copy, Download, Filter,
-    Italic, Merge, Plus, Redo2, Rows3, Scissors, Sheet, SortAsc, SortDesc,
-    Trash2, Underline, Undo2, UnfoldHorizontal, UnfoldVertical, Upload,
+    AlignCenter, AlignLeft, AlignRight, ArrowDownToLine, ArrowLeftToLine,
+    ArrowRightToLine, ArrowUpToLine, Bold, ChevronDown, ClipboardPaste, Copy,
+    Download, Eraser, Filter, Italic, Merge, Plus, Redo2, Rows3, Scissors, Sheet,
+    SortAsc, SortDesc, Trash2, Underline, Undo2, UnfoldHorizontal, UnfoldVertical,
+    Upload,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
     MAX_COLS, MAX_ROWS, MIN_COLS, MIN_ROWS, cellKey, columnName, createSpreadsheetData, evaluateSpreadsheet,
-    formatCellValue, normalizeSpreadsheetData, parseCellKey, parseDelimited, rangeKeys,
-    toCsv, type CellStyle, type SpreadsheetData,
+    defaultCellAlignment, formatCellValue, normalizeSpreadsheetData, parseCellKey, parseDelimited, rangeKeys,
+    toCsv, type CellFormat, type CellStyle, type SpreadsheetData,
 } from './spreadsheetEngine'
+import {
+    matchesSpreadsheetShortcut, spreadsheetActionTooltip, spreadsheetShortcutLabel,
+} from '../spreadsheetShortcuts'
 
 type Selection = { anchor: string; focus: string }
+type ContextMenuState = {
+    x: number
+    y: number
+    kind: 'cell' | 'row' | 'col'
+    row: number
+    col: number
+}
 
 type SpreadsheetEditorProps = {
     data: SpreadsheetData
@@ -26,6 +39,41 @@ type SpreadsheetEditorProps = {
 }
 
 const selectedKeys = (selection: Selection) => rangeKeys(selection.anchor, selection.focus)
+
+const CELL_FORMAT_GROUPS: Array<{
+    label: string
+    options: Array<{ value: CellFormat; label: string }>
+}> = [
+    {
+        label: '通用',
+        options: [
+            { value: 'general', label: '自动识别' },
+            { value: 'text', label: '纯文本' },
+        ],
+    },
+    {
+        label: '数字',
+        options: [
+            { value: 'number', label: '数字' },
+            { value: 'percent', label: '百分比' },
+            { value: 'currency', label: '货币（人民币）' },
+        ],
+    },
+    {
+        label: '日期与逻辑',
+        options: [
+            { value: 'date', label: '日期' },
+            { value: 'boolean', label: '布尔值' },
+        ],
+    },
+]
+
+const displayedDecimalPlaces = (value: number, format?: CellFormat) => {
+    if (format === 'currency') return 2
+    const displayedValue = format === 'percent' ? value * 100 : value
+    const normalized = displayedValue.toFixed(8).replace(/0+$/, '').replace(/\.$/, '')
+    return normalized.includes('.') ? normalized.length - normalized.indexOf('.') - 1 : 0
+}
 
 const selectionBounds = (selection: Selection) => {
     const a = parseCellKey(selection.anchor) || { row: 0, col: 0 }
@@ -75,6 +123,7 @@ export const SpreadsheetEditor = ({
     const [draft, setDraft] = useState('')
     const [showFilters, setShowFilters] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
     const [actionStatus, setActionStatus] = useState('')
     const gridRef = useRef<HTMLDivElement>(null)
     const fileRef = useRef<HTMLInputElement>(null)
@@ -87,6 +136,26 @@ export const SpreadsheetEditor = ({
     }, [externalData])
 
     useEffect(() => () => clearTimeout(actionTimerRef.current), [])
+
+    useEffect(() => {
+        if (!contextMenu) return
+        const close = () => setContextMenu(null)
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') close()
+        }
+        document.addEventListener('pointerdown', close)
+        document.addEventListener('keydown', closeOnEscape)
+        window.addEventListener('blur', close)
+        window.addEventListener('resize', close)
+        window.addEventListener('scroll', close, true)
+        return () => {
+            document.removeEventListener('pointerdown', close)
+            document.removeEventListener('keydown', closeOnEscape)
+            window.removeEventListener('blur', close)
+            window.removeEventListener('resize', close)
+            window.removeEventListener('scroll', close, true)
+        }
+    }, [contextMenu])
 
     const announceAction = useCallback((message: string) => {
         clearTimeout(actionTimerRef.current)
@@ -111,6 +180,13 @@ export const SpreadsheetEditor = ({
     const activeKey = selection.focus
     const activeStyle = data.styles[activeKey] || {}
     const activeRaw = data.cells[activeKey] || ''
+    const activeAlignment = defaultCellAlignment(calculated.get(activeKey), activeStyle)
+    const activeValue = calculated.get(activeKey)
+    const isNumericCell = typeof activeValue === 'number'
+        && activeStyle.format !== 'date'
+        && activeStyle.format !== 'boolean'
+    const activeDecimalPlaces = activeStyle.decimalPlaces
+        ?? (typeof activeValue === 'number' ? displayedDecimalPlaces(activeValue, activeStyle.format) : 0)
 
     const commitCell = useCallback((key: string, value: string) => {
         patch(current => {
@@ -189,6 +265,20 @@ export const SpreadsheetEditor = ({
         })
     }
 
+    const pasteFromClipboard = async () => {
+        try {
+            const text = await navigator.clipboard.readText()
+            if (!text) {
+                announceAction('剪贴板中没有可粘贴的文本')
+                return
+            }
+            pasteText(text)
+            announceAction('已粘贴剪贴板内容')
+        } catch {
+            announceAction('浏览器未允许读取剪贴板，请使用 Ctrl/⌘ + V')
+        }
+    }
+
     const moveSelection = (rowDelta: number, colDelta: number, extend = false) => {
         const pos = parseCellKey(activeKey)
         if (!pos) return
@@ -198,18 +288,68 @@ export const SpreadsheetEditor = ({
     }
 
     const handleKeyDown = (event: React.KeyboardEvent) => {
+        const target = event.target as HTMLElement
+        if (
+            target instanceof HTMLInputElement
+            || target instanceof HTMLTextAreaElement
+            || target instanceof HTMLSelectElement
+            || target.isContentEditable
+        ) return
         if (editing) return
-        const mod = event.metaKey || event.ctrlKey
-        if (mod && event.key.toLowerCase() === 'c') { event.preventDefault(); void copySelection(); return }
-        if (mod && event.key.toLowerCase() === 'x') { event.preventDefault(); void copySelection(true); return }
-        if (mod && event.key.toLowerCase() === 'a') {
+        if (matchesSpreadsheetShortcut(event, 'undo') && onUndo) {
+            event.preventDefault()
+            onUndo()
+            return
+        }
+        if ((matchesSpreadsheetShortcut(event, 'redo') || matchesSpreadsheetShortcut(event, 'redoAlternative')) && onRedo) {
+            event.preventDefault()
+            onRedo()
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'bold')) {
+            event.preventDefault()
+            setSelectedStyle({ bold: !activeStyle.bold })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'italic')) {
+            event.preventDefault()
+            setSelectedStyle({ italic: !activeStyle.italic })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'underline')) {
+            event.preventDefault()
+            setSelectedStyle({ underline: !activeStyle.underline })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'alignLeft')) {
+            event.preventDefault()
+            setSelectedStyle({ align: 'left' })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'alignCenter')) {
+            event.preventDefault()
+            setSelectedStyle({ align: 'center' })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'alignRight')) {
+            event.preventDefault()
+            setSelectedStyle({ align: 'right' })
+            return
+        }
+        if (matchesSpreadsheetShortcut(event, 'copy')) { event.preventDefault(); void copySelection(); return }
+        if (matchesSpreadsheetShortcut(event, 'cut')) { event.preventDefault(); void copySelection(true); return }
+        if (matchesSpreadsheetShortcut(event, 'selectAll')) {
             event.preventDefault()
             setSelection({ anchor: 'A1', focus: cellKey(data.rows - 1, data.cols - 1) })
             return
         }
-        if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); clearSelected(); return }
-        if (event.key === 'Enter') { event.preventDefault(); beginEdit(activeKey); return }
-        if (event.key === 'Tab') { event.preventDefault(); moveSelection(0, event.shiftKey ? -1 : 1); return }
+        if (matchesSpreadsheetShortcut(event, 'clear') || event.key === 'Backspace') { event.preventDefault(); clearSelected(); return }
+        if (matchesSpreadsheetShortcut(event, 'edit')) { event.preventDefault(); beginEdit(activeKey); return }
+        if (matchesSpreadsheetShortcut(event, 'moveNext') || matchesSpreadsheetShortcut(event, 'movePrevious')) {
+            event.preventDefault()
+            moveSelection(0, event.shiftKey ? -1 : 1)
+            return
+        }
         const arrows: Record<string, [number, number]> = {
             ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
         }
@@ -218,7 +358,7 @@ export const SpreadsheetEditor = ({
             moveSelection(arrows[event.key][0], arrows[event.key][1], event.shiftKey)
             return
         }
-        if (!mod && event.key.length === 1) {
+        if (!(event.metaKey || event.ctrlKey) && event.key.length === 1) {
             event.preventDefault()
             beginEdit(activeKey, event.key)
         }
@@ -255,8 +395,12 @@ export const SpreadsheetEditor = ({
         return map
     }, [data.merges])
 
-    const changeDimension = (axis: 'row' | 'col', mode: 'insert' | 'delete') => {
-        const start = axis === 'row' ? bounds.top : bounds.left
+    const changeDimension = (
+        axis: 'row' | 'col',
+        mode: 'insert' | 'delete',
+        targetIndex = axis === 'row' ? bounds.top : bounds.left,
+    ) => {
+        const start = targetIndex
         const size = axis === 'row' ? data.rows : data.cols
         const limit = axis === 'row' ? (mode === 'insert' ? MAX_ROWS : MIN_ROWS) : (mode === 'insert' ? MAX_COLS : MIN_COLS)
         if ((mode === 'insert' && size >= limit) || (mode === 'delete' && size <= limit)) {
@@ -272,9 +416,36 @@ export const SpreadsheetEditor = ({
             else next.cols += mode === 'insert' ? 1 : -1
             return next
         })
-        selectCell(cellKey(Math.min(bounds.top, data.rows - 2), Math.min(bounds.left, data.cols - 2)))
+        const nextRow = axis === 'row'
+            ? Math.min(start, data.rows - (mode === 'delete' ? 2 : 1))
+            : bounds.top
+        const nextCol = axis === 'col'
+            ? Math.min(start, data.cols - (mode === 'delete' ? 2 : 1))
+            : bounds.left
+        selectCell(cellKey(Math.max(0, nextRow), Math.max(0, nextCol)))
         setMenuOpen(false)
+        setContextMenu(null)
         announceAction(`${mode === 'insert' ? '已插入' : '已删除'}第 ${start + 1} ${axis === 'row' ? '行' : '列'}`)
+    }
+
+    const openContextMenu = (
+        event: React.MouseEvent,
+        kind: ContextMenuState['kind'],
+        row: number,
+        col: number,
+    ) => {
+        event.preventDefault()
+        event.stopPropagation()
+        if (kind === 'row') {
+            setSelection({ anchor: cellKey(row, 0), focus: cellKey(row, data.cols - 1) })
+        } else if (kind === 'col') {
+            setSelection({ anchor: cellKey(0, col), focus: cellKey(data.rows - 1, col) })
+        } else if (row < bounds.top || row > bounds.bottom || col < bounds.left || col > bounds.right) {
+            setSelection({ anchor: cellKey(row, col), focus: cellKey(row, col) })
+        }
+        setMenuOpen(false)
+        setEditing(null)
+        setContextMenu({ x: event.clientX, y: event.clientY, kind, row, col })
     }
 
     const sortRows = (descending: boolean) => {
@@ -389,6 +560,16 @@ export const SpreadsheetEditor = ({
         return offset
     }
 
+    const invokeContextAction = (action: () => void | Promise<void>) => {
+        setContextMenu(null)
+        void action()
+    }
+
+    const contextMenuStyle = contextMenu ? {
+        left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 226)),
+        top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - (contextMenu.kind === 'cell' ? 340 : 300))),
+    } : undefined
+
     const Wrapper = standalone ? 'div' : NodeViewWrapper
 
     return (
@@ -396,6 +577,7 @@ export const SpreadsheetEditor = ({
             className={`spreadsheet-block ${standalone ? 'spreadsheet-block-standalone' : ''}`}
             data-type="spreadsheet"
             contentEditable={false}
+            onKeyDown={handleKeyDown}
             onMouseUp={() => { dragSelecting.current = false }}
             onMouseLeave={() => { dragSelecting.current = false }}
         >
@@ -420,24 +602,24 @@ export const SpreadsheetEditor = ({
                             </span>
                         )}
                     </div>
-                    <div className="spreadsheet-title-actions">
-                        <button type="button" title="撤销" disabled={!onUndo} onClick={onUndo}><Undo2 size={15} /></button>
-                        <button type="button" title="重做" disabled={!onRedo} onClick={onRedo}><Redo2 size={15} /></button>
-                        <button type="button" title="导入 CSV" onClick={() => fileRef.current?.click()}><Upload size={15} /></button>
-                        <button type="button" title="导出 CSV" onClick={exportCsv}><Download size={15} /></button>
-                        {onDelete && <button type="button" className="danger" title="删除电子表格" onClick={onDelete}><Trash2 size={15} /></button>}
+                    <div className="spreadsheet-title-actions document-title-actions">
+                        <button type="button" title={spreadsheetActionTooltip('撤销', 'undo')} disabled={!onUndo} onClick={onUndo}><Undo2 size={16} /></button>
+                        <button type="button" title={spreadsheetActionTooltip('重做', 'redo')} disabled={!onRedo} onClick={onRedo}><Redo2 size={16} /></button>
+                        <button type="button" title="导入 CSV" onClick={() => fileRef.current?.click()}><Upload size={16} /></button>
+                        <button type="button" title="导出 CSV" onClick={exportCsv}><Download size={16} /></button>
+                        {onDelete && <button type="button" className="danger" title="删除电子表格" onClick={onDelete}><Trash2 size={16} /></button>}
                         <input ref={fileRef} type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden onChange={event => void importFile(event.target.files?.[0])} />
                     </div>
                 </div>
 
                 <div className="spreadsheet-toolbar">
-                    <button type="button" className={activeStyle.bold ? 'active' : ''} title="粗体" onClick={() => setSelectedStyle({ bold: !activeStyle.bold })}><Bold size={15} /></button>
-                    <button type="button" className={activeStyle.italic ? 'active' : ''} title="斜体" onClick={() => setSelectedStyle({ italic: !activeStyle.italic })}><Italic size={15} /></button>
-                    <button type="button" className={activeStyle.underline ? 'active' : ''} title="下划线" onClick={() => setSelectedStyle({ underline: !activeStyle.underline })}><Underline size={15} /></button>
+                    <button type="button" className={activeStyle.bold ? 'active' : ''} title={spreadsheetActionTooltip('粗体', 'bold')} onClick={() => setSelectedStyle({ bold: !activeStyle.bold })}><Bold size={15} /></button>
+                    <button type="button" className={activeStyle.italic ? 'active' : ''} title={spreadsheetActionTooltip('斜体', 'italic')} onClick={() => setSelectedStyle({ italic: !activeStyle.italic })}><Italic size={15} /></button>
+                    <button type="button" className={activeStyle.underline ? 'active' : ''} title={spreadsheetActionTooltip('下划线', 'underline')} onClick={() => setSelectedStyle({ underline: !activeStyle.underline })}><Underline size={15} /></button>
                     <span className="spreadsheet-divider" />
-                    <button type="button" className={activeStyle.align === 'left' ? 'active' : ''} title="左对齐" onClick={() => setSelectedStyle({ align: 'left' })}><AlignLeft size={15} /></button>
-                    <button type="button" className={activeStyle.align === 'center' ? 'active' : ''} title="居中" onClick={() => setSelectedStyle({ align: 'center' })}><AlignCenter size={15} /></button>
-                    <button type="button" className={activeStyle.align === 'right' ? 'active' : ''} title="右对齐" onClick={() => setSelectedStyle({ align: 'right' })}><AlignRight size={15} /></button>
+                    <button type="button" className={activeAlignment === 'left' ? 'active' : ''} title={spreadsheetActionTooltip('左对齐', 'alignLeft')} onClick={() => setSelectedStyle({ align: 'left' })}><AlignLeft size={15} /></button>
+                    <button type="button" className={activeAlignment === 'center' ? 'active' : ''} title={spreadsheetActionTooltip('居中', 'alignCenter')} onClick={() => setSelectedStyle({ align: 'center' })}><AlignCenter size={15} /></button>
+                    <button type="button" className={activeAlignment === 'right' ? 'active' : ''} title={spreadsheetActionTooltip('右对齐', 'alignRight')} onClick={() => setSelectedStyle({ align: 'right' })}><AlignRight size={15} /></button>
                     <span className="spreadsheet-divider" />
                     <label title="文字颜色" className="spreadsheet-color-control">
                         A<input type="color" value={activeStyle.color || '#141413'} onChange={event => setSelectedStyle({ color: event.target.value })} />
@@ -445,13 +627,37 @@ export const SpreadsheetEditor = ({
                     <label title="填充颜色" className="spreadsheet-color-control fill">
                         <span /> <input type="color" value={activeStyle.background || '#faf9f5'} onChange={event => setSelectedStyle({ background: event.target.value })} />
                     </label>
-                    <select aria-label="数字格式" value={activeStyle.format || 'general'} onChange={event => setSelectedStyle({ format: event.target.value as CellStyle['format'] })}>
-                        <option value="general">常规</option>
-                        <option value="number">数字</option>
-                        <option value="percent">百分比</option>
-                        <option value="currency">人民币</option>
-                        <option value="date">日期</option>
+                    <select aria-label="单元格类型" value={activeStyle.format || 'general'} onChange={event => setSelectedStyle({ format: event.target.value as CellFormat })}>
+                        {CELL_FORMAT_GROUPS.map(group => (
+                            <optgroup key={group.label} label={group.label}>
+                                {group.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                            </optgroup>
+                        ))}
                     </select>
+                    {isNumericCell && (
+                        <div className="spreadsheet-decimal-controls" aria-label="小数位数">
+                            <button
+                                type="button"
+                                className="spreadsheet-tool-button"
+                                aria-label="减少小数位数"
+                                data-tooltip="减少小数位数"
+                                disabled={activeDecimalPlaces <= 0}
+                                onClick={() => setSelectedStyle({ decimalPlaces: Math.max(0, activeDecimalPlaces - 1) })}
+                            >
+                                <span className="spreadsheet-decimal-icon" aria-hidden="true">.0<sup>−</sup></span>
+                            </button>
+                            <button
+                                type="button"
+                                className="spreadsheet-tool-button"
+                                aria-label="增加小数位数"
+                                data-tooltip="增加小数位数"
+                                disabled={activeDecimalPlaces >= 8}
+                                onClick={() => setSelectedStyle({ decimalPlaces: Math.min(8, activeDecimalPlaces + 1) })}
+                            >
+                                <span className="spreadsheet-decimal-icon" aria-hidden="true">.0<sup>+</sup></span>
+                            </button>
+                        </div>
+                    )}
                     <span className="spreadsheet-divider" />
                     <button
                         type="button"
@@ -505,8 +711,8 @@ export const SpreadsheetEditor = ({
                         )}
                     </div>
                     <span className="spreadsheet-divider" />
-                    <button type="button" title="复制" onClick={() => void copySelection()}><Copy size={15} /></button>
-                    <button type="button" title="剪切" onClick={() => void copySelection(true)}><Scissors size={15} /></button>
+                    <button type="button" title={spreadsheetActionTooltip('复制', 'copy')} onClick={() => void copySelection()}><Copy size={15} /></button>
+                    <button type="button" title={spreadsheetActionTooltip('剪切', 'cut')} onClick={() => void copySelection(true)}><Scissors size={15} /></button>
                 </div>
 
                 <div className="spreadsheet-formula">
@@ -527,7 +733,6 @@ export const SpreadsheetEditor = ({
                     role="grid"
                     tabIndex={0}
                     aria-label="电子表格"
-                    onKeyDown={handleKeyDown}
                     onPaste={event => { event.preventDefault(); pasteText(event.clipboardData.getData('text/plain')) }}
                 >
                     <table>
@@ -544,6 +749,7 @@ export const SpreadsheetEditor = ({
                                         className={col >= bounds.left && col <= bounds.right ? 'selected-header' : ''}
                                         style={col < data.frozenCols ? { position: 'sticky', left: stickyOffset(col), zIndex: 7 } : undefined}
                                         onClick={() => setSelection({ anchor: cellKey(0, col), focus: cellKey(data.rows - 1, col) })}
+                                        onContextMenu={event => openContextMenu(event, 'col', bounds.top, col)}
                                     >
                                         {columnName(col)}
                                         <span className="spreadsheet-col-resize" onPointerDown={event => resizeColumn(col, event)} />
@@ -573,6 +779,7 @@ export const SpreadsheetEditor = ({
                                         className={row >= bounds.top && row <= bounds.bottom ? 'selected-header' : ''}
                                         style={row < data.frozenRows ? { position: 'sticky', top: showFilters ? 56 : 28, zIndex: 6 } : undefined}
                                         onClick={() => setSelection({ anchor: cellKey(row, 0), focus: cellKey(row, data.cols - 1) })}
+                                        onContextMenu={event => openContextMenu(event, 'row', row, bounds.left)}
                                     >{row + 1}</th>
                                     {Array.from({ length: data.cols }, (_, col) => {
                                         const key = cellKey(row, col)
@@ -593,7 +800,7 @@ export const SpreadsheetEditor = ({
                                                     fontWeight: style.bold ? 700 : undefined,
                                                     fontStyle: style.italic ? 'italic' : undefined,
                                                     textDecoration: style.underline ? 'underline' : undefined,
-                                                    textAlign: style.align,
+                                                    textAlign: defaultCellAlignment(calculated.get(key), style),
                                                     color: style.color,
                                                     backgroundColor: style.background,
                                                     ...(col < data.frozenCols ? { position: 'sticky', left: stickyOffset(col), zIndex: 4 } : {}),
@@ -608,6 +815,7 @@ export const SpreadsheetEditor = ({
                                                     if (dragSelecting.current) setSelection(current => ({ ...current, focus: key }))
                                                 }}
                                                 onDoubleClick={() => beginEdit(key)}
+                                                onContextMenu={event => openContextMenu(event, 'cell', row, col)}
                                             >
                                                 {editing === key ? (
                                                     <input
@@ -643,6 +851,86 @@ export const SpreadsheetEditor = ({
                     {actionStatus && <span className="spreadsheet-action-status" role="status">{actionStatus}</span>}
                 </div>
             </div>
+            {contextMenu && createPortal(
+                <div
+                    className="spreadsheet-context-menu"
+                    role="menu"
+                    aria-label={`${contextMenu.kind === 'cell' ? '单元格' : contextMenu.kind === 'row' ? '行' : '列'}操作`}
+                    style={contextMenuStyle}
+                    onPointerDown={event => event.stopPropagation()}
+                    onContextMenu={event => event.preventDefault()}
+                >
+                    <div className="spreadsheet-context-title">
+                        {contextMenu.kind === 'cell' && `${cellKey(contextMenu.row, contextMenu.col)} 单元格`}
+                        {contextMenu.kind === 'row' && `第 ${contextMenu.row + 1} 行`}
+                        {contextMenu.kind === 'col' && `${columnName(contextMenu.col)} 列`}
+                    </div>
+                    <button type="button" role="menuitem" onClick={() => invokeContextAction(() => copySelection())}>
+                        <Copy size={15} />复制
+                        <kbd>{spreadsheetShortcutLabel('copy')}</kbd>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => invokeContextAction(() => copySelection(true))}>
+                        <Scissors size={15} />剪切
+                        <kbd>{spreadsheetShortcutLabel('cut')}</kbd>
+                    </button>
+                    {contextMenu.kind === 'cell' && (
+                        <button type="button" role="menuitem" onClick={() => invokeContextAction(pasteFromClipboard)}>
+                            <ClipboardPaste size={15} />粘贴
+                            <kbd>{spreadsheetShortcutLabel('paste')}</kbd>
+                        </button>
+                    )}
+                    <div className="spreadsheet-context-divider" />
+                    {(contextMenu.kind === 'cell' || contextMenu.kind === 'row') && (
+                        <>
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('row', 'insert', contextMenu.row))}>
+                                <ArrowUpToLine size={15} />在上方插入行
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('row', 'insert', contextMenu.row + 1))}>
+                                <ArrowDownToLine size={15} />在下方插入行
+                            </button>
+                        </>
+                    )}
+                    {(contextMenu.kind === 'cell' || contextMenu.kind === 'col') && (
+                        <>
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('col', 'insert', contextMenu.col))}>
+                                <ArrowLeftToLine size={15} />在左侧插入列
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('col', 'insert', contextMenu.col + 1))}>
+                                <ArrowRightToLine size={15} />在右侧插入列
+                            </button>
+                        </>
+                    )}
+                    {contextMenu.kind === 'col' && (
+                        <>
+                            <div className="spreadsheet-context-divider" />
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => sortRows(false))}>
+                                <SortAsc size={15} />升序排列
+                            </button>
+                            <button type="button" role="menuitem" onClick={() => invokeContextAction(() => sortRows(true))}>
+                                <SortDesc size={15} />降序排列
+                            </button>
+                        </>
+                    )}
+                    <div className="spreadsheet-context-divider" />
+                    <button type="button" role="menuitem" onClick={() => invokeContextAction(() => {
+                        clearSelected()
+                        announceAction('已清除所选单元格内容')
+                    })}>
+                        <Eraser size={15} />清除内容
+                    </button>
+                    {contextMenu.kind === 'row' && (
+                        <button className="danger" type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('row', 'delete', contextMenu.row))}>
+                            <Trash2 size={15} />删除第 {contextMenu.row + 1} 行
+                        </button>
+                    )}
+                    {contextMenu.kind === 'col' && (
+                        <button className="danger" type="button" role="menuitem" onClick={() => invokeContextAction(() => changeDimension('col', 'delete', contextMenu.col))}>
+                            <Trash2 size={15} />删除 {columnName(contextMenu.col)} 列
+                        </button>
+                    )}
+                </div>,
+                document.body,
+            )}
         </Wrapper>
     )
 }

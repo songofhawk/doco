@@ -1,5 +1,7 @@
 export type CellValue = string | number | boolean
 
+export type CellFormat = 'general' | 'text' | 'number' | 'percent' | 'currency' | 'date' | 'boolean'
+
 export type CellStyle = {
     bold?: boolean
     italic?: boolean
@@ -7,7 +9,8 @@ export type CellStyle = {
     align?: 'left' | 'center' | 'right'
     color?: string
     background?: string
-    format?: 'general' | 'number' | 'percent' | 'currency' | 'date'
+    format?: CellFormat
+    decimalPlaces?: number
 }
 
 export type SpreadsheetData = {
@@ -151,7 +154,7 @@ export const evaluateSpreadsheet = (data: SpreadsheetData) => {
             } catch (error) {
                 value = error instanceof Error && error.message === '除数为零' ? '#DIV/0!' : '#ERROR!'
             }
-        } else if (raw !== '' && Number.isFinite(Number(raw))) {
+        } else if (data.styles[key]?.format !== 'text' && raw !== '' && Number.isFinite(Number(raw))) {
             value = Number(raw)
         }
         visiting.delete(key)
@@ -282,15 +285,55 @@ const parseFormula = (expression: string, getCell: (key: string) => CellValue): 
 }
 
 export const formatCellValue = (value: CellValue, style?: CellStyle) => {
+    if (style?.format === 'boolean') {
+        if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
+        const normalized = String(value).trim().toLowerCase()
+        if (['true', '是', '1'].includes(normalized)) return 'TRUE'
+        if (['false', '否', '0'].includes(normalized)) return 'FALSE'
+    }
     if (typeof value !== 'number') return String(value)
-    if (style?.format === 'percent') return `${(value * 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`
-    if (style?.format === 'currency') return value.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
+    const decimalPlaces = Number.isInteger(style?.decimalPlaces)
+        ? Math.max(0, Math.min(8, style!.decimalPlaces!))
+        : undefined
+    const decimalOptions = decimalPlaces === undefined
+        ? {}
+        : { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces }
+    if (style?.format === 'percent') {
+        return `${(value * 100).toLocaleString('zh-CN', {
+            maximumFractionDigits: decimalPlaces ?? 2,
+            ...(decimalPlaces === undefined ? {} : { minimumFractionDigits: decimalPlaces }),
+        })}%`
+    }
+    if (style?.format === 'currency') {
+        return value.toLocaleString('zh-CN', {
+            style: 'currency',
+            currency: 'CNY',
+            ...decimalOptions,
+        })
+    }
     if (style?.format === 'date') {
         const date = new Date(Math.round((value - 25569) * 86400 * 1000))
         return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('zh-CN')
     }
-    if (style?.format === 'number') return value.toLocaleString('zh-CN', { maximumFractionDigits: 8 })
+    if (style?.format === 'number') return value.toLocaleString('zh-CN', {
+        maximumFractionDigits: decimalPlaces ?? 8,
+        ...(decimalPlaces === undefined ? {} : { minimumFractionDigits: decimalPlaces }),
+    })
+    if (decimalPlaces !== undefined) return value.toLocaleString('zh-CN', decimalOptions)
     return String(value)
+}
+
+export const defaultCellAlignment = (
+    value: CellValue,
+    style?: CellStyle,
+): NonNullable<CellStyle['align']> => {
+    if (style?.align) return style.align
+    if (style?.format === 'text') return 'left'
+    if (style?.format === 'boolean') return 'center'
+    if (style?.format && ['number', 'percent', 'currency', 'date'].includes(style.format)) return 'right'
+    if (typeof value === 'number') return 'right'
+    if (typeof value === 'boolean') return 'center'
+    return 'left'
 }
 
 export const parseDelimited = (text: string) => {

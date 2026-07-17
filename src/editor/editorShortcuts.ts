@@ -31,7 +31,7 @@ export const EDITOR_SHORTCUTS: Record<EditorShortcutId, string> = {
     highlight: 'Mod-Shift-h',
     link: 'Mod-k',
     alignLeft: 'Mod-Shift-l',
-    alignCenter: 'Mod-Shift-e',
+    alignCenter: 'Mod-Shift-m',
     alignRight: 'Mod-Shift-r',
     cut: 'Mod-x',
     copy: 'Mod-c',

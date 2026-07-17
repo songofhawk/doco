@@ -113,7 +113,7 @@ export const KeyboardShortcuts = Extension.create({
                 return true
             },
 
-            // Cmd+Shift+e: 居中对齐
+            // Cmd+Shift+M: 居中对齐
             [EDITOR_SHORTCUTS.alignCenter]: ({ editor }) => {
                 (editor.chain().focus() as any).setTextAlign('center').run()
                 return true

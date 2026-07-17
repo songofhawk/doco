@@ -25,7 +25,9 @@ export const StandaloneSpreadsheetPage = ({
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [ydoc] = useState(() => new Y.Doc())
     const sheetMap = useMemo(() => ydoc.getMap<unknown>('spreadsheet'), [ydoc])
-    const undoManager = useMemo(() => new Y.UndoManager(sheetMap), [sheetMap])
+    const undoManager = useMemo(() => new Y.UndoManager(sheetMap, {
+        trackedOrigins: new Set(['doco:spreadsheet-edit']),
+    }), [sheetMap])
     const providerRef = useRef<HocuspocusProvider | null>(null)
     const saveRequestRef = useRef<string | null>(null)
     const saveTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -73,7 +75,13 @@ export const StandaloneSpreadsheetPage = ({
         idb.once('synced', () => {
             if (disposed) return
             const stored = sheetMap.get('data')
-            if (stored) setData(normalizeSpreadsheetData(stored))
+            if (stored) {
+                setData(normalizeSpreadsheetData(stored))
+            } else {
+                const initialData = createSpreadsheetData()
+                ydoc.transact(() => sheetMap.set('data', initialData), 'doco:spreadsheet-initialize')
+                setData(initialData)
+            }
             connectTimer = setTimeout(() => {
                 if (!disposed) socket.connect()
             }, 0)
