@@ -14,6 +14,7 @@ import {
   verifyGoogleCredential,
 } from './auth.js';
 import {
+  getDefaultWorkspaceForUser,
   getDocumentForUser,
   getDocumentPathForUser,
   getFolderForUser,
@@ -25,11 +26,20 @@ import {
   listSubfoldersForUser,
   searchDocsForUser,
 } from './permissions.js';
+import { getWorkspaceQuotaUsage } from './quota.js';
 import { createApiToken, listApiTokens, revokeApiToken } from './open-api/tokens.js';
 import { documents as documentService, folders as folderService, knowledgeBases as knowledgeBaseService } from './resource-service.js';
 import { initializeStandaloneSpreadsheet } from './ydoc-service.js';
 
 export const api = Router();
+
+function sendServiceError(res, error, fallbackStatus = 400) {
+  res.status(error.status || error.statusCode || fallbackStatus).json({
+    error: error.message || '请求失败',
+    code: error.code,
+    details: error.details,
+  });
+}
 
 // ---- 认证 ----
 
@@ -104,6 +114,12 @@ api.patch('/auth/preferences', (req, res) => {
   }
 });
 
+api.get('/quota', (req, res) => {
+  const workspace = getDefaultWorkspaceForUser(req.user.id);
+  if (!workspace) return res.status(404).json({ error: '未找到工作区' });
+  res.json(getWorkspaceQuotaUsage(workspace.id));
+});
+
 // ---- 开放 API Token（只允许页面 Session Cookie） ----
 
 api.get('/api-tokens', (req, res) => {
@@ -154,7 +170,7 @@ api.post('/kb', (req, res) => {
   if (!name) return res.status(400).json({ error: '知识库名称不能为空' });
 
   try { res.json(knowledgeBaseService.create(req.user.id, { name })); }
-  catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  catch (error) { sendServiceError(res, error); }
 });
 
 api.patch('/kb/:id', (req, res) => {
@@ -165,7 +181,7 @@ api.patch('/kb/:id', (req, res) => {
   if (!name) return res.status(400).json({ error: '知识库名称不能为空' });
 
   try { res.json(knowledgeBaseService.update(req.user.id, kb.id, { name })); }
-  catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  catch (error) { sendServiceError(res, error); }
 });
 
 api.delete('/kb/:id', (req, res) => {
@@ -210,7 +226,7 @@ api.post('/folders', (req, res) => {
   }
 
   try { res.json(folderService.create(req.user.id, { name, kb_id: kbId, parent_id: parentId })); }
-  catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  catch (error) { sendServiceError(res, error); }
 });
 
 api.patch('/folders/:id', (req, res) => {
@@ -221,7 +237,7 @@ api.patch('/folders/:id', (req, res) => {
   if (!name) return res.status(400).json({ error: '文件夹名称不能为空' });
 
   try { res.json(folderService.update(req.user.id, folder.id, { name })); }
-  catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  catch (error) { sendServiceError(res, error); }
 });
 
 api.delete('/folders/:id', (req, res) => {
@@ -291,7 +307,7 @@ api.post('/docs', async (req, res) => {
       initializeStandaloneSpreadsheet(id);
     }
     res.json(getDocumentForUser(req.user.id, id));
-  } catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  } catch (error) { sendServiceError(res, error); }
 });
 
 api.patch('/docs/:id', (req, res) => {
@@ -311,7 +327,7 @@ api.patch('/docs/:id', (req, res) => {
     if (body.kb_id !== undefined && body.folder_id === undefined) patch.folder_id = null;
     documentService.update(req.user.id, doc.id, patch);
     res.json(getDocumentForUser(req.user.id, doc.id));
-  } catch (error) { res.status(error.status || 400).json({ error: error.message }); }
+  } catch (error) { sendServiceError(res, error); }
 });
 
 api.delete('/docs/:id', (req, res) => {

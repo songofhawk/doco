@@ -207,6 +207,57 @@ const migrations = [
         CHECK (appearance_theme IN ('simple', 'paper'));
     `,
   },
+  {
+    version: 6,
+    name: 'resource_creators_and_timestamps',
+    up: `
+      ALTER TABLE knowledge_bases ADD COLUMN created_by_user_id TEXT
+        REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE knowledge_bases ADD COLUMN created_at INTEGER;
+      ALTER TABLE knowledge_bases ADD COLUMN updated_at INTEGER;
+
+      ALTER TABLE folders ADD COLUMN created_by_user_id TEXT
+        REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE folders ADD COLUMN created_at INTEGER;
+      ALTER TABLE folders ADD COLUMN updated_at INTEGER;
+
+      ALTER TABLE documents ADD COLUMN created_by_user_id TEXT
+        REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE documents ADD COLUMN created_at INTEGER;
+      ALTER TABLE documents ADD COLUMN updated_at INTEGER;
+
+      UPDATE knowledge_bases
+      SET created_by_user_id = (
+        SELECT w.owner_user_id FROM workspaces w WHERE w.id = knowledge_bases.workspace_id
+      )
+      WHERE created_by_user_id IS NULL;
+
+      UPDATE folders
+      SET created_by_user_id = (
+        SELECT w.owner_user_id
+        FROM knowledge_bases kb
+        JOIN workspaces w ON w.id = kb.workspace_id
+        WHERE kb.id = folders.kb_id
+      )
+      WHERE created_by_user_id IS NULL;
+
+      UPDATE documents
+      SET created_by_user_id = (
+        SELECT w.owner_user_id
+        FROM knowledge_bases kb
+        JOIN workspaces w ON w.id = kb.workspace_id
+        WHERE kb.id = COALESCE(
+          documents.kb_id,
+          (SELECT f.kb_id FROM folders f WHERE f.id = documents.folder_id)
+        )
+      )
+      WHERE created_by_user_id IS NULL;
+
+      CREATE INDEX idx_knowledge_bases_created_by ON knowledge_bases(created_by_user_id);
+      CREATE INDEX idx_folders_created_by ON folders(created_by_user_id);
+      CREATE INDEX idx_documents_created_by ON documents(created_by_user_id);
+    `,
+  },
 ];
 
 function columnExists(db, table, column) {

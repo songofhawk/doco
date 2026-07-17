@@ -66,6 +66,7 @@ COOKIE_SECURE=true
 | api.js | 页面认证、Token 管理、知识库/文件夹/文档路由 |
 | open-api/ | Bearer 鉴权、限频、统一错误、幂等、开放路由 |
 | resource-service.js | 页面与开放能力使用的资源业务规则 |
+| quota.js | 工作区资源配额、文件夹深度和文档容量约束 |
 | ydoc-service.js | 在线/离线 Y.Doc 统一加载、事务和立即持久化 |
 | document-schema.js / markdown.js | 共享 Schema、格式转换与 Markdown 序列化 |
 | migrate.js | 一次性迁移旧版 ydoc_updates 增量表 → ydoc_state 快照表 |
@@ -87,10 +88,20 @@ curl -b cookies.txt -O http://localhost:8000/app-api/v1/kb/{kb_id}/export.zip
 - `email_login_codes`：邮箱验证码 scrypt 哈希、有效期、尝试次数与发送限流依据
 - `sessions` / `workspaces` / `workspace_members`：登录态与多用户工作区边界
 - `knowledge_bases.workspace_id`：知识库归属的权限根；文件夹、文档通过所属知识库继承权限
+- `knowledge_bases` / `folders` / `documents`：记录创建者和创建/更新时间；创建者用于展示审计，配额仍按工作区归属计算
 - `ydoc_state`：每文档一行合并快照，UPSERT 更新，表大小恒定
 - `api_tokens`：只保存 Token secret 的 SHA-256；`idempotency_keys` 默认保留 24 小时
 - 写入时机：Hocuspocus 内置防抖（编辑停顿 2s / 最长 10s），最后一个连接断开时、进程收到 SIGINT/SIGTERM 时强制落库
 - 旧版 `ydoc_updates` 增量表：`node migrate.js` 批量合并，或由 server.js 在文档首次加载时懒迁移；确认无误后可手动 DROP
+
+## 工作区配额
+
+默认每个工作区最多拥有 100 个知识库，文档与文件夹合计最多 10,000 个，文件夹最多嵌套 20 层。
+普通文档和独立电子表格都受 100,000 个非空白可见字符及 5 MiB Yjs 快照限制；已经超限的历史内容仍可读取、导出、删除和缩减。
+可通过 `DOCO_MAX_KNOWLEDGE_BASES`、`DOCO_MAX_DOCUMENTS_AND_FOLDERS`、`DOCO_MAX_FOLDER_DEPTH`、
+`DOCO_MAX_DOCUMENT_CHARACTERS` 和 `DOCO_MAX_YDOC_SNAPSHOT_BYTES` 调整默认值。
+构建前端时如调整文档容量，还应同步设置 `VITE_MAX_DOCUMENT_CHARACTERS` 和
+`VITE_MAX_YDOC_SNAPSHOT_BYTES`；前端只做即时预检，后端始终是最终强制边界。
 
 ## 数据恢复提示
 

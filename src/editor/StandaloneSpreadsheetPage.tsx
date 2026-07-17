@@ -4,6 +4,11 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 import { SpreadsheetEditor } from './components/SpreadsheetComponent'
 import { createSpreadsheetData, normalizeSpreadsheetData, type SpreadsheetData } from './components/spreadsheetEngine'
+import {
+    countSpreadsheetVisibleCharacters,
+    DOCUMENT_CHARACTER_LIMIT,
+    YDOC_SNAPSHOT_BYTE_LIMIT,
+} from './documentLimits'
 
 type StandaloneSpreadsheetPageProps = {
     docId: string
@@ -23,6 +28,7 @@ export const StandaloneSpreadsheetPage = ({
     const [title, setTitle] = useState(initialTitle)
     const [data, setData] = useState<SpreadsheetData>(() => createSpreadsheetData())
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+    const [limitMessage, setLimitMessage] = useState('')
     const [ydoc] = useState(() => new Y.Doc())
     const sheetMap = useMemo(() => ydoc.getMap<unknown>('spreadsheet'), [ydoc])
     const undoManager = useMemo(() => new Y.UndoManager(sheetMap, {
@@ -60,8 +66,12 @@ export const StandaloneSpreadsheetPage = ({
                 }
             },
             onStateless: ({ payload }) => {
-                let message: { type?: string; requestId?: string; ok?: boolean }
+                let message: { type?: string; requestId?: string; ok?: boolean; message?: string }
                 try { message = JSON.parse(payload) } catch { return }
+                if (message.type === 'doco:quota-error') {
+                    setLimitMessage(message.message || '电子表格已达到容量上限')
+                    return
+                }
                 if (message.type !== 'doco:save-result' || message.requestId !== saveRequestRef.current) return
                 saveRequestRef.current = null
                 clearTimeout(saveTimerRef.current)
@@ -98,9 +108,25 @@ export const StandaloneSpreadsheetPage = ({
     }, [docId, sheetMap, userId, websocketUrl, ydoc])
 
     const updateData = useCallback((next: SpreadsheetData) => {
+        const beforeCharacters = countSpreadsheetVisibleCharacters(data.cells)
+        const afterCharacters = countSpreadsheetVisibleCharacters(next.cells)
+        if (afterCharacters > DOCUMENT_CHARACTER_LIMIT && afterCharacters >= beforeCharacters) {
+            setLimitMessage(`电子表格最多允许 ${DOCUMENT_CHARACTER_LIMIT.toLocaleString()} 个非空白可见字符`)
+            return
+        }
+
+        const encoder = new TextEncoder()
+        const beforeBytes = encoder.encode(JSON.stringify(data)).byteLength
+        const afterBytes = encoder.encode(JSON.stringify(next)).byteLength
+        if (afterBytes > YDOC_SNAPSHOT_BYTE_LIMIT && afterBytes >= beforeBytes && afterCharacters >= beforeCharacters) {
+            setLimitMessage('电子表格协同数据已达到 5 MiB 上限')
+            return
+        }
+
+        setLimitMessage('')
         setData(next)
         ydoc.transact(() => sheetMap.set('data', next), 'doco:spreadsheet-edit')
-    }, [sheetMap, ydoc])
+    }, [data, sheetMap, ydoc])
 
     const requestSave = useCallback(() => {
         const provider = providerRef.current
@@ -144,6 +170,11 @@ export const StandaloneSpreadsheetPage = ({
 
     return (
         <div className="doco-editor-root standalone-spreadsheet-page">
+            {limitMessage && (
+                <div className="mx-4 mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600" role="alert">
+                    {limitMessage}
+                </div>
+            )}
             <SpreadsheetEditor
                 standalone
                 data={data}

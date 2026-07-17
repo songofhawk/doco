@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
-import { Hocuspocus } from '@hocuspocus/server';
+import { Hocuspocus, IncomingMessage, MessageReceiver, MessageType } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import JSZip from 'jszip';
 import { fileURLToPath } from 'url';
@@ -18,7 +18,14 @@ import {
   listSubfoldersForUser,
   userCanAccessDocument,
 } from './permissions.js';
-import { loadLegacyState, migrateStandaloneSpreadsheet, persistYDoc, registerHocuspocus, yDocService } from './ydoc-service.js';
+import {
+  assertYDocsWithinQuota,
+  loadLegacyState,
+  migrateStandaloneSpreadsheet,
+  persistYDoc,
+  registerHocuspocus,
+  yDocService,
+} from './ydoc-service.js';
 import { openApi } from './open-api/router.js';
 import { openApiErrorHandler, openApiNotFound, requestContext } from './open-api/errors.js';
 import { getOpenApiDocument } from './openapi.js';
@@ -40,8 +47,46 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.j
   .filter(Boolean);
 
 const selectState = db.prepare('SELECT state FROM ydoc_state WHERE doc_id = ?');
+const quotaRejectedConnections = new WeakSet();
 export const hocuspocus = new Hocuspocus({
   quiet: true,
+
+  async beforeHandleMessage({ connection, document, update }) {
+    const inspect = new IncomingMessage(update);
+    inspect.readVarString();
+    const messageType = inspect.readVarUint();
+    if (messageType !== MessageType.Sync && messageType !== MessageType.SyncReply) return;
+
+    const candidate = new Y.Doc();
+    try {
+      Y.applyUpdate(candidate, Y.encodeStateAsUpdate(document));
+      const message = new IncomingMessage(update);
+      message.readVarString();
+      await new MessageReceiver(message).apply(candidate);
+      assertYDocsWithinQuota(document, candidate);
+    } catch (error) {
+      if (error?.code === 'document_character_limit_exceeded' || error?.code === 'document_snapshot_limit_exceeded') {
+        connection.sendStateless(JSON.stringify({
+          type: 'doco:quota-error',
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        }));
+        quotaRejectedConnections.add(connection);
+        connection.readOnly = true;
+        return;
+      }
+      throw error;
+    } finally {
+      candidate.destroy();
+    }
+  },
+
+  async afterHandleMessage({ connection }) {
+    if (!quotaRejectedConnections.has(connection)) return;
+    quotaRejectedConnections.delete(connection);
+    connection.readOnly = false;
+  },
 
   async onAuthenticate({ context, documentName }) {
     if (!context?.user || !userCanAccessDocument(context.user.id, documentName)) {

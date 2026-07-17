@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom'
 import { BrowserRouter, Link, Navigate, Routes, Route, useLocation, useParams } from 'react-router-dom'
 import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
-import { FileText, ChevronDown, LogOut, KeyRound, Check } from 'lucide-react'
+import { FileText, ChevronDown, LogOut, KeyRound, Check, Gauge } from 'lucide-react'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import { AuthProvider, apiFetch, type AppearanceTheme, type CurrentUser, useAuth } from './auth'
 import { ApiTokenDialog } from './components/ApiTokenDialog'
+import { QuotaDialog } from './components/QuotaDialog'
 import { DocoLogo, DocoWordmark } from './components/DocoLogo'
 import { HomePage } from './components/HomePage'
 
@@ -218,6 +219,7 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
   const { signOut, updateAppearance } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [apiTokenOpen, setApiTokenOpen] = useState(false)
+  const [quotaOpen, setQuotaOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [appearanceTheme, setAppearanceTheme] = useState<AppearanceTheme>(() => {
     const stored = window.localStorage.getItem('doco-appearance-theme')
@@ -411,6 +413,15 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
                 <button
                   type="button"
                   role="menuitem"
+                  onClick={() => { setAccountMenuOpen(false); setQuotaOpen(true) }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                >
+                  <Gauge size={16} />
+                  配额与用量
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => { setAccountMenuOpen(false); setApiTokenOpen(true) }}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
                 >
@@ -499,6 +510,7 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
         />
       )}
       {apiTokenOpen && <ApiTokenDialog onClose={() => setApiTokenOpen(false)} />}
+      {quotaOpen && <QuotaDialog onClose={() => setQuotaOpen(false)} />}
     </div>
   )
 }

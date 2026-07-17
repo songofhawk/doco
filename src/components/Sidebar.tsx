@@ -213,12 +213,30 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: any[] } | null>(null);
     const [editingItem, setEditingItem] = useState<{ type: string; id: number | string } | null>(null);
     const [movingDoc, setMovingDoc] = useState<{ docId: string; fromFolderId?: number; fromKbId?: number } | null>(null);
+    const [operationError, setOperationError] = useState('');
     const [inputDialog, setInputDialog] = useState<{
         title: string; placeholder?: string;
         onConfirm: (value: string) => void;
     } | null>(null);
     const navigate = useNavigate();
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+    useEffect(() => {
+        if (!operationError) return;
+        const timer = setTimeout(() => setOperationError(''), 5000);
+        return () => clearTimeout(timer);
+    }, [operationError]);
+
+    const reportFailedResponse = async (response: Response) => {
+        let message = '操作失败，请稍后重试';
+        try {
+            const body = await response.json();
+            message = body.error?.message || body.error || message;
+        } catch {
+            // 非 JSON 错误响应使用通用提示。
+        }
+        setOperationError(message);
+    };
 
     const navigateToDoc = (docId: string) => {
         navigate(`/doc/${docId}`);
@@ -367,6 +385,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                         body: JSON.stringify({ name })
                     });
                     if (res.ok) await fetchKbs();
+                    else await reportFailedResponse(res);
                 } catch {}
             }
         });
@@ -399,7 +418,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                             }
                             setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
                         }
-                    }
+                    } else await reportFailedResponse(res);
                 } catch {}
             }
         });
@@ -437,7 +456,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                             setExpandedKbs(prev => ({ ...prev, [kbId]: true }));
                         }
                         navigateToDoc(docId);
-                    }
+                    } else await reportFailedResponse(res);
                 } catch {}
             }
         });
@@ -860,6 +879,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                     onConfirm={inputDialog.onConfirm}
                     onClose={() => setInputDialog(null)}
                 />
+            )}
+
+            {operationError && createPortal(
+                <div className="fixed bottom-6 left-1/2 z-[100] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-red-600 px-4 py-3 text-sm text-white shadow-xl" role="alert">
+                    {operationError}
+                </div>,
+                document.body,
             )}
         </aside>
     );

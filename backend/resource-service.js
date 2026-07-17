@@ -7,6 +7,11 @@ import {
   listSubfoldersForUser,
 } from './permissions.js';
 import { ApiError } from './open-api/errors.js';
+import {
+  assertDocumentsAndFoldersQuota,
+  assertFolderPlacement,
+  assertKnowledgeBaseQuota,
+} from './quota.js';
 
 function requiredName(value, label) {
   const name = String(value || '').trim();
@@ -24,6 +29,9 @@ export function serializeDocument(doc) {
     knowledge_base_id: doc.effective_kb_id ?? doc.kb_id,
     folder_id: doc.folder_id,
     document_type: doc.document_type || 'document',
+    created_by_user_id: doc.created_by_user_id,
+    created_at: doc.created_at,
+    updated_at: doc.updated_at,
     heading_numbered: Boolean(doc.heading_numbered),
     background_color: doc.bg_color,
     collapsed_block_ids: String(doc.collapsed_blocks || '').split(',').filter(Boolean),
@@ -36,13 +44,21 @@ export const knowledgeBases = {
   create(userId, body) {
     const workspace = getDefaultWorkspaceForUser(userId);
     if (!workspace) throw new ApiError(500, 'workspace_not_found', '未找到默认工作区');
-    const info = db.prepare('INSERT INTO knowledge_bases (name, workspace_id) VALUES (?, ?)')
-      .run(requiredName(body?.name, '知识库名称'), workspace.id);
-    return this.get(userId, info.lastInsertRowid);
+    const name = requiredName(body?.name, '知识库名称');
+    const id = db.transaction(() => {
+      assertKnowledgeBaseQuota(workspace.id);
+      const timestamp = Date.now();
+      return db.prepare(`
+        INSERT INTO knowledge_bases (name, workspace_id, created_by_user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(name, workspace.id, userId, timestamp, timestamp).lastInsertRowid;
+    })();
+    return this.get(userId, id);
   },
   update(userId, id, body) {
     const kb = this.get(userId, id);
-    db.prepare('UPDATE knowledge_bases SET name = ? WHERE id = ?').run(requiredName(body?.name, '知识库名称'), kb.id);
+    db.prepare('UPDATE knowledge_bases SET name = ?, updated_at = ? WHERE id = ?')
+      .run(requiredName(body?.name, '知识库名称'), Date.now(), kb.id);
     return this.get(userId, kb.id);
   },
   remove(userId, id) {
@@ -96,8 +112,17 @@ export const folders = {
     } else {
       kbId = knowledgeBases.get(userId, kbId).id;
     }
-    const info = db.prepare('INSERT INTO folders (name, kb_id, parent_id) VALUES (?, ?, ?)').run(name, kbId, parentId);
-    return this.get(userId, info.lastInsertRowid);
+    const kb = knowledgeBases.get(userId, kbId);
+    assertFolderPlacement(parentId);
+    const id = db.transaction(() => {
+      assertDocumentsAndFoldersQuota(kb.workspace_id);
+      const timestamp = Date.now();
+      return db.prepare(`
+        INSERT INTO folders (name, kb_id, parent_id, created_by_user_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(name, kbId, parentId, userId, timestamp, timestamp).lastInsertRowid;
+    })();
+    return this.get(userId, id);
   },
   update(userId, id, body) {
     const folder = this.get(userId, id);
@@ -116,12 +141,16 @@ export const folders = {
       } else {
         kbId = knowledgeBases.get(userId, body.knowledge_base_id ?? folder.kb_id).id;
       }
+      assertFolderPlacement(parentId, folder.id);
     }
     const subtree = descendantFolderIds(folder.id);
     db.transaction(() => {
-      db.prepare('UPDATE folders SET name = ?, parent_id = ?, kb_id = ? WHERE id = ?').run(name, parentId, kbId, folder.id);
+      db.prepare('UPDATE folders SET name = ?, parent_id = ?, kb_id = ?, updated_at = ? WHERE id = ?')
+        .run(name, parentId, kbId, Date.now(), folder.id);
       if (kbId !== folder.kb_id) {
-        for (const childId of subtree.slice(1)) db.prepare('UPDATE folders SET kb_id = ? WHERE id = ?').run(kbId, childId);
+        for (const childId of subtree.slice(1)) {
+          db.prepare('UPDATE folders SET kb_id = ?, updated_at = ? WHERE id = ?').run(kbId, Date.now(), childId);
+        }
       }
     })();
     return this.get(userId, folder.id);
@@ -188,13 +217,22 @@ export const documents = {
     let kbId = body?.knowledge_base_id ?? body?.kb_id;
     if (folderId) kbId = folders.get(userId, folderId).kb_id;
     else kbId = knowledgeBases.get(userId, kbId).id;
+    const kb = knowledgeBases.get(userId, kbId);
     try {
-      db.prepare(`
-        INSERT INTO documents (id, title, kb_id, folder_id, document_type, heading_numbered, bg_color, collapsed_blocks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, title, folderId ? null : kbId, folderId,
-        body.document_type === 'spreadsheet' ? 'spreadsheet' : 'document', body.heading_numbered ? 1 : 0,
-        body.background_color || body.bg_color || '#ffffff', (body.collapsed_block_ids || []).join(','));
+      db.transaction(() => {
+        assertDocumentsAndFoldersQuota(kb.workspace_id);
+        const timestamp = Date.now();
+        db.prepare(`
+          INSERT INTO documents (
+            id, title, kb_id, folder_id, document_type, heading_numbered, bg_color, collapsed_blocks,
+            created_by_user_id, created_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(id, title, folderId ? null : kbId, folderId,
+          body.document_type === 'spreadsheet' ? 'spreadsheet' : 'document', body.heading_numbered ? 1 : 0,
+          body.background_color || body.bg_color || '#ffffff', (body.collapsed_block_ids || []).join(','),
+          userId, timestamp, timestamp);
+      })();
     } catch (error) {
       if (String(error.code).startsWith('SQLITE_CONSTRAINT')) throw new ApiError(409, 'document_id_conflict', '文档 ID 已存在');
       throw error;
@@ -216,6 +254,7 @@ export const documents = {
     if (body.heading_numbered !== undefined) db.prepare('UPDATE documents SET heading_numbered = ? WHERE id = ?').run(body.heading_numbered ? 1 : 0, id);
     if (body.background_color !== undefined) db.prepare('UPDATE documents SET bg_color = ? WHERE id = ?').run(String(body.background_color), id);
     if (body.collapsed_block_ids !== undefined) db.prepare('UPDATE documents SET collapsed_blocks = ? WHERE id = ?').run(body.collapsed_block_ids.join(','), id);
+    db.prepare('UPDATE documents SET updated_at = ? WHERE id = ?').run(Date.now(), id);
     return this.get(userId, id);
   },
   remove(userId, id) { this.get(userId, id); db.transaction(() => deleteDocumentData(id))(); },

@@ -137,8 +137,33 @@ test('真实 Hocuspocus 链路双向同步、在线优先与响应前持久化',
   Y.applyUpdate(persistedDoc, new Uint8Array(manuallyPersisted.state));
   assert.equal(yDocToProsemirrorJSON(persistedDoc, 'default').content[0].content[0].text, '快捷键手动保存已落库');
 
+  const beforeLimit = await api('/documents/collab-doc/content');
+  await api('/documents/collab-doc/content', {
+    method: 'PUT', headers: { 'If-Match': beforeLimit.response.headers.get('etag') },
+    body: JSON.stringify({ format: 'tiptap-json', document: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '12345' }] }] } }),
+  });
+  await waitFor(() => yDocToProsemirrorJSON(clientDoc, 'default').content?.[0]?.content?.[0]?.text === '12345');
+
+  process.env.DOCO_MAX_DOCUMENT_CHARACTERS = '5';
+  let quotaError;
+  const onQuotaError = ({ payload }) => {
+    const message = JSON.parse(payload);
+    if (message.type === 'doco:quota-error') quotaError = message;
+  };
+  provider.on('stateless', onQuotaError);
+  clientDoc.transact(() => {
+    prosemirrorJSONToYXmlFragment(documentSchema, {
+      type: 'doc', content: [{ type: 'paragraph', attrs: { id: 'block_01ARZ3NDEKTSV4RRFFQ69G5FAV' }, content: [{ type: 'text', text: '123456' }] }],
+    }, clientDoc.getXmlFragment('default'));
+  }, 'test-client');
+  await waitFor(() => quotaError);
+  provider.off('stateless', onQuotaError);
+  delete process.env.DOCO_MAX_DOCUMENT_CHARACTERS;
+  assert.equal(quotaError.code, 'document_character_limit_exceeded');
+  assert.equal(yDocToProsemirrorJSON(hocuspocus.documents.get('collab-doc'), 'default').content[0].content[0].text, '12345');
+
   provider.destroy(); socketProvider.destroy();
   await waitFor(() => !hocuspocus.documents.has('collab-doc'));
   const offlineRead = await api('/documents/collab-doc/content');
-  assert.equal(offlineRead.body.data.document.content[0].content[0].text, '快捷键手动保存已落库');
+  assert.equal(offlineRead.body.data.document.content[0].content[0].text, '12345');
 });

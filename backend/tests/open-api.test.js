@@ -71,6 +71,25 @@ test('Token 仅哈希存储且撤销立即生效', async () => {
   await request(app).get('/api/v1/me').set('Authorization', `Bearer ${created.token}`).expect(401);
 });
 
+test('个人可以查看当前工作区的配额与用量', async () => {
+  const kbId = db.prepare('INSERT INTO knowledge_bases (name, workspace_id) VALUES (?, ?)').run('Quota visible', 'workspace-user-1').lastInsertRowid;
+  db.prepare('INSERT INTO folders (name, kb_id) VALUES (?, ?)').run('Quota folder', kbId);
+  db.prepare('INSERT INTO documents (id, title, kb_id) VALUES (?, ?, ?)').run('quota-visible-doc', 'Quota doc', kbId);
+
+  const response = await request(app).get('/app-api/v1/quota').set('Cookie', cookie1).expect(200);
+  assert.equal(response.body.workspace_id, 'workspace-user-1');
+  assert.equal(response.body.knowledge_bases.used, 1);
+  assert.equal(response.body.knowledge_bases.limit, 100);
+  assert.deepEqual(response.body.documents_and_folders, {
+    used: 2,
+    limit: 10_000,
+    documents: 1,
+    folders: 1,
+  });
+  assert.equal(response.body.per_document.character_limit, 100_000);
+  assert.equal(response.body.folder_depth_limit, 20);
+});
+
 test('旧文档块 ID 懒迁移幂等并立即持久化', async () => {
   const { documentSchema } = await import('../document-schema.js');
   const { yDocService } = await import('../ydoc-service.js');
@@ -251,4 +270,84 @@ test('四层限频桶和标准响应头', async () => {
   }, /请求过于频繁/);
   assert.equal(headers['X-RateLimit-Remaining'], '0');
   assert.ok(headers['Retry-After']);
+});
+
+test('工作区配额、文件夹深度和资源创建者由服务层统一约束', async () => {
+  const original = {
+    knowledgeBases: process.env.DOCO_MAX_KNOWLEDGE_BASES,
+    resources: process.env.DOCO_MAX_DOCUMENTS_AND_FOLDERS,
+    depth: process.env.DOCO_MAX_FOLDER_DEPTH,
+    characters: process.env.DOCO_MAX_DOCUMENT_CHARACTERS,
+    snapshot: process.env.DOCO_MAX_YDOC_SNAPSHOT_BYTES,
+  };
+  process.env.DOCO_MAX_KNOWLEDGE_BASES = '1';
+  process.env.DOCO_MAX_DOCUMENTS_AND_FOLDERS = '2';
+  process.env.DOCO_MAX_FOLDER_DEPTH = '2';
+  process.env.DOCO_MAX_DOCUMENT_CHARACTERS = '5';
+  process.env.DOCO_MAX_YDOC_SNAPSHOT_BYTES = String(1024 * 1024);
+
+  try {
+    seedUser('quota-user', 'quota-google', 'quota@example.com');
+    const { knowledgeBases, folders, documents } = await import('../resource-service.js');
+    const { yDocService } = await import('../ydoc-service.js');
+
+    const kb = knowledgeBases.create('quota-user', { name: 'Quota' });
+    assert.equal(kb.created_by_user_id, 'quota-user');
+    assert.ok(Number.isInteger(kb.created_at));
+    assert.equal(kb.created_at, kb.updated_at);
+    assert.throws(
+      () => knowledgeBases.create('quota-user', { name: 'Too many' }),
+      (error) => error.code === 'knowledge_base_quota_exceeded' && error.status === 409,
+    );
+
+    const root = folders.create('quota-user', { name: 'Root', knowledge_base_id: kb.id });
+    const child = folders.create('quota-user', { name: 'Child', parent_id: root.id });
+    assert.equal(root.created_by_user_id, 'quota-user');
+    assert.equal(child.created_by_user_id, 'quota-user');
+    assert.throws(
+      () => documents.create('quota-user', { title: 'Too many', knowledge_base_id: kb.id }),
+      (error) => error.code === 'resource_quota_exceeded',
+    );
+
+    process.env.DOCO_MAX_DOCUMENTS_AND_FOLDERS = '10';
+    assert.throws(
+      () => folders.create('quota-user', { name: 'Too deep', parent_id: child.id }),
+      (error) => error.code === 'folder_depth_exceeded',
+    );
+
+    const doc = documents.create('quota-user', { title: 'Limited', knowledge_base_id: kb.id });
+    assert.equal(doc.created_by_user_id, 'quota-user');
+    await assert.rejects(
+      () => yDocService.transact(doc.id, { id: 'quota-user' }, () => ({
+        type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '123456' }] }],
+      })),
+      (error) => error.code === 'document_character_limit_exceeded' && error.status === 409,
+    );
+    await yDocService.transact(doc.id, { id: 'quota-user' }, () => ({
+      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '12345' }] }],
+    }));
+
+    process.env.DOCO_MAX_DOCUMENT_CHARACTERS = '4';
+    process.env.DOCO_MAX_YDOC_SNAPSHOT_BYTES = '1';
+    await yDocService.transact(doc.id, { id: 'quota-user' }, () => ({
+      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '1234' }] }],
+    }));
+    process.env.DOCO_MAX_DOCUMENT_CHARACTERS = '100';
+    await assert.rejects(
+      () => yDocService.transact(doc.id, { id: 'quota-user' }, () => ({
+        type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '12345' }] }],
+      })),
+      (error) => error.code === 'document_snapshot_limit_exceeded',
+    );
+  } finally {
+    const restore = (name, value) => {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    };
+    restore('DOCO_MAX_KNOWLEDGE_BASES', original.knowledgeBases);
+    restore('DOCO_MAX_DOCUMENTS_AND_FOLDERS', original.resources);
+    restore('DOCO_MAX_FOLDER_DEPTH', original.depth);
+    restore('DOCO_MAX_DOCUMENT_CHARACTERS', original.characters);
+    restore('DOCO_MAX_YDOC_SNAPSHOT_BYTES', original.snapshot);
+  }
 });

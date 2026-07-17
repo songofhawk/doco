@@ -5,6 +5,7 @@ import { db, hasLegacyUpdatesTable } from './database.js';
 import { getDocumentForUser } from './permissions.js';
 import { documentSchema, normalizeAndValidateDocument } from './document-schema.js';
 import { ApiError } from './open-api/errors.js';
+import { assertYDocChangeWithinQuota, ydocMetrics } from './quota.js';
 
 const selectState = db.prepare('SELECT state FROM ydoc_state WHERE doc_id = ?');
 const upsertState = db.prepare(`
@@ -29,6 +30,7 @@ export function loadLegacyState(documentId) {
 export function persistYDoc(documentId, ydoc) {
   const state = Buffer.from(Y.encodeStateAsUpdate(ydoc));
   upsertState.run(documentId, state);
+  db.prepare('UPDATE documents SET updated_at = ? WHERE id = ?').run(Date.now(), documentId);
   return state;
 }
 
@@ -47,6 +49,13 @@ function currentJson(ydoc) {
 function setJson(ydoc, json) {
   const fragment = ydoc.getXmlFragment('default');
   prosemirrorJSONToYXmlFragment(documentSchema, json, fragment);
+}
+
+export function assertYDocsWithinQuota(beforeYDoc, afterYDoc) {
+  assertYDocChangeWithinQuota(
+    ydocMetrics(beforeYDoc, currentJson(beforeYDoc)),
+    ydocMetrics(afterYDoc, currentJson(afterYDoc)),
+  );
 }
 
 export function defaultSpreadsheetData() {
@@ -142,6 +151,14 @@ export class YDocService {
       }
       const candidate = await callback(structuredClone(before.document), currentVersion);
       const normalized = normalizeAndValidateDocument(candidate);
+      const candidateYDoc = new Y.Doc();
+      try {
+        Y.applyUpdate(candidateYDoc, Y.encodeStateAsUpdate(loaded.ydoc));
+        candidateYDoc.transact(() => setJson(candidateYDoc, normalized.document), options.origin || 'doco:open-api:validate');
+        assertYDocsWithinQuota(loaded.ydoc, candidateYDoc);
+      } finally {
+        candidateYDoc.destroy();
+      }
       loaded.ydoc.transact(() => setJson(loaded.ydoc, normalized.document), options.origin || 'doco:open-api');
       persistYDoc(documentId, loaded.ydoc);
       return {

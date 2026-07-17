@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   workspace_id TEXT,
+  created_by_user_id TEXT,
+  created_at INTEGER,
+  updated_at INTEGER,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
@@ -83,7 +87,11 @@ CREATE TABLE IF NOT EXISTS folders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   kb_id INTEGER NOT NULL,
-  parent_id INTEGER
+  parent_id INTEGER,
+  created_by_user_id TEXT,
+  created_at INTEGER,
+  updated_at INTEGER,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS documents (
@@ -95,7 +103,11 @@ CREATE TABLE IF NOT EXISTS documents (
     CHECK (document_type IN ('document', 'spreadsheet')),
   heading_numbered INTEGER DEFAULT 0,
   bg_color TEXT DEFAULT '#ffffff',
-  collapsed_blocks TEXT DEFAULT ''
+  collapsed_blocks TEXT DEFAULT '',
+  created_by_user_id TEXT,
+  created_at INTEGER,
+  updated_at INTEGER,
+  FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- 每文档一行合并快照（Yjs 完整状态，UPSERT 更新，不再无限增长）
@@ -162,11 +174,14 @@ CREATE INDEX IF NOT EXISTS idx_email_login_codes_ip_created ON email_login_codes
 CREATE INDEX IF NOT EXISTS idx_email_login_codes_expires_at ON email_login_codes(expires_at);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON workspace_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_bases_workspace_id ON knowledge_bases(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_bases_created_by ON knowledge_bases(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_folders_kb_id ON folders(kb_id);
 CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_folders_created_by ON folders(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_documents_kb_id ON documents(kb_id);
 CREATE INDEX IF NOT EXISTS idx_documents_folder_id ON documents(folder_id);
 CREATE INDEX IF NOT EXISTS idx_documents_document_type ON documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_documents_created_by ON documents(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_idempotency_created_at ON idempotency_keys(created_at);
 CREATE INDEX IF NOT EXISTS idx_api_audit_created_at ON api_audit_logs(created_at);

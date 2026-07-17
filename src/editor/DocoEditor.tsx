@@ -43,6 +43,7 @@ import { SpreadsheetBlock } from './components/SpreadsheetBlock'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
 import { ListNormalizationExtension } from './components/ListNormalizationExtension'
 import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
+import { countVisibleCharacters, DOCUMENT_CHARACTER_LIMIT, DocumentLimitExtension } from './documentLimits'
 import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 
 const lowlight = createLowlight(common)
@@ -65,6 +66,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const exportMenuRef = useRef<HTMLDivElement>(null)
     const [exportOpen, setExportOpen] = useState(false)
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+    const [limitMessage, setLimitMessage] = useState('')
     const pasteDialog = usePasteMarkdownDialog()
     const isCollaborative = Boolean(collaboration?.websocketUrl)
     const websocketUrl = collaboration?.websocketUrl
@@ -109,10 +111,14 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             name: roomName,
             document: ydoc,
             onStateless: ({ payload }) => {
-                let message: { type?: string; requestId?: string; ok?: boolean }
+                let message: { type?: string; requestId?: string; ok?: boolean; message?: string }
                 try {
                     message = JSON.parse(payload)
                 } catch {
+                    return
+                }
+                if (message.type === 'doco:quota-error') {
+                    setLimitMessage(message.message || '文档已达到容量上限')
                     return
                 }
                 if (message.type !== 'doco:save-result' || message.requestId !== saveRequestRef.current) return
@@ -240,6 +246,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         collapseChangeRef.current?.(ids)
     }, [])
 
+    const handleDocumentLimit = useCallback((limit: number) => {
+        setLimitMessage(`正文最多允许 ${limit.toLocaleString()} 个非空白可见字符`)
+    }, [])
+
     const extensions = useMemo(() => {
         const exts: any[] = [
             (StarterKit as any).configure({
@@ -270,6 +280,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
             DocoDocument,
             BlockIdExtension,
+            DocumentLimitExtension.configure({
+                limit: DOCUMENT_CHARACTER_LIMIT,
+                onLimit: handleDocumentLimit,
+            }),
             ResizableImage.configure({ inline: false, allowBase64: true }),
             Placeholder.configure({
                 placeholder: placeholderText || '输入 / 唤起菜单，或直接开始写作...',
@@ -300,7 +314,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
         if (extraExtensions) exts.push(...extraExtensions)
         return exts
-    }, [ydoc, isCollaborative, placeholderText, extraExtensions, handleCollapseChange])
+    }, [ydoc, isCollaborative, placeholderText, extraExtensions, handleCollapseChange, handleDocumentLimit])
 
     const editor = useEditor({
         extensions,
@@ -401,8 +415,9 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     useEffect(() => {
         if (!editor) return
         const update = () => {
-            const text = editor.state.doc.textContent || ''
-            setWordCount(text.replace(/\s/g, '').length)
+            const nextCount = countVisibleCharacters(editor.state.doc)
+            setWordCount(nextCount)
+            if (nextCount < DOCUMENT_CHARACTER_LIMIT) setLimitMessage('')
         }
         update()
         editor.on('update', update)
@@ -606,7 +621,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
             {/* 底部状态栏 */}
             <div className="mt-6 pt-4 border-t border-gray-100 flex items-center text-xs text-gray-400">
-                <span>{wordCount} 字</span>
+                <span className={wordCount >= DOCUMENT_CHARACTER_LIMIT * 0.8 ? 'text-amber-600' : ''}>
+                    {wordCount.toLocaleString()} / {DOCUMENT_CHARACTER_LIMIT.toLocaleString()} 字
+                </span>
+                {limitMessage && <span className="ml-3 text-red-500" role="alert">{limitMessage}</span>}
                 {saveStatus !== 'idle' && (
                     <span className={`ml-auto ${saveStatus === 'error' ? 'text-red-500' : ''}`} role="status">
                         {saveStatus === 'saving' && '正在保存…'}
