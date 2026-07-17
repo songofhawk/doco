@@ -192,11 +192,19 @@ const MoveDialog = ({ kbs, onMove, onClose }: {
     );
 };
 
+type SidebarProps = {
+    collapsed?: boolean;
+    onToggle?: () => void;
+    onDocRenamed?: (docId: string, title: string) => void;
+    onActiveKnowledgeBaseChange?: (title?: string) => void;
+};
+
 /* ---- 主侧边栏 ---- */
-export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boolean; onToggle?: () => void; onDocRenamed?: (docId: string, title: string) => void }) => {
+export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBaseChange }: SidebarProps) => {
     const location = useLocation();
     const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
+    const [activeKbId, setActiveKbId] = useState<number | null>(null);
     const [expandedKbs, setExpandedKbs] = useState<Record<number, boolean>>({});
     const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
     const [content, setContent] = useState<Record<string, any[]>>({});
@@ -220,6 +228,11 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
     // 加载知识库列表
     useEffect(() => { fetchKbs(); }, []);
 
+    useEffect(() => {
+        const activeKb = kbs.find(kb => kb.id === activeKbId);
+        onActiveKnowledgeBaseChange?.(activeKb?.name);
+    }, [activeKbId, kbs, onActiveKnowledgeBaseChange]);
+
     // 根据 URL 中的 docId 自动展开对应的树路径
     useEffect(() => {
         if (!currentDocId) return;
@@ -231,6 +244,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                 if (!pathRes.ok || cancelled) return;
                 const { folder_id, kb_id } = await pathRes.json();
                 if (!kb_id || cancelled) return;
+                setActiveKbId(kb_id);
 
                 // 加载知识库的顶层文件夹和直属文档
                 const fetches: Promise<Response>[] = [
@@ -299,11 +313,18 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
     const fetchKbs = async () => {
         try {
             const res = await apiFetch(`/kb`);
-            if (res.ok) setKbs(await res.json());
+            if (res.ok) {
+                const nextKbs = await res.json();
+                setKbs(nextKbs);
+                setActiveKbId(current => nextKbs.some((kb: any) => kb.id === current)
+                    ? current
+                    : (nextKbs[0]?.id ?? null));
+            }
         } catch (e) { console.error('[Sidebar] fetch KBs failed:', e); }
     };
 
     const toggleKb = async (kbId: number) => {
+        setActiveKbId(kbId);
         setExpandedKbs(prev => ({ ...prev, [kbId]: !prev[kbId] }));
         if (!content[`kb_${kbId}_folders`]) {
             try {
@@ -477,7 +498,9 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
         if (!confirm('确定删除此知识库？其下所有文件夹和文档将一并删除。')) return;
         try {
             await apiFetch(`/kb/${kbId}`, { method: 'DELETE' });
-            setKbs(prev => prev.filter(kb => kb.id !== kbId));
+            const nextKbs = kbs.filter(kb => kb.id !== kbId);
+            setKbs(nextKbs);
+            if (activeKbId === kbId) setActiveKbId(nextKbs[0]?.id ?? null);
         } catch {}
     };
 

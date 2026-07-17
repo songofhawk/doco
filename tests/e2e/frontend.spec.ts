@@ -34,10 +34,15 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
     return json({ error: `未模拟 ${request.method()} ${path}` }, 404)
   })
 
+  await page.goto('/')
+  await expect(page.getByText('测试知识库')).toBeVisible()
+  await expect(page).toHaveTitle('测试知识库')
+
   await page.goto('/doc/doc_test')
   await expect(page.getByText('E2E 用户')).toBeVisible()
   await expect(page.getByText('测试知识库')).toBeVisible()
   await expect(page.getByPlaceholder('无标题')).toHaveValue('测试文档')
+  await expect(page).toHaveTitle('测试文档')
   const documentCanvas = page.locator('.doco-document-canvas')
   await expect(documentCanvas.getByRole('button', { name: '导入文档' })).toBeVisible()
   await expect(documentCanvas.getByRole('button', { name: '导出文档' })).toBeVisible()

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
+import { BrowserRouter, Link, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
 import { FileText, ChevronDown, LogOut, KeyRound, Mail, ArrowLeft, LoaderCircle, Check } from 'lucide-react'
@@ -8,6 +8,7 @@ import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import { AuthProvider, apiFetch, type AppearanceTheme, type CurrentUser, useAuth } from './auth'
 import { ApiTokenDialog } from './components/ApiTokenDialog'
+import { DocoLogo, DocoWordmark } from './components/DocoLogo'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
@@ -34,8 +35,9 @@ const EmptyState = () => (
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 const LoadingScreen = () => (
-  <div className="h-screen bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-    正在载入...
+  <div className="h-screen bg-gray-50 flex flex-col items-center justify-center gap-3 text-sm text-gray-400">
+    <DocoLogo className="h-9 w-9" />
+    <span>正在载入...</span>
   </div>
 )
 
@@ -139,11 +141,8 @@ const LoginPage = () => {
   return (
     <div className="h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm px-8 py-9 flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-5">
-          <FileText size={26} className="text-blue-500" />
-        </div>
-        <h1 className="text-xl font-semibold text-gray-800 tracking-tight">Doco</h1>
-        <p className="text-sm text-gray-500 mt-2 mb-7 leading-relaxed">你的知识库与协同写作空间<br />使用邮箱或 Google 账号登录</p>
+        <h1 className="mb-5"><DocoWordmark className="doco-wordmark-large" /></h1>
+        <p className="text-sm text-gray-500 mb-7 leading-relaxed">你的知识库与协同写作空间<br />使用邮箱或 Google 账号登录</p>
 
         <form onSubmit={emailStep === 'email' ? (event) => { event.preventDefault(); void sendEmailCode() } : verifyEmailCode} className="w-full text-left">
           {emailStep === 'email' ? (
@@ -292,19 +291,30 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
   )
 }
 
-const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
+type ExternalDocTitle = { docId: string; title: string }
+
+const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onActiveDocumentTitleChange }: {
   exportRef: any
-  externalTitle?: string
+  externalTitle?: ExternalDocTitle
   user: CurrentUser
   onImportRequest: () => void
+  onActiveDocumentTitleChange: (title?: string) => void
 }) => {
   const { id } = useParams<{ id: string }>()
   const [meta, setMeta] = useState<any>(undefined)
+  const renamedTitle = externalTitle && externalTitle.docId === id ? externalTitle.title : undefined
+  const activeTitle = meta && meta.docId === id ? (renamedTitle ?? meta.title) : undefined
+
+  useEffect(() => {
+    onActiveDocumentTitleChange(id ? activeTitle : undefined)
+  }, [activeTitle, id, onActiveDocumentTitleChange])
+
   useEffect(() => {
     setMeta(undefined)
     if (!id) return
     apiFetch(`/docs/${id}`).then(r => r.ok ? r.json() : null).then(d => {
       if (d) setMeta({
+        docId: id,
         title: d.title,
         documentType: d.document_type || 'document',
         headingNumbered: d.heading_numbered,
@@ -314,16 +324,17 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
     }).catch(() => {})
   }, [id])
   if (!id) return <EmptyState />
-  if (!meta) return <LoadingScreen />
+  if (!meta || meta.docId !== id) return <LoadingScreen />
   if (meta.documentType === 'spreadsheet') {
     return (
       <StandaloneSpreadsheetPage
         key={`${user.id}:${id}:spreadsheet`}
         docId={id}
         userId={user.id}
-        title={externalTitle ?? meta.title}
+        title={activeTitle}
         websocketUrl={import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}
         onTitleChange={(title) => {
+          setMeta((current: any) => current ? { ...current, title } : current)
           apiFetch(`/docs/${id}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title }),
@@ -341,6 +352,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
       initialMeta={meta}
       collaboration={{ websocketUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws' }}
       onTitleChange={(docId, title) => {
+        setMeta((current: any) => current ? { ...current, title } : current)
         apiFetch(`/docs/${docId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title })
@@ -366,7 +378,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
         }).catch(() => {})
       }}
       onImportRequest={onImportRequest}
-      externalTitle={externalTitle}
+      externalTitle={renamedTitle}
     />
   )
 }
@@ -401,7 +413,9 @@ function AppShell() {
   })
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [externalTitle, setExternalTitle] = useState<string | undefined>()
+  const [externalTitle, setExternalTitle] = useState<ExternalDocTitle | undefined>()
+  const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | undefined>()
+  const [activeKnowledgeBaseTitle, setActiveKnowledgeBaseTitle] = useState<string | undefined>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed)
   const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth)
   const [sidebarResizing, setSidebarResizing] = useState(false)
@@ -417,6 +431,10 @@ function AppShell() {
   useEffect(() => {
     if (user?.appearanceTheme) setAppearanceTheme(user.appearanceTheme)
   }, [user?.appearanceTheme])
+
+  useEffect(() => {
+    document.title = activeDocumentTitle || activeKnowledgeBaseTitle || '知识库'
+  }, [activeDocumentTitle, activeKnowledgeBaseTitle])
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -535,7 +553,9 @@ function AppShell() {
     <BrowserRouter>
       <div className="doco-app h-screen flex flex-col overflow-hidden">
         <header className="doco-app-header z-40 flex h-12 shrink-0 items-center px-4">
-          <h1 className="doco-brand text-base font-semibold tracking-tight">Doco</h1>
+          <Link to="/" className="doco-wordmark-link" aria-label="Doco 首页">
+            <DocoWordmark />
+          </Link>
           <div className="ml-auto flex items-center text-sm text-gray-500">
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt,.docx,.pdf" onChange={handleFileChange} className="hidden" />
             <div className="relative" ref={accountMenuRef}>
@@ -617,7 +637,12 @@ function AppShell() {
               sidebarCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
             }`}
           />
-          <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggle={toggleSidebar}
+            onDocRenamed={(docId, title) => setExternalTitle({ docId, title })}
+            onActiveKnowledgeBaseChange={setActiveKnowledgeBaseTitle}
+          />
           <div
             aria-hidden="true"
             className={`doco-sidebar-toggle-rail ${sidebarCollapsed ? 'is-visible' : ''}`}
@@ -651,8 +676,8 @@ function AppShell() {
           </button>
           <main className="doco-app-main min-w-0 flex-1 overflow-y-auto">
             <Routes>
-              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} />} />
-              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} />} />
+              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} onActiveDocumentTitleChange={setActiveDocumentTitle} />} />
+              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} onActiveDocumentTitleChange={setActiveDocumentTitle} />} />
             </Routes>
           </main>
         </div>

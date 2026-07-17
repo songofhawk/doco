@@ -121,6 +121,31 @@ body {
   font-weight: var(--heading-weight);
 }
 
+.doco-wordmark {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+  overflow: visible;
+}
+
+.doco-wordmark-link {
+  display: inline-flex;
+  color: inherit;
+  text-decoration: none;
+}
+
+.doco-wordmark-letters {
+  fill: #2c2c28;
+  font-family: var(--font-ui);
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: 0.45px;
+}
+
+.doco-wordmark-large {
+  height: 3rem;
+}
+
 .doco-app-main {
   background: var(--surface-app);
 }

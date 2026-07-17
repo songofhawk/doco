@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <rect x="1" y="1" width="46" height="46" rx="13" fill="#F5F1E8" stroke="#DED7CA" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="9 9 86 32" width="86" height="32" fill="none">
+  <title>Doco</title>
   <path d="M15 12.5h9.25C32.4 12.5 38 17.2 38 24s-5.6 11.5-13.75 11.5H15v-23Z" stroke="#C96442" stroke-width="4.25" stroke-linejoin="round"/>
   <path d="M28.5 12.8v7.7h8.2" stroke="#74785C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="28.5" cy="28" r="2" fill="#74785C"/>
+  <text x="45" y="36" fill="#2C2C28" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="25" font-weight="700" letter-spacing="0.45">oco</text>
 </svg>
