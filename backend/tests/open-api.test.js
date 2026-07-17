@@ -22,7 +22,14 @@ let cookie1;
 
 function seedUser(id, googleSub, email) {
   const now = Date.now();
-  db.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, googleSub, email, id, null, now, now);
+  db.prepare(`
+    INSERT INTO users (id, email, normalized_email, email_verified_at, name, avatar_url, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, email, email, now, id, null, now, now);
+  db.prepare(`
+    INSERT INTO auth_identities (provider, subject, user_id, email, created_at, updated_at)
+    VALUES ('google', ?, ?, ?, ?, ?)
+  `).run(googleSub, id, email, now, now);
   db.prepare('INSERT INTO workspaces VALUES (?, ?, ?, ?, ?)').run(`workspace-${id}`, `${id} workspace`, id, now, now);
   db.prepare('INSERT INTO workspace_members VALUES (?, ?, ?, ?)').run(`workspace-${id}`, id, 'owner', now);
 }

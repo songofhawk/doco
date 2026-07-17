@@ -10,6 +10,8 @@ WorkingDirectory=/opt/doco/backend
 ExecStart=/usr/bin/node server.js
 Environment=NODE_ENV=production
 Environment=PORT=8000
+# SMTP 等敏感配置写入此服务器本地文件（chmod 600），部署不会覆盖。
+EnvironmentFile=-/etc/doco-backend.env
 # 只绑本机回环，公网入口由 Caddy (443, TLS) 反代
 Environment=HOST=127.0.0.1
 # 浏览器 REST/WebSocket 请求只允许指定前端 Origin；多个地址用英文逗号分隔

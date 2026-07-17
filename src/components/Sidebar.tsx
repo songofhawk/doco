@@ -615,7 +615,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             onClick={() => navigateToDoc(doc.id)}
             onContextMenu={e => showDocMenu(e, doc, folderId, kbId)}>
             {doc.document_type === 'spreadsheet'
-                ? <Sheet aria-label="电子表格" size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-[#c96442]' : 'text-[#87867f]'}`} />
+                ? <Sheet aria-label="电子表格" size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-[var(--accent)]' : 'text-gray-400'}`} />
                 : <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />}
             {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
                 <InlineEdit value={doc.title}
@@ -702,7 +702,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
     if (collapsed) return null;
 
     return (
-        <aside className="absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col border-r border-gray-200 bg-[#fafafa] shadow-xl select-none md:static md:w-64 md:shadow-none">
+        <aside id="doco-sidebar" className="doco-sidebar absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col border-r shadow-xl select-none md:static md:w-64 md:shadow-none">
             {/* 搜索栏 */}
             <div className="px-3 pt-3 pb-2">
                 <div className="relative">
@@ -735,7 +735,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                             }`}>
                             {doc.document_type === 'spreadsheet'
-                                ? <Sheet aria-label="电子表格" size={14} className="mr-2 shrink-0 text-[#c96442]" />
+                                ? <Sheet aria-label="电子表格" size={14} className="mr-2 shrink-0 text-[var(--accent)]" />
                                 : <FileText size={14} className="mr-2 shrink-0 text-gray-400" />}
                             <span className="truncate">{doc.title}</span>
                         </button>

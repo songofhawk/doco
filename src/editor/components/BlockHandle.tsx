@@ -21,7 +21,7 @@ const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: Luc
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
         {shortcut && (
-            <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#5e5d59]">
+            <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[var(--text-secondary)]">
                 {shortcutLabel(shortcut)}
             </kbd>
         )}
@@ -37,7 +37,7 @@ const ConvertItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: 
     >
         <Icon className="w-4 h-4 mr-3 text-gray-400" />
         {label}
-        <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#5e5d59]">
+        <kbd className="ml-auto font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[var(--text-secondary)]">
             {shortcutLabel(shortcut)}
         </kbd>
     </button>

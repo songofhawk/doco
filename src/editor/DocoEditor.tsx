@@ -36,6 +36,7 @@ import { KeyboardShortcuts } from './components/KeyboardShortcuts'
 import { InlineMarkToolbar } from './components/InlineMarkToolbar'
 import { LinkPopover } from './components/LinkPopover'
 import { DocSettings } from './components/DocSettings'
+import { ChevronDown, Download, Upload } from 'lucide-react'
 import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
 import { SpreadsheetBlock } from './components/SpreadsheetBlock'
@@ -48,7 +49,7 @@ const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     docId, userId, initialMeta, collaboration, onTitleChange, onSettingsChange,
-    externalTitle, extraExtensions, placeholder: placeholderText, className, style
+    onImportRequest, externalTitle, extraExtensions, placeholder: placeholderText, className, style
 }, ref) => {
     const [title, setTitle] = useState('')
     const [wordCount, setWordCount] = useState(0)
@@ -61,11 +62,25 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const collaborationProviderRef = useRef<HocuspocusProvider | null>(null)
     const saveRequestRef = useRef<string | null>(null)
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
+    const exportMenuRef = useRef<HTMLDivElement>(null)
+    const [exportOpen, setExportOpen] = useState(false)
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const pasteDialog = usePasteMarkdownDialog()
     const isCollaborative = Boolean(collaboration?.websocketUrl)
     const websocketUrl = collaboration?.websocketUrl
     const roomName = collaboration?.roomName || docId
+    const persistenceKey = `doco-${userId || 'anonymous'}-${docId}`
+    const [readyPersistenceKey, setReadyPersistenceKey] = useState<string | null>(null)
+    const isPersistenceReady = !isCollaborative || readyPersistenceKey === persistenceKey
+
+    useEffect(() => {
+        if (!exportOpen) return
+        const handleOutsideClick = (event: MouseEvent) => {
+            if (!exportMenuRef.current?.contains(event.target as Node)) setExportOpen(false)
+        }
+        document.addEventListener('mousedown', handleOutsideClick)
+        return () => document.removeEventListener('mousedown', handleOutsideClick)
+    }, [exportOpen])
 
     // 保存文档设置
     const patchDocSettings = useCallback((patch: Partial<DocMeta>) => {
@@ -75,7 +90,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const ydoc = useMemo(() => new Y.Doc(), [docId])
 
     useEffect(() => {
-        const idb = new IndexeddbPersistence(`doco-${userId || 'anonymous'}-${docId}`, ydoc)
+        const idb = new IndexeddbPersistence(persistenceKey, ydoc)
         let disposed = false
         let connectTimer: ReturnType<typeof setTimeout> | undefined
         let socket: HocuspocusProviderWebsocket | null = null
@@ -113,7 +128,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
         // IndexedDB 主存储先加载，再连服务器；初始状态互补由 SyncStep1/2 协议双向完成
         idb.once('synced', () => {
-            if (disposed || !socket) return
+            if (disposed) return
+            // 本地快照恢复完成后才挂载 EditorContent，避免用户在恢复过程中编辑临时状态。
+            setReadyPersistenceKey(persistenceKey)
+            if (!socket) return
             connectTimer = setTimeout(() => {
                 if (!disposed) socket?.connect()
             }, 0)
@@ -127,7 +145,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             socket?.destroy()
             idb.destroy()
         }
-    }, [ydoc, docId, userId, websocketUrl, roomName])
+    }, [ydoc, persistenceKey, websocketUrl, roomName])
 
     // Cmd/Ctrl+S：拦截浏览器“保存网页”，通过当前协同连接要求后端立即持久化。
     useEffect(() => {
@@ -286,6 +304,9 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
     const editor = useEditor({
         extensions,
+        // IndexedDB 恢复前不挂载 EditorContent；这里同时显式使用真正的空 doc，
+        // 避免 Collaboration 初始化时把默认段落写入尚未恢复的 YDoc。
+        content: { type: 'doc', content: [] },
         editorProps: {
             attributes: {
                 class: 'focus:outline-none min-h-[500px] text-gray-800 leading-relaxed prose prose-blue sm:prose-base list-none tiptap-editor-container',
@@ -446,50 +467,79 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         return () => { style!.textContent = '' }
     }, [headingNumbered, minHeadingLevel])
 
+    const exportMarkdown = useCallback(() => {
+        if (!editor) return
+        const md = (editor.storage as any).markdown.getMarkdown()
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `${title || 'document'}.md`
+        link.click()
+    }, [editor, title])
+
+    const exportPDF = useCallback(() => {
+        const element = document.querySelector('.tiptap-editor-container')
+        if (element) {
+            html2pdf().from(element as HTMLElement).save(`${title || 'document'}.pdf`)
+        }
+    }, [title])
+
+    const exportWord = useCallback(async () => {
+        if (!editor) return
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>${editor.getHTML()}</body></html>`
+        const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `${title || 'document'}.doc`
+        link.click()
+    }, [editor, title])
+
     useImperativeHandle(ref, () => ({
-        importMarkdown: (markdown: string) => {
-            if (!editor) return
-            editor.commands.setContent(markdown)
-        },
-        importHTML: (html: string) => {
-            if (!editor) return
-            editor.commands.setContent(html)
-        },
-        exportMarkdown: () => {
-            if (!editor) return
-            const md = (editor.storage as any).markdown.getMarkdown()
-            const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
-            const link = document.createElement('a')
-            link.href = URL.createObjectURL(blob)
-            link.download = `${title || 'document'}.md`
-            link.click()
-        },
-        exportPDF: () => {
-            const element = document.querySelector('.tiptap-editor-container')
-            if (element) {
-                html2pdf().from(element as HTMLElement).save(`${title || 'document'}.pdf`)
-            }
-        },
-        exportWord: async () => {
-            if (!editor) return
-            const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>${editor.getHTML()}</body></html>`
-            const blob = new Blob([html], { type: 'application/msword;charset=utf-8' })
-            const link = document.createElement('a')
-            link.href = URL.createObjectURL(blob)
-            link.download = `${title || 'document'}.doc`
-            link.click()
-        },
+        importMarkdown: (markdown: string) => editor?.commands.setContent(markdown),
+        importHTML: (html: string) => editor?.commands.setContent(html),
+        exportMarkdown,
+        exportPDF,
+        exportWord,
         getEditor: () => editor,
-    }))
+    }), [editor, exportMarkdown, exportPDF, exportWord])
 
     return (
-        <div className={`doco-editor-root w-full max-w-4xl mx-auto min-h-[80vh] border border-gray-100 p-4 shadow-sm sm:mt-6 sm:rounded-lg sm:p-10 sm:px-14 relative group transition-colors ${className || ''}`}
-            style={{ backgroundColor: bgColor, ...style }}
+        <div className={`doco-editor-root doco-document-canvas w-full max-w-4xl mx-auto min-h-[80vh] border p-4 shadow-sm sm:mt-6 sm:rounded-lg sm:p-10 sm:px-14 relative group transition-colors ${className || ''}`}
+            style={{ backgroundColor: bgColor.toLowerCase() === '#ffffff' ? 'var(--surface-canvas)' : bgColor, ...style }}
         >
             {/* 左侧目录导航 */}
-            {editor && <TableOfContents editor={editor} headingNumbered={headingNumbered} />}
-            {/* 文档设置按钮 */}
-            <div className="absolute top-4 right-4 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+            {editor && isPersistenceReady && <TableOfContents editor={editor} headingNumbered={headingNumbered} />}
+            {/* 文档级操作 */}
+            <div className="document-title-actions absolute right-3 top-3 z-10 transition-opacity sm:right-4 sm:top-4 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+                <button
+                    type="button"
+                    onClick={onImportRequest}
+                    title="导入文档"
+                    aria-label="导入文档"
+                >
+                    <Upload size={16} />
+                </button>
+                <div ref={exportMenuRef} className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setExportOpen(value => !value)}
+                        className="document-title-action-menu"
+                        title="导出文档"
+                        aria-label="导出文档"
+                        aria-haspopup="menu"
+                        aria-expanded={exportOpen}
+                    >
+                        <Download size={16} />
+                        <ChevronDown size={12} />
+                    </button>
+                    {exportOpen && (
+                        <div className="doco-menu absolute right-0 top-full z-50 mt-2 min-w-32 rounded-lg p-1 shadow-lg" role="menu">
+                            <button type="button" role="menuitem" onClick={() => { exportMarkdown(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Markdown</button>
+                            <button type="button" role="menuitem" onClick={() => { void exportWord(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Word</button>
+                            <button type="button" role="menuitem" onClick={() => { exportPDF(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">PDF</button>
+                        </div>
+                    )}
+                </div>
                 <DocSettings
                     docId={docId}
                     headingNumbered={headingNumbered}
@@ -511,18 +561,23 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 ref={titleInputRef}
                 value={title}
                 onChange={e => { handleTitleChange(e.target.value); autoResizeTitle() }}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus('start') } }}
+                onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (isPersistenceReady) editor?.commands.focus('start')
+                    }
+                }}
                 placeholder="无标题"
                 rows={1}
-                className="mb-4 w-full resize-none border-none bg-transparent pr-10 text-2xl font-bold leading-snug text-gray-900 outline-none placeholder:text-gray-300 sm:pr-0 sm:text-3xl"
+                className="doco-document-title mb-4 w-full resize-none border-none bg-transparent pr-32 text-2xl font-bold leading-snug outline-none sm:text-3xl"
             />
 
             <div className="tiptap-editor-container relative">
-                {editor && <FloatingToolbar editor={editor} />}
-                {editor && <BlockHandle editor={editor} />}
-                {editor && <InlineMarkToolbar editor={editor} />}
-                {editor && <TableToolbar editor={editor} />}
-                {editor && linkPopover && (
+                {editor && isPersistenceReady && <FloatingToolbar editor={editor} />}
+                {editor && isPersistenceReady && <BlockHandle editor={editor} />}
+                {editor && isPersistenceReady && <InlineMarkToolbar editor={editor} />}
+                {editor && isPersistenceReady && <TableToolbar editor={editor} />}
+                {editor && isPersistenceReady && linkPopover && (
                     <LinkPopover
                         editor={editor}
                         pos={linkPopover}
@@ -531,7 +586,15 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                         onClose={() => setLinkPopover(null)}
                     />
                 )}
-                <EditorContent editor={editor} />
+                {isPersistenceReady ? (
+                    <EditorContent editor={editor} />
+                ) : (
+                    <div
+                        className="min-h-[500px] animate-pulse rounded-lg bg-gray-50/60"
+                        role="status"
+                        aria-label="正在恢复本地文档"
+                    />
+                )}
             </div>
 
             {/* Markdown 粘贴提示弹窗 */}

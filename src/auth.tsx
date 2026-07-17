@@ -7,13 +7,19 @@ export type CurrentUser = {
   email: string
   name?: string | null
   avatarUrl?: string | null
+  appearanceTheme?: AppearanceTheme
 }
+
+export type AppearanceTheme = 'simple' | 'paper'
 
 type AuthContextValue = {
   user: CurrentUser | null
   loading: boolean
   signInWithGoogleCredential(credential: string): Promise<void>
+  requestEmailCode(email: string): Promise<{ expiresInSeconds: number; retryAfterSeconds: number }>
+  signInWithEmailCode(email: string, code: string): Promise<void>
   signOut(): Promise<void>
+  updateAppearance(theme: AppearanceTheme): Promise<void>
   refresh(): Promise<void>
 }
 
@@ -78,18 +84,69 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(data.user)
   }, [])
 
+  const requestEmailCode = useCallback(async (email: string) => {
+    const res = await apiFetch('/auth/email/code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || '验证码发送失败')
+    }
+    return res.json()
+  }, [])
+
+  const signInWithEmailCode = useCallback(async (email: string, code: string) => {
+    const res = await apiFetch('/auth/email/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || '邮箱登录失败')
+    }
+    const data = await res.json()
+    setUser(data.user)
+  }, [])
+
   const signOut = useCallback(async () => {
     await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {})
     setUser(null)
+  }, [])
+
+  const updateAppearance = useCallback(async (appearanceTheme: AppearanceTheme) => {
+    setUser(current => current ? { ...current, appearanceTheme } : current)
+    const res = await apiFetch('/auth/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ appearanceTheme }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || '外观设置保存失败')
+    }
+    const data = await res.json()
+    setUser(data.user)
   }, [])
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
     loading,
     signInWithGoogleCredential,
+    requestEmailCode,
+    signInWithEmailCode,
     signOut,
+    updateAppearance,
     refresh,
-  }), [user, loading, signInWithGoogleCredential, signOut, refresh])
+  }), [
+    user,
+    loading,
+    signInWithGoogleCredential,
+    requestEmailCode,
+    signInWithEmailCode,
+    signOut,
+    updateAppearance,
+    refresh,
+  ])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

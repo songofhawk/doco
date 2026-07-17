@@ -227,6 +227,7 @@ components:
         title: { type: string }
         knowledge_base_id: { type: [string, integer] }
         folder_id: { type: [string, integer, 'null'] }
+        document_type: { enum: [document, spreadsheet], default: document }
         heading_numbered: { type: boolean }
         background_color: { type: string }
         collapsed_block_ids: { type: array, items: { type: string } }
@@ -263,7 +264,7 @@ components:
       type: object
       required: [type]
       properties:
-        type: { enum: [blockquote, horizontalRule, hardBreak, codeBlock, bulletList, orderedList, listItem, taskList, taskItem, table, tableRow, tableHeader, tableCell, mermaidBlock, plantUMLBlock, calloutBlock] }
+        type: { enum: [blockquote, horizontalRule, hardBreak, codeBlock, bulletList, orderedList, listItem, taskList, taskItem, table, tableRow, tableHeader, tableCell, mermaidBlock, plantUMLBlock, calloutBlock, spreadsheetBlock] }
         attrs: { $ref: '#/components/schemas/BlockAttrs' }
         content: { type: array, items: { $ref: '#/components/schemas/TiptapNode' } }
     Position:

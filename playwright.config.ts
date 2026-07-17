@@ -6,12 +6,12 @@ export default defineConfig({
   workers: 1,
   timeout: 30_000,
   use: {
-    baseURL: 'http://127.0.0.1:4199',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4199',
     headless: true,
     channel: 'chrome',
     viewport: { width: 1280, height: 800 },
   },
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_SKIP_WEBSERVER ? undefined : {
     command: 'npm run dev -- --host 127.0.0.1 --port 4199',
     url: 'http://127.0.0.1:4199',
     reuseExistingServer: false,

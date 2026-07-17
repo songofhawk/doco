@@ -624,8 +624,9 @@
 
 /* ===== 电子表格块 ===== */
 .doco-editor-root .spreadsheet-block {
-  margin: 1.5rem -2rem;
-  max-width: calc(100% + 4rem);
+  width: 100%;
+  margin: 1.5rem 0;
+  max-width: 100%;
   color: #141413;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -691,7 +692,6 @@
   gap: 2px;
 }
 
-.doco-editor-root .spreadsheet-title-actions button,
 .doco-editor-root .spreadsheet-toolbar button,
 .doco-editor-root .spreadsheet-toolbar select {
   display: inline-flex;
@@ -708,7 +708,6 @@
   cursor: pointer;
 }
 
-.doco-editor-root .spreadsheet-title-actions button:hover,
 .doco-editor-root .spreadsheet-toolbar button:hover,
 .doco-editor-root .spreadsheet-toolbar button.active {
   background: #e8e6dc;
@@ -724,6 +723,55 @@
 .doco-editor-root .spreadsheet-toolbar button:disabled:hover {
   background: transparent;
   box-shadow: none;
+}
+
+/* 文档与电子表格共用标题区操作的视觉语言，但保留各自的显示逻辑。 */
+.doco-editor-root .document-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.doco-editor-root .document-title-actions button {
+  display: inline-flex;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.doco-editor-root .document-title-actions button.document-title-action-menu {
+  padding: 0 7px;
+}
+
+.doco-editor-root .document-title-actions button:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+.doco-editor-root .document-title-actions button:focus-visible {
+  outline: 2px solid #3898ec;
+  outline-offset: 1px;
+}
+
+.doco-editor-root .document-title-actions button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.doco-editor-root .document-title-actions button:disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
 }
 
 .doco-editor-root .spreadsheet-tool-button {
@@ -775,6 +823,34 @@
   padding: 0 7px;
   border: 1px solid transparent;
   outline: none;
+}
+
+.doco-editor-root .spreadsheet-decimal-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.doco-editor-root .spreadsheet-decimal-icon {
+  position: relative;
+  display: inline-block;
+  min-width: 19px;
+  color: currentColor;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  line-height: 1;
+}
+
+.doco-editor-root .spreadsheet-decimal-icon sup {
+  position: absolute;
+  top: -5px;
+  right: -2px;
+  color: #87867f;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .doco-editor-root .spreadsheet-divider {
@@ -840,6 +916,73 @@
   width: 100%;
   justify-content: flex-start;
   padding: 0 8px;
+}
+
+.spreadsheet-context-menu {
+  position: fixed;
+  z-index: 10000;
+  width: 218px;
+  padding: 6px;
+  border: 1px solid #dedcd2;
+  border-radius: 10px;
+  background: #faf9f5;
+  box-shadow: 0 0 0 1px rgba(209, 207, 197, 0.35), 0 12px 32px rgba(20, 20, 19, 0.14);
+  color: #141413;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.spreadsheet-context-title {
+  padding: 5px 9px 7px;
+  color: #87867f;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12px;
+}
+
+.spreadsheet-context-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #4d4c48;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spreadsheet-context-menu button:hover,
+.spreadsheet-context-menu button:focus-visible {
+  background: #e8e6dc;
+  box-shadow: inset 0 0 0 1px #d1cfc5;
+  color: #141413;
+  outline: none;
+}
+
+.spreadsheet-context-menu button.danger {
+  color: #b53333;
+}
+
+.spreadsheet-context-menu button.danger:hover,
+.spreadsheet-context-menu button.danger:focus-visible {
+  background: #f8e8e5;
+}
+
+.spreadsheet-context-menu button kbd {
+  margin-left: auto;
+  color: #87867f;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.spreadsheet-context-divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: #e8e6dc;
 }
 
 .doco-editor-root .spreadsheet-formula {
@@ -1027,9 +1170,9 @@
 
 @media (max-width: 640px) {
   .doco-editor-root .spreadsheet-block {
-    margin-right: -1rem;
-    margin-left: -1rem;
-    max-width: calc(100% + 2rem);
+    margin-right: 0;
+    margin-left: 0;
+    max-width: 100%;
   }
 
   .doco-editor-root .spreadsheet-titlebar {
@@ -1283,4 +1426,276 @@
 
     --color-editor-hr: #313244;
   }
+}
+
+/* ===== 全局外观主题适配 ===== */
+.doco-editor-root {
+  --color-primary-50: var(--accent-soft);
+  --color-primary-100: var(--surface-selected-strong);
+  --color-primary-500: var(--accent);
+  --color-primary-600: var(--accent-strong);
+  --color-editor-codeblock-bg: var(--surface-subtle);
+  --color-editor-codeblock-text: var(--text-primary);
+  --color-editor-codeblock-border: var(--border-subtle);
+  --color-editor-code-bg: var(--surface-subtle);
+  --color-editor-code-hover-bg: var(--surface-hover);
+  --color-editor-code-hover-ring: var(--border-subtle);
+  --color-editor-quote-border: var(--border-strong);
+  --color-editor-quote-text: var(--text-secondary);
+  --color-editor-hr: var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.doco-document-canvas {
+  border-color: var(--border-subtle);
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--shadow-ring), 0 4px 24px rgba(20, 20, 19, 0.04);
+}
+
+.doco-document-title {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+}
+
+.doco-document-title::placeholder,
+.doco-editor-root .ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .doco-editor-root .ProseMirror h1,
+:root[data-theme="paper"] .doco-editor-root .ProseMirror h2,
+:root[data-theme="paper"] .doco-editor-root .ProseMirror h3,
+:root[data-theme="paper"] .doco-editor-root .ProseMirror h4 {
+  font-family: var(--font-heading);
+  font-weight: 500;
+}
+
+.doco-editor-root .toc-trigger,
+.doco-editor-root .toc-panel,
+.doco-editor-root .image-toolbar,
+.doco-editor-root .callout-picker,
+.doco-editor-root .table-menu-inner {
+  border-color: var(--border-subtle);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--shadow-ring), 0 8px 24px rgba(20, 20, 19, 0.08);
+}
+
+.doco-editor-root .image-toolbar-btn,
+.doco-editor-root .table-menu-item {
+  color: var(--text-secondary);
+}
+
+.doco-editor-root .image-toolbar-btn:hover,
+.doco-editor-root .callout-picker-item:hover,
+.doco-editor-root .table-menu-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.doco-editor-root .image-toolbar-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.doco-editor-root .ProseMirror td,
+.doco-editor-root .ProseMirror th {
+  border-color: var(--border-subtle);
+}
+
+.doco-editor-root .ProseMirror th {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+.doco-editor-root .ProseMirror .selectedCell {
+  background: var(--surface-selected-strong);
+}
+
+.doco-editor-root .ProseMirror .column-resize-handle,
+.doco-editor-root .table-handle:hover,
+.doco-editor-root .table-handle.active {
+  background: var(--accent);
+}
+
+.doco-editor-root .table-handle {
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+}
+
+.doco-editor-root .table-add-btn {
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+
+.doco-editor-root .table-add-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.doco-editor-root .spreadsheet-block {
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.doco-editor-root .spreadsheet-shell {
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
+  box-shadow: 0 0 0 1px var(--shadow-ring), 0 4px 24px rgba(20, 20, 19, 0.05);
+}
+
+.doco-editor-root .spreadsheet-titlebar,
+.doco-editor-root .spreadsheet-toolbar,
+.doco-editor-root .spreadsheet-formula,
+.doco-editor-root .spreadsheet-status {
+  border-color: var(--border-subtle);
+}
+
+.doco-editor-root .spreadsheet-titlebar,
+.doco-editor-root .spreadsheet-status,
+.standalone-spreadsheet-page {
+  background: var(--surface-app);
+}
+
+.doco-editor-root .spreadsheet-toolbar,
+.doco-editor-root .spreadsheet-formula,
+.doco-editor-root .spreadsheet-grid,
+.doco-editor-root .spreadsheet-grid th,
+.doco-editor-root .spreadsheet-grid td,
+.doco-editor-root .spreadsheet-grid td input,
+.doco-editor-root .spreadsheet-filter-row input,
+.doco-editor-root .spreadsheet-block-standalone .spreadsheet-titlebar {
+  background: var(--surface-grid-cell);
+  color: var(--text-primary);
+}
+
+.doco-editor-root .spreadsheet-document-title {
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+}
+
+:root[data-theme="simple"] .doco-editor-root .spreadsheet-document-title {
+  font-weight: 600;
+}
+
+.doco-editor-root .spreadsheet-document-title::placeholder,
+.doco-editor-root .spreadsheet-toolbar button:disabled,
+.doco-editor-root .spreadsheet-status,
+.doco-editor-root .standalone-spreadsheet-save,
+.doco-editor-root .spreadsheet-fx,
+.doco-editor-root .spreadsheet-grid tbody th {
+  color: var(--text-muted);
+}
+
+.doco-editor-root .spreadsheet-toolbar button,
+.doco-editor-root .spreadsheet-toolbar select,
+.doco-editor-root .spreadsheet-name-box {
+  color: var(--text-secondary);
+}
+
+.doco-editor-root .spreadsheet-toolbar button:hover,
+.doco-editor-root .spreadsheet-toolbar button.active,
+.doco-editor-root .spreadsheet-color-control:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.doco-editor-root .spreadsheet-divider,
+.spreadsheet-context-divider {
+  background: var(--border-subtle);
+}
+
+.doco-editor-root .spreadsheet-name-box {
+  border-color: var(--border-subtle);
+}
+
+.doco-editor-root .spreadsheet-grid th,
+.doco-editor-root .spreadsheet-grid td {
+  border-color: var(--border-subtle);
+}
+
+.doco-editor-root .spreadsheet-grid thead th,
+.doco-editor-root .spreadsheet-grid tbody th {
+  background: var(--surface-grid-header);
+  color: var(--text-secondary);
+}
+
+.doco-editor-root .spreadsheet-grid th.selected-header,
+.doco-editor-root .spreadsheet-grid td.selected {
+  background: var(--surface-selected);
+  color: var(--accent);
+}
+
+.doco-editor-root .spreadsheet-grid td.active {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.doco-editor-root .spreadsheet-grid td input {
+  border-color: var(--accent);
+}
+
+.doco-editor-root .spreadsheet-action-status {
+  color: var(--accent);
+}
+
+.doco-editor-root .spreadsheet-menu,
+.spreadsheet-context-menu {
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--shadow-ring), 0 12px 32px rgba(20, 20, 19, 0.12);
+}
+
+.spreadsheet-context-title,
+.spreadsheet-context-menu button kbd {
+  color: var(--text-muted);
+}
+
+.spreadsheet-context-menu button {
+  color: var(--text-secondary);
+}
+
+.spreadsheet-context-menu button:hover,
+.spreadsheet-context-menu button:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.spreadsheet-context-menu button.danger {
+  color: var(--danger);
+}
+
+.spreadsheet-context-menu button.danger:hover,
+.spreadsheet-context-menu button.danger:focus-visible {
+  background: var(--surface-danger);
+}
+
+.doco-editor-root .paste-md-dialog,
+.doco-editor-root .paste-md-dialog-preview {
+  border-color: var(--border-subtle);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.doco-editor-root .paste-md-btn-primary {
+  background: var(--accent);
+}
+
+.doco-editor-root .paste-md-btn-primary:hover {
+  background: var(--accent-strong);
+}
+
+.doco-editor-root .paste-md-btn-secondary {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+.doco-editor-root .paste-md-btn-secondary:hover {
+  background: var(--surface-hover);
 }

@@ -34,8 +34,8 @@ const ToolbarButton = ({ icon: Icon, label, shortcut, active, danger, onClick }:
         type="button"
         onClick={onClick}
         className={`p-2 m-0.5 rounded-lg transition-colors outline-none
-            ${danger ? 'text-[#b53333] hover:bg-[#f8ebe6]' : 'text-[#5e5d59] hover:bg-[#e8e6dc]'}
-            ${active ? 'bg-[#e8e6dc] text-[#c96442] ring-1 ring-[#d1cfc5]' : ''}`}
+            ${danger ? 'text-[var(--danger)] hover:bg-[var(--surface-danger)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'}
+            ${active ? 'bg-[var(--surface-hover)] text-[var(--accent)] ring-1 ring-[var(--border-strong)]' : ''}`}
         title={actionTooltip(label, shortcut)}
         aria-label={actionTooltip(label, shortcut)}
     >
@@ -62,18 +62,18 @@ const MenuAction = ({ icon: Icon, label, shortcut, active, disabled, disabledRea
         aria-label={actionTooltip(label, shortcut, disabled ? disabledReason : undefined)}
         className={`flex w-full items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors
             ${disabled ? 'cursor-not-allowed text-[#b0aea5]' : danger ? 'text-[#b53333] hover:bg-[#f8ebe6]' : 'text-[#4d4c48] hover:bg-[#f0eee6]'}
-            ${active ? 'bg-[#e8e6dc]' : ''}`}
+            ${active ? 'bg-[var(--surface-hover)]' : ''}`}
     >
         <Icon className="w-4 h-4 shrink-0 opacity-70" />
         <span className="flex-1">{label}</span>
-        {active && <Check className="w-3.5 h-3.5 text-[#c96442]" />}
-        <kbd className="font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[#5e5d59]">
+        {active && <Check className="w-3.5 h-3.5 text-[var(--accent)]" />}
+        <kbd className="font-sans text-[13px] leading-none font-medium tracking-[0.01em] text-[var(--text-secondary)]">
             {shortcutLabel(shortcut)}
         </kbd>
     </button>
 )
 
-const MenuDivider = () => <div className="h-px bg-[#e8e6dc] my-1" />
+const MenuDivider = () => <div className="h-px bg-[var(--border-subtle)] my-1" />
 
 export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
     const [linkPopover, setLinkPopover] = useState<{ top: number; left: number } | null>(null)
@@ -206,7 +206,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
             <TiptapBubbleMenu
                 editor={editor}
                 shouldShow={shouldShowBubbleMenu}
-                className="flex overflow-visible border border-[#e8e6dc] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] bg-[#faf9f5] z-50"
+                className="flex overflow-visible border border-[var(--border-subtle)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] bg-[var(--surface-elevated)] z-50"
             >
                 <div ref={toolbarRef} className="flex px-1 items-center outline-none">
                     {!isImage && !isUnsupportedBlock && (
@@ -215,7 +215,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                 <Popover.Trigger asChild>
                                     <button
                                         type="button"
-                                        className="flex items-center gap-0.5 p-2 m-0.5 rounded-lg text-[#5e5d59] hover:bg-[#e8e6dc] outline-none"
+                                        className="flex items-center gap-0.5 p-2 m-0.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] outline-none"
                                         title="转换块类型"
                                         aria-label="打开块类型转换菜单"
                                     >
@@ -229,7 +229,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                         align="start"
                                         onOpenAutoFocus={event => event.preventDefault()}
                                         onCloseAutoFocus={event => event.preventDefault()}
-                                        className="z-[60] w-56 max-h-[360px] overflow-y-auto rounded-xl border border-[#e8e6dc] bg-[#faf9f5] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                        className="z-[60] w-56 max-h-[360px] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                                     >
                                         {blockTypeItems.map(item => (
                                             <Fragment key={item.shortcut}>
@@ -245,15 +245,15 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                     </Popover.Content>
                                 </Popover.Portal>
                             </Popover.Root>
-                            <div className="w-px h-5 bg-[#e8e6dc] mx-0.5" />
+                            <div className="w-px h-5 bg-[var(--border-subtle)] mx-0.5" />
                             {textButtons.map(item => <ToolbarButton key={item.shortcut} {...item} />)}
-                            <div className="w-px h-5 bg-[#e8e6dc] mx-0.5" />
+                            <div className="w-px h-5 bg-[var(--border-subtle)] mx-0.5" />
                         </>
                     )}
 
                     <Popover.Root open={alignOpen} onOpenChange={setAlignOpen}>
                         <Popover.Trigger
-                            className="p-2 m-0.5 rounded-lg text-[#5e5d59] hover:bg-[#e8e6dc] outline-none"
+                            className="p-2 m-0.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] outline-none"
                             title="对齐方式"
                             aria-label="打开对齐方式菜单"
                         >
@@ -265,7 +265,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                 align="end"
                                 onOpenAutoFocus={event => event.preventDefault()}
                                 onCloseAutoFocus={event => event.preventDefault()}
-                                className="z-[60] w-48 rounded-xl border border-[#e8e6dc] bg-[#faf9f5] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                className="z-[60] w-48 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                             >
                                 <MenuAction icon={AlignLeft} label="左对齐" shortcut="alignLeft" active={editor.isActive({ textAlign: 'left' })} onClick={() => { editor.chain().focus().setTextAlign('left').run(); setAlignOpen(false); refocusEditorAfterMenuClose() }} />
                                 <MenuAction icon={AlignCenter} label="居中对齐" shortcut="alignCenter" active={editor.isActive({ textAlign: 'center' })} onClick={() => { editor.chain().focus().setTextAlign('center').run(); setAlignOpen(false); refocusEditorAfterMenuClose() }} />
@@ -277,7 +277,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                     {!isImage && (
                         <Popover.Root open={moreOpen} onOpenChange={setMoreOpen}>
                             <Popover.Trigger
-                                className="p-2 m-0.5 rounded-lg text-[#5e5d59] hover:bg-[#e8e6dc] outline-none"
+                                className="p-2 m-0.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] outline-none"
                                 title="更多操作"
                                 aria-label="打开更多操作菜单"
                             >
@@ -289,7 +289,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                     align="end"
                                     onOpenAutoFocus={event => event.preventDefault()}
                                     onCloseAutoFocus={event => event.preventDefault()}
-                                    className="z-[60] w-60 rounded-xl border border-[#e8e6dc] bg-[#faf9f5] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                    className="z-[60] w-60 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                                 >
                                     <MenuAction icon={Scissors} label="剪切" shortcut="cut" onClick={() => nativeClipboardAction('cut')} />
                                     <MenuAction icon={Copy} label="复制" shortcut="copy" onClick={() => nativeClipboardAction('copy')} />

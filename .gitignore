@@ -31,6 +31,7 @@ backend/attachments/*
 backend/*.db
 backend/*.db-*
 backend/*.db.backup-*
+backend/backups/
 exports/
 secret/
 test-results/

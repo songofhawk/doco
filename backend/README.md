@@ -13,10 +13,13 @@ npm start        # 或 npm run dev（文件变更自动重启）
 
 ## 认证配置
 
-页面登录接受 Google ID token 并写入 httpOnly Session Cookie；开放 API 使用独立、可撤销的 Bearer Token。
+页面支持邮箱验证码和 Google ID token 登录，成功后都写入 httpOnly Session Cookie；开放 API 使用独立、可撤销的 Bearer Token。
 两种凭证不可互换。前端 `VITE_GOOGLE_CLIENT_ID` 与后端
 `GOOGLE_CLIENT_ID` 必须使用同一个 Google OAuth Web Client ID。
 后端启动时会读取仓库根目录 `.env` 和 `backend/.env`；已有 shell 环境变量优先。
+
+Google 返回的邮箱经过验证后，如果已存在相同的已验证邮箱账户，会把 Google 身份关联到原用户，
+继续使用原用户的工作区和知识库。若 Google 身份和邮箱分别属于两个用户，则拒绝静默合并。
 
 ```bash
 GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
@@ -24,7 +27,19 @@ ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 SESSION_TTL_DAYS=30
 COOKIE_SAMESITE=lax
 COOKIE_SECURE=false
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM="Doco <no-reply@example.com>"
 ```
+
+邮箱验证码默认 10 分钟有效、60 秒后可重发，并限制每邮箱和每 IP 的小时发送次数。
+可通过 `EMAIL_CODE_TTL_MINUTES`、`EMAIL_CODE_RESEND_SECONDS`、
+`EMAIL_CODE_MAX_PER_HOUR`、`EMAIL_CODE_IP_MAX_PER_HOUR` 和
+`EMAIL_CODE_MAX_ATTEMPTS` 调整。验证码仅保存 scrypt 哈希，验证成功后立即失效。
 
 生产环境如果前端和后端是不同站点且使用 HTTPS，通常需要：
 
@@ -46,7 +61,7 @@ COOKIE_SECURE=true
 |---|---|
 | server.js | 入口：Express + Hocuspocus 集成、导出路由、优雅退出 |
 | database.js / migrations.js | better-sqlite3 初始化、WAL 与版本化迁移 |
-| auth.js | Google ID token 校验、session cookie、用户与默认工作区初始化 |
+| auth.js / email.js | 邮箱验证码、Google 身份关联、session cookie、用户与默认工作区初始化 |
 | permissions.js | 当前用户到工作区/知识库/文件夹/文档的权限查询 |
 | api.js | 页面认证、Token 管理、知识库/文件夹/文档路由 |
 | open-api/ | Bearer 鉴权、限频、统一错误、幂等、开放路由 |
@@ -68,7 +83,9 @@ curl -b cookies.txt -O http://localhost:8000/app-api/v1/kb/{kb_id}/export.zip
 
 ## 持久化模型
 
-- `users` / `sessions` / `workspaces` / `workspace_members`：Google 用户、登录态与多用户工作区边界
+- `users` / `auth_identities`：用户主账户与 Google 等外部身份；邮箱是规范化且唯一的已验证登录标识
+- `email_login_codes`：邮箱验证码 scrypt 哈希、有效期、尝试次数与发送限流依据
+- `sessions` / `workspaces` / `workspace_members`：登录态与多用户工作区边界
 - `knowledge_bases.workspace_id`：知识库归属的权限根；文件夹、文档通过所属知识库继承权限
 - `ydoc_state`：每文档一行合并快照，UPSERT 更新，表大小恒定
 - `api_tokens`：只保存 Token secret 的 SHA-256；`idempotency_keys` 默认保留 24 小时

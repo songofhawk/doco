@@ -9,12 +9,39 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
-  google_sub TEXT NOT NULL UNIQUE,
   email TEXT NOT NULL,
+  normalized_email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  email_verified_at INTEGER NOT NULL,
   name TEXT,
   avatar_url TEXT,
+  appearance_theme TEXT NOT NULL DEFAULT 'simple'
+    CHECK (appearance_theme IN ('simple', 'paper')),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS auth_identities (
+  provider TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  email TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (provider, subject),
+  UNIQUE (user_id, provider),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS email_login_codes (
+  id TEXT PRIMARY KEY,
+  normalized_email TEXT NOT NULL COLLATE NOCASE,
+  code_hash TEXT NOT NULL,
+  code_salt TEXT NOT NULL,
+  requester_ip_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  consumed_at INTEGER,
+  created_at INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -129,6 +156,10 @@ CREATE TABLE IF NOT EXISTS api_audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_auth_identities_user_id ON auth_identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_login_codes_email_created ON email_login_codes(normalized_email, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_login_codes_ip_created ON email_login_codes(requester_ip_hash, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_login_codes_expires_at ON email_login_codes(expires_at);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user_id ON workspace_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_bases_workspace_id ON knowledge_bases(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_folders_kb_id ON folders(kb_id);

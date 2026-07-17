@@ -78,6 +78,27 @@ Environment=COOKIE_SAMESITE=none
 Environment=COOKIE_SECURE=true
 ```
 
+邮箱验证码登录所需的 SMTP 密钥不要写入仓库或 service 文件。创建服务器本地配置：
+
+```bash
+install -m 600 /dev/null /etc/doco-backend.env
+editor /etc/doco-backend.env
+```
+
+内容示例：
+
+```ini
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-smtp-user
+SMTP_PASS=your-smtp-password
+SMTP_FROM="Doco <no-reply@example.com>"
+```
+
+`doco-backend.service` 通过 `EnvironmentFile=-/etc/doco-backend.env` 读取它，
+`deploy-from-local.sh` 不会上传或覆盖该文件。修改后重启服务生效。
+
 若前端域名变化，或需要临时允许 Cloudflare Pages 预览域名，修改
 `/etc/systemd/system/doco-backend.service` 中的 `ALLOWED_ORIGINS`，多个 Origin 用英文逗号分隔，
 然后执行：

@@ -5,9 +5,12 @@ import {
   clearSessionCookie,
   createSession,
   deleteSessionFromCookieHeader,
+  requestEmailLoginCode,
   requireAuth,
   setSessionCookie,
+  updateUserAppearance,
   upsertGoogleUser,
+  verifyEmailLoginCode,
   verifyGoogleCredential,
 } from './auth.js';
 import {
@@ -50,6 +53,37 @@ api.post('/auth/google', async (req, res) => {
   }
 });
 
+api.post('/auth/email/code', async (req, res) => {
+  try {
+    const result = await requestEmailLoginCode(req.body?.email, req.ip);
+    res.json({
+      status: 'ok',
+      expiresInSeconds: result.expiresInSeconds,
+      retryAfterSeconds: result.retryAfterSeconds,
+    });
+  } catch (error) {
+    if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+    res.status(error.statusCode || 500).json({
+      error: error.message || '验证码发送失败',
+      code: error.code,
+    });
+  }
+});
+
+api.post('/auth/email/verify', (req, res) => {
+  try {
+    const { user } = verifyEmailLoginCode(req.body?.email, req.body?.code);
+    const session = createSession(user.id);
+    setSessionCookie(res, session.token, session.expiresAt, req);
+    res.json({ user });
+  } catch (error) {
+    res.status(error.statusCode || 401).json({
+      error: error.message || '邮箱登录失败',
+      code: error.code,
+    });
+  }
+});
+
 api.post('/auth/logout', (req, res) => {
   deleteSessionFromCookieHeader(req.headers.cookie || '');
   clearSessionCookie(res, req);
@@ -57,6 +91,18 @@ api.post('/auth/logout', (req, res) => {
 });
 
 api.use(requireAuth);
+
+api.patch('/auth/preferences', (req, res) => {
+  try {
+    const user = updateUserAppearance(req.user.id, req.body?.appearanceTheme);
+    res.json({ user });
+  } catch (error) {
+    res.status(error.statusCode || 400).json({
+      error: error.message || '外观设置保存失败',
+      code: error.code,
+    });
+  }
+});
 
 // ---- 开放 API Token（只允许页面 Session Cookie） ----
 
@@ -210,7 +256,7 @@ api.get('/docs/:id', (req, res) => {
   res.json(doc);
 });
 
-api.post('/docs', (req, res) => {
+api.post('/docs', async (req, res) => {
   const title = String(req.body?.title || '').trim();
   const id = String(req.body?.id || `doc_${randomUUID()}`).trim();
   const folderId = req.body?.folder_id || null;

@@ -53,7 +53,14 @@ before(async () => {
   const serverModule = await import('../server.js');
   hocuspocus = serverModule.hocuspocus;
   const now = Date.now();
-  db.prepare('INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)').run('collab-user', 'collab-google', 'collab@example.com', 'Collab', null, now, now);
+  db.prepare(`
+    INSERT INTO users (id, email, normalized_email, email_verified_at, name, avatar_url, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run('collab-user', 'collab@example.com', 'collab@example.com', now, 'Collab', null, now, now);
+  db.prepare(`
+    INSERT INTO auth_identities (provider, subject, user_id, email, created_at, updated_at)
+    VALUES ('google', ?, ?, ?, ?, ?)
+  `).run('collab-google', 'collab-user', 'collab@example.com', now, now);
   db.prepare('INSERT INTO workspaces VALUES (?, ?, ?, ?, ?)').run('collab-workspace', 'Collab', 'collab-user', now, now);
   db.prepare('INSERT INTO workspace_members VALUES (?, ?, ?, ?)').run('collab-workspace', 'collab-user', 'owner', now);
   const kb = db.prepare('INSERT INTO knowledge_bases (name, workspace_id) VALUES (?, ?)').run('Collab KB', 'collab-workspace').lastInsertRowid;

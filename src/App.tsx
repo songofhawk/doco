@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
-import { PanelLeft, PanelLeftClose, FileText, Upload, Download, ChevronDown, LogOut, KeyRound } from 'lucide-react'
+import { PanelLeft, PanelLeftClose, FileText, ChevronDown, LogOut, KeyRound, Mail, ArrowLeft, LoaderCircle, Check } from 'lucide-react'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
-import { AuthProvider, apiFetch, type CurrentUser, useAuth } from './auth'
+import { AuthProvider, apiFetch, type AppearanceTheme, type CurrentUser, useAuth } from './auth'
 import { ApiTokenDialog } from './components/ApiTokenDialog'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
@@ -40,15 +40,23 @@ const LoadingScreen = () => (
 )
 
 const LoginPage = () => {
-  const { signInWithGoogleCredential } = useAuth()
+  const { signInWithGoogleCredential, requestEmailCode, signInWithEmailCode } = useAuth()
   const buttonRef = useRef<HTMLDivElement>(null)
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [emailStep, setEmailStep] = useState<'email' | 'code'>('email')
+  const [submitting, setSubmitting] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError('未配置 VITE_GOOGLE_CLIENT_ID')
-      return
-    }
+    if (cooldown <= 0) return
+    const timer = window.setInterval(() => setCooldown((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [cooldown])
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return
 
     let cancelled = false
     const renderButton = () => {
@@ -98,6 +106,36 @@ const LoginPage = () => {
     }
   }, [signInWithGoogleCredential])
 
+  const sendEmailCode = async () => {
+    if (submitting || cooldown > 0) return
+    try {
+      setSubmitting(true)
+      setError('')
+      const result = await requestEmailCode(email)
+      setEmail(email.trim().toLowerCase())
+      setEmailStep('code')
+      setCooldown(result.retryAfterSeconds || 60)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '验证码发送失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const verifyEmailCode = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (submitting) return
+    try {
+      setSubmitting(true)
+      setError('')
+      await signInWithEmailCode(email, code)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '邮箱登录失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-xl shadow-sm px-8 py-9 flex flex-col items-center text-center">
@@ -105,8 +143,86 @@ const LoginPage = () => {
           <FileText size={26} className="text-blue-500" />
         </div>
         <h1 className="text-xl font-semibold text-gray-800 tracking-tight">Doco</h1>
-        <p className="text-sm text-gray-500 mt-2 mb-7 leading-relaxed">你的知识库与协同写作空间<br />使用 Google 账号登录即可开始</p>
-        <div ref={buttonRef} className="min-h-[44px]" />
+        <p className="text-sm text-gray-500 mt-2 mb-7 leading-relaxed">你的知识库与协同写作空间<br />使用邮箱或 Google 账号登录</p>
+
+        <form onSubmit={emailStep === 'email' ? (event) => { event.preventDefault(); void sendEmailCode() } : verifyEmailCode} className="w-full text-left">
+          {emailStep === 'email' ? (
+            <>
+              <label htmlFor="login-email" className="block text-xs font-medium text-gray-600 mb-2">邮箱地址</label>
+              <div className="relative">
+                <Mail size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                  placeholder="name@example.com"
+                  className="w-full h-11 rounded-lg border border-gray-300 bg-white pl-10 pr-3 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="mt-3 w-full h-11 rounded-lg bg-gray-900 text-white text-sm font-medium flex items-center justify-center gap-2 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting && <LoaderCircle size={16} className="animate-spin" />}
+                发送验证码
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => { setEmailStep('email'); setCode(''); setError('') }}
+                className="mb-4 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
+              >
+                <ArrowLeft size={14} /> 更换邮箱
+              </button>
+              <label htmlFor="login-code" className="block text-xs font-medium text-gray-600 mb-1">输入 6 位验证码</label>
+              <p className="text-xs text-gray-400 mb-3 truncate">验证码已发送至 {email}</p>
+              <input
+                id="login-code"
+                type="text"
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                required
+                pattern="[0-9]{6}"
+                placeholder="000000"
+                className="w-full h-12 rounded-lg border border-gray-300 bg-white px-3 text-center text-lg tracking-[0.45em] text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+              <button
+                type="submit"
+                disabled={submitting || code.length !== 6}
+                className="mt-3 w-full h-11 rounded-lg bg-gray-900 text-white text-sm font-medium flex items-center justify-center gap-2 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting && <LoaderCircle size={16} className="animate-spin" />}
+                登录
+              </button>
+              <button
+                type="button"
+                disabled={submitting || cooldown > 0}
+                onClick={() => void sendEmailCode()}
+                className="mt-3 w-full text-center text-xs text-gray-500 hover:text-gray-800 disabled:cursor-not-allowed disabled:text-gray-300"
+              >
+                {cooldown > 0 ? `${cooldown} 秒后可重新发送` : '重新发送验证码'}
+              </button>
+            </>
+          )}
+        </form>
+
+        {GOOGLE_CLIENT_ID && (
+          <>
+            <div className="my-6 w-full flex items-center gap-3 text-xs text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />或<span className="h-px flex-1 bg-gray-200" />
+            </div>
+            <div ref={buttonRef} className="min-h-[44px]" />
+          </>
+        )}
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
       </div>
       <p className="mt-6 text-xs text-gray-400">多端实时同步 · 富文本协同编辑</p>
@@ -145,11 +261,11 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
         aria-modal="true"
         aria-labelledby="logout-dialog-title"
         aria-describedby="logout-dialog-description"
-        className="w-full max-w-sm rounded-xl border border-[#e8e6dc] bg-[#faf9f5] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
+        className="w-full max-w-sm rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.08)]"
       >
-        <h2 id="logout-dialog-title" className="text-lg font-medium text-[#141413]">确认退出登录？</h2>
-        <p id="logout-dialog-description" className="mt-2 text-sm leading-6 text-[#5e5d59]">
-          退出后，需要重新使用 Google 账号登录才能访问你的知识库。
+        <h2 id="logout-dialog-title" className="text-lg font-medium text-[var(--text-primary)]">确认退出登录？</h2>
+        <p id="logout-dialog-description" className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+          退出后，需要重新使用邮箱或 Google 账号登录才能访问你的知识库。
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button
@@ -157,7 +273,7 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
             onClick={onClose}
             disabled={submitting}
             autoFocus
-            className="min-h-11 rounded-lg bg-[#e8e6dc] px-4 py-2 text-sm text-[#4d4c48] shadow-[0_0_0_1px_#d1cfc5] transition-colors hover:bg-[#dedcd2] disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-[var(--surface-hover)] px-4 py-2 text-sm text-[var(--text-secondary)] shadow-[0_0_0_1px_var(--border-strong)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             取消
           </button>
@@ -165,7 +281,7 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
             type="button"
             onClick={handleConfirm}
             disabled={submitting}
-            className="min-h-11 rounded-lg bg-[#c96442] px-4 py-2 text-sm text-[#faf9f5] shadow-[0_0_0_1px_#c96442] transition-colors hover:bg-[#b95b3b] disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-lg bg-[var(--accent)] px-4 py-2 text-sm text-white shadow-[0_0_0_1px_var(--accent)] transition-colors hover:bg-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? '正在退出...' : '确认退出'}
           </button>
@@ -176,7 +292,12 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
   )
 }
 
-const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; externalTitle?: string; user: CurrentUser }) => {
+const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
+  exportRef: any
+  externalTitle?: string
+  user: CurrentUser
+  onImportRequest: () => void
+}) => {
   const { id } = useParams<{ id: string }>()
   const [meta, setMeta] = useState<any>(undefined)
   useEffect(() => {
@@ -244,35 +365,62 @@ const EditorPage = ({ exportRef, externalTitle, user }: { exportRef: any; extern
           body: JSON.stringify(payload)
         }).catch(() => {})
       }}
+      onImportRequest={onImportRequest}
       externalTitle={externalTitle}
     />
   )
 }
 
 const COLLAPSE_BREAKPOINT = 768
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'doco-sidebar-collapsed'
+
+const getInitialSidebarCollapsed = () => {
+  if (window.innerWidth < COLLAPSE_BREAKPOINT) return true
+  return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
+}
 
 function AppShell() {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, updateAppearance } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [apiTokenOpen, setApiTokenOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [appearanceTheme, setAppearanceTheme] = useState<AppearanceTheme>(() => {
+    const stored = window.localStorage.getItem('doco-appearance-theme')
+    return stored === 'paper' ? 'paper' : 'simple'
+  })
   const exportRef = useRef<any>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [externalTitle, setExternalTitle] = useState<string | undefined>()
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < COLLAPSE_BREAKPOINT)
-  const [exportOpen, setExportOpen] = useState(false)
-  const exportMenuRef = useRef<HTMLDivElement>(null)
-  const manualOverride = useRef(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+  const wasNarrow = useRef(window.innerWidth < COLLAPSE_BREAKPOINT)
 
-  // 点击外部关闭导出菜单
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setExportOpen(false)
+    document.documentElement.dataset.theme = appearanceTheme
+    window.localStorage.setItem('doco-appearance-theme', appearanceTheme)
+  }, [appearanceTheme])
+
+  useEffect(() => {
+    if (user?.appearanceTheme) setAppearanceTheme(user.appearanceTheme)
+  }, [user?.appearanceTheme])
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountMenuOpen(false)
       }
     }
-    if (exportOpen) document.addEventListener('mousedown', onClick)
+    if (accountMenuOpen) document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
-  }, [exportOpen])
+  }, [accountMenuOpen])
+
+  const handleAppearanceChange = useCallback((theme: AppearanceTheme) => {
+    setAppearanceTheme(theme)
+    setAccountMenuOpen(false)
+    void updateAppearance(theme).catch((error) => {
+      console.error('[Appearance] save failed:', error)
+    })
+  }, [updateAppearance])
 
   const handleImport = () => fileInputRef.current?.click()
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -302,27 +450,31 @@ function AppShell() {
     e.target.value = ''
   }
 
-  // 窗口变窄时自动折叠，变宽时自动展开（除非用户手动操作过）
+  // 移动端使用抽屉式侧边栏；回到桌面端时恢复用户上次的折叠偏好。
   useEffect(() => {
     const onResize = () => {
       const narrow = window.innerWidth < COLLAPSE_BREAKPOINT
-      if (manualOverride.current) {
-        // 用户手动操作后，只在跨越断点时重置 override
-        if (narrow !== sidebarCollapsed) {
-          manualOverride.current = false
-          setSidebarCollapsed(narrow)
-        }
-        return
-      }
-      setSidebarCollapsed(narrow)
+      if (narrow === wasNarrow.current) return
+
+      wasNarrow.current = narrow
+      setSidebarCollapsed(
+        narrow
+          ? true
+          : window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true',
+      )
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [sidebarCollapsed])
+  }, [])
 
   const toggleSidebar = useCallback(() => {
-    manualOverride.current = true
-    setSidebarCollapsed(v => !v)
+    setSidebarCollapsed((collapsed) => {
+      const nextCollapsed = !collapsed
+      if (window.innerWidth >= COLLAPSE_BREAKPOINT) {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(nextCollapsed))
+      }
+      return nextCollapsed
+    })
   }, [])
 
   if (loading) return <LoadingScreen />
@@ -330,64 +482,85 @@ function AppShell() {
 
   return (
     <BrowserRouter>
-      <div className="h-screen bg-white flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 h-12 flex items-center px-4 shrink-0 z-10">
+      <div className="doco-app h-screen flex flex-col overflow-hidden">
+        <header className="doco-app-header z-40 flex h-12 shrink-0 items-center px-4">
           <button
+            type="button"
             onClick={toggleSidebar}
             aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            aria-controls="doco-sidebar"
+            aria-expanded={!sidebarCollapsed}
             className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 sm:mr-3"
             title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
           >
             {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
           </button>
-          <h1 className="text-base font-semibold text-gray-800 tracking-tight">Doco</h1>
-          <div className="ml-auto flex items-center gap-2 text-sm text-gray-500 sm:gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-gray-600">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-gray-200" />
-              )}
-              <span className="max-w-[180px] truncate">{user.name || user.email}</span>
-            </div>
+          <h1 className="doco-brand text-base font-semibold tracking-tight">Doco</h1>
+          <div className="ml-auto flex items-center text-sm text-gray-500">
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt,.docx,.pdf" onChange={handleFileChange} className="hidden" />
-            <button onClick={handleImport} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="导入文档">
-              <Upload size={16} /><span className="hidden sm:inline">导入</span>
-            </button>
-            <span className="hidden text-gray-300 sm:inline">|</span>
-            <div className="relative" ref={exportMenuRef}>
+            <div className="relative" ref={accountMenuRef}>
               <button
-                onClick={() => setExportOpen(v => !v)}
-                className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent"
-                title="导出文档"
+                type="button"
+                onClick={() => setAccountMenuOpen(value => !value)}
+                className="flex h-10 items-center gap-2 rounded-lg px-2 text-gray-600 transition-colors hover:bg-gray-100"
+                title="账户菜单"
+                aria-label="账户菜单"
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
               >
-                <Download size={16} /><span className="hidden sm:inline">导出</span><ChevronDown size={12} className="hidden sm:block" />
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <div className="h-7 w-7 rounded-full bg-gray-200" />
+                )}
+                <span className="hidden max-w-[180px] truncate sm:inline">{user.name || user.email}</span>
+                <ChevronDown size={14} />
               </button>
-              {exportOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[120px] z-50">
+              {accountMenuOpen && (
+                <div className="doco-menu absolute right-0 top-full z-50 mt-2 w-64 rounded-xl p-2 shadow-lg" role="menu" aria-label="账户菜单">
+                  <p className="px-2 pb-2 pt-1 text-xs font-medium text-gray-400">外观</p>
+                  {([
+                    { value: 'simple', label: '冷感', description: '冷白蓝灰的现代编辑器风格' },
+                    { value: 'paper', label: '纸感', description: '暖白陶土的纸张阅读风格' },
+                  ] as const).map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={appearanceTheme === option.value}
+                      onClick={() => handleAppearanceChange(option.value)}
+                      className={`doco-theme-option flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${appearanceTheme === option.value ? 'active' : ''}`}
+                    >
+                      <span className={`doco-theme-swatch ${option.value}`} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">{option.label}</span>
+                        <span className="mt-0.5 block text-xs text-gray-400">{option.description}</span>
+                      </span>
+                      {appearanceTheme === option.value && <Check size={15} className="mt-0.5 shrink-0" />}
+                    </button>
+                  ))}
+                  <div className="mx-2 my-2 border-t border-gray-100" />
                   <button
-                    onClick={() => { exportRef.current?.exportMarkdown(); setExportOpen(false) }}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 transition-colors"
-                  >Markdown</button>
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setAccountMenuOpen(false); setApiTokenOpen(true) }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    <KeyRound size={16} />
+                    API Token
+                  </button>
                   <button
-                    onClick={() => { exportRef.current?.exportWord(); setExportOpen(false) }}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 transition-colors"
-                  >Word</button>
-                  <button
-                    onClick={() => { exportRef.current?.exportPDF(); setExportOpen(false) }}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 transition-colors"
-                  >PDF</button>
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setAccountMenuOpen(false); setLogoutConfirmOpen(true) }}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    <LogOut size={16} />
+                    退出登录
+                  </button>
                 </div>
               )}
             </div>
-            <span className="hidden text-gray-300 sm:inline">|</span>
-            <button onClick={() => setApiTokenOpen(true)} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="开放 API Token">
-              <KeyRound size={16} /><span className="hidden sm:inline">API Token</span>
-            </button>
-            <span className="hidden text-gray-300 sm:inline">|</span>
-            <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-9 w-9 items-center justify-center gap-1 rounded-md transition-colors hover:bg-gray-100 hover:text-blue-600 sm:h-auto sm:w-auto sm:hover:bg-transparent" title="退出登录">
-              <LogOut size={16} /><span className="hidden sm:inline">退出</span>
-            </button>
           </div>
         </header>
         <div className="relative flex flex-1 overflow-hidden">
@@ -400,10 +573,10 @@ function AppShell() {
             />
           )}
           <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
-          <main className="min-w-0 flex-1 overflow-y-auto bg-gray-50">
+          <main className="doco-app-main min-w-0 flex-1 overflow-y-auto">
             <Routes>
-              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
-              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} />} />
+              <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} />} />
+              <Route path="/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} />} />
             </Routes>
           </main>
         </div>

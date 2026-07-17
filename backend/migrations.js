@@ -131,12 +131,80 @@ const migrations = [
     `,
   },
   {
+    version: 3,
+    name: 'email_login_and_auth_identities',
+    foreignKeysOff: true,
+    up: `
+      CREATE TABLE users_v3 (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        normalized_email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        email_verified_at INTEGER NOT NULL,
+        name TEXT,
+        avatar_url TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      INSERT INTO users_v3 (
+        id, email, normalized_email, email_verified_at, name, avatar_url, created_at, updated_at
+      )
+      SELECT id, email, lower(trim(email)), updated_at, name, avatar_url, created_at, updated_at
+      FROM users;
+
+      CREATE TABLE auth_identities (
+        provider TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        email TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (provider, subject),
+        UNIQUE (user_id, provider),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      INSERT INTO auth_identities (provider, subject, user_id, email, created_at, updated_at)
+      SELECT 'google', google_sub, id, email, created_at, updated_at FROM users;
+
+      DROP TABLE users;
+      ALTER TABLE users_v3 RENAME TO users;
+
+      CREATE TABLE email_login_codes (
+        id TEXT PRIMARY KEY,
+        normalized_email TEXT NOT NULL COLLATE NOCASE,
+        code_hash TEXT NOT NULL,
+        code_salt TEXT NOT NULL,
+        requester_ip_hash TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        consumed_at INTEGER,
+        created_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_auth_identities_user_id ON auth_identities(user_id);
+      CREATE INDEX idx_email_login_codes_email_created
+        ON email_login_codes(normalized_email, created_at DESC);
+      CREATE INDEX idx_email_login_codes_ip_created
+        ON email_login_codes(requester_ip_hash, created_at DESC);
+      CREATE INDEX idx_email_login_codes_expires_at ON email_login_codes(expires_at);
+    `,
+  },
+  {
     version: 4,
     name: 'document_types',
     up: `
       ALTER TABLE documents ADD COLUMN document_type TEXT NOT NULL DEFAULT 'document'
         CHECK (document_type IN ('document', 'spreadsheet'));
       CREATE INDEX idx_documents_document_type ON documents(document_type);
+    `,
+  },
+  {
+    version: 5,
+    name: 'user_appearance_theme',
+    up: `
+      ALTER TABLE users ADD COLUMN appearance_theme TEXT NOT NULL DEFAULT 'simple'
+        CHECK (appearance_theme IN ('simple', 'paper'));
     `,
   },
 ];
@@ -162,11 +230,33 @@ export function runMigrations(db) {
   const applied = new Set(db.prepare('SELECT version FROM schema_migrations').all().map((row) => row.version));
   for (const migration of migrations) {
     if (applied.has(migration.version)) continue;
-    db.transaction(() => {
+    const existingViolations = migration.foreignKeysOff
+      ? new Set(db.pragma('foreign_key_check').map((row) => JSON.stringify(row)))
+      : new Set();
+    const apply = db.transaction(() => {
       db.exec(migration.up);
+      if (migration.foreignKeysOff) {
+        const newViolations = db.pragma('foreign_key_check')
+          .filter((row) => !existingViolations.has(JSON.stringify(row)));
+        if (newViolations.length > 0) {
+          throw new Error(`Migration ${migration.version} introduced foreign key violations`);
+        }
+      }
       db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
         .run(migration.version, migration.name, Date.now());
-    })();
+    });
+
+    if (!migration.foreignKeysOff) {
+      apply();
+      continue;
+    }
+
+    db.pragma('foreign_keys = OFF');
+    try {
+      apply();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
   }
 }
 
