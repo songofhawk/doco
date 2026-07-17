@@ -31,11 +31,17 @@ export function TableOfContents({ editor, headingNumbered }: { editor: Editor; h
       const card = editor.view.dom.closest('.max-w-4xl') as HTMLElement | null
       if (card) setCardLeft(card.getBoundingClientRect().left)
     }
-    updatePos()
+    const card = editor.view.dom.closest('.max-w-4xl') as HTMLElement | null
     const main = document.querySelector('main')
+    const resizeObserver = new ResizeObserver(updatePos)
+
+    updatePos()
+    if (card) resizeObserver.observe(card)
+    if (main) resizeObserver.observe(main)
     window.addEventListener('resize', updatePos)
     main?.addEventListener('scroll', updatePos, { passive: true })
     return () => {
+      resizeObserver.disconnect()
       window.removeEventListener('resize', updatePos)
       main?.removeEventListener('scroll', updatePos)
     }

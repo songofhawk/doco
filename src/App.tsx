@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
-import { PanelLeft, PanelLeftClose, FileText, ChevronDown, LogOut, KeyRound, Mail, ArrowLeft, LoaderCircle, Check } from 'lucide-react'
+import { FileText, ChevronDown, LogOut, KeyRound, Mail, ArrowLeft, LoaderCircle, Check } from 'lucide-react'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import { AuthProvider, apiFetch, type AppearanceTheme, type CurrentUser, useAuth } from './auth'
@@ -373,10 +373,21 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest }: {
 
 const COLLAPSE_BREAKPOINT = 768
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'doco-sidebar-collapsed'
+const SIDEBAR_WIDTH_STORAGE_KEY = 'doco-sidebar-width'
+const SIDEBAR_MIN_WIDTH = 220
+const SIDEBAR_MAX_WIDTH = 420
+const SIDEBAR_DEFAULT_WIDTH = 256
+
+const clampSidebarWidth = (width: number) => Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width))
 
 const getInitialSidebarCollapsed = () => {
   if (window.innerWidth < COLLAPSE_BREAKPOINT) return true
   return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
+}
+
+const getInitialSidebarWidth = () => {
+  const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
+  return Number.isFinite(stored) && stored > 0 ? clampSidebarWidth(stored) : SIDEBAR_DEFAULT_WIDTH
 }
 
 function AppShell() {
@@ -392,7 +403,10 @@ function AppShell() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [externalTitle, setExternalTitle] = useState<string | undefined>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed)
+  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth)
+  const [sidebarResizing, setSidebarResizing] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
+  const sidebarResizeRef = useRef<{ startX: number; startWidth: number; currentWidth: number } | null>(null)
   const wasNarrow = useRef(window.innerWidth < COLLAPSE_BREAKPOINT)
 
   useEffect(() => {
@@ -477,6 +491,43 @@ function AppShell() {
     })
   }, [])
 
+  const handleSidebarResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (sidebarCollapsed || window.innerWidth < COLLAPSE_BREAKPOINT) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    sidebarResizeRef.current = { startX: event.clientX, startWidth: sidebarWidth, currentWidth: sidebarWidth }
+    setSidebarResizing(true)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [sidebarCollapsed, sidebarWidth])
+
+  const handleSidebarResizeMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const resize = sidebarResizeRef.current
+    if (!resize) return
+    const nextWidth = clampSidebarWidth(resize.startWidth + event.clientX - resize.startX)
+    resize.currentWidth = nextWidth
+    setSidebarWidth(nextWidth)
+  }, [])
+
+  const finishSidebarResize = useCallback(() => {
+    const resize = sidebarResizeRef.current
+    if (resize) window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(resize.currentWidth))
+    sidebarResizeRef.current = null
+    setSidebarResizing(false)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  const handleSidebarResizeKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    setSidebarWidth((width) => {
+      const nextWidth = clampSidebarWidth(width + (event.key === 'ArrowRight' ? 16 : -16))
+      window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(nextWidth))
+      return nextWidth
+    })
+  }, [])
+
   if (loading) return <LoadingScreen />
   if (!user) return <LoginPage />
 
@@ -484,17 +535,6 @@ function AppShell() {
     <BrowserRouter>
       <div className="doco-app h-screen flex flex-col overflow-hidden">
         <header className="doco-app-header z-40 flex h-12 shrink-0 items-center px-4">
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-            aria-controls="doco-sidebar"
-            aria-expanded={!sidebarCollapsed}
-            className="mr-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 sm:mr-3"
-            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-          >
-            {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-          </button>
           <h1 className="doco-brand text-base font-semibold tracking-tight">Doco</h1>
           <div className="ml-auto flex items-center text-sm text-gray-500">
             <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt,.docx,.pdf" onChange={handleFileChange} className="hidden" />
@@ -563,16 +603,52 @@ function AppShell() {
             </div>
           </div>
         </header>
-        <div className="relative flex flex-1 overflow-hidden">
-          {!sidebarCollapsed && (
-            <button
-              type="button"
-              aria-label="关闭侧边栏"
-              onClick={toggleSidebar}
-              className="absolute inset-0 z-20 bg-black/20 md:hidden"
-            />
-          )}
+        <div
+          className={`relative flex flex-1 overflow-hidden ${sidebarResizing ? 'is-sidebar-resizing' : ''}`}
+          style={{ '--doco-sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+        >
+          <button
+            type="button"
+            aria-label="关闭侧边栏"
+            aria-hidden={sidebarCollapsed}
+            tabIndex={sidebarCollapsed ? -1 : 0}
+            onClick={toggleSidebar}
+            className={`absolute inset-0 z-20 bg-black/20 transition-opacity duration-200 md:hidden ${
+              sidebarCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+            }`}
+          />
           <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} onDocRenamed={(_, title) => setExternalTitle(title)} />
+          <div
+            aria-hidden="true"
+            className={`doco-sidebar-toggle-rail ${sidebarCollapsed ? 'is-visible' : ''}`}
+          />
+          <div
+            role="separator"
+            aria-label="调整侧边栏宽度"
+            aria-orientation="vertical"
+            aria-valuemin={SIDEBAR_MIN_WIDTH}
+            aria-valuemax={SIDEBAR_MAX_WIDTH}
+            aria-valuenow={sidebarWidth}
+            aria-hidden={sidebarCollapsed}
+            tabIndex={sidebarCollapsed ? -1 : 0}
+            className={`doco-sidebar-resizer ${sidebarCollapsed ? 'is-hidden' : ''}`}
+            onPointerDown={handleSidebarResizeStart}
+            onPointerMove={handleSidebarResizeMove}
+            onPointerUp={finishSidebarResize}
+            onPointerCancel={finishSidebarResize}
+            onKeyDown={handleSidebarResizeKeyDown}
+          />
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            aria-controls="doco-sidebar"
+            aria-expanded={!sidebarCollapsed}
+            className={`doco-sidebar-edge-toggle ${sidebarCollapsed ? 'is-collapsed' : ''}`}
+            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+          >
+            <span className={`doco-sidebar-toggle-triangle ${sidebarCollapsed ? 'points-right' : 'points-left'}`} />
+          </button>
           <main className="doco-app-main min-w-0 flex-1 overflow-y-auto">
             <Routes>
               <Route path="/" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} />} />

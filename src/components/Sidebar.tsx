@@ -59,7 +59,7 @@ const InlineEdit = ({ value, onSave, onCancel }: {
                 if (e.key === 'Escape') onCancel();
             }}
             onBlur={() => { if (text.trim()) onSave(text.trim()); else onCancel(); }}
-            className="flex-1 text-sm bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
+            className="flex-1 text-base bg-white border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-400 min-w-0"
             onClick={e => e.stopPropagation()} />
     );
 };
@@ -609,20 +609,20 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
     // ---- 渲染文档项 ----
     const renderDoc = (doc: any, folderId?: number, kbId?: number) => (
         <div key={doc.id}
-            className={`flex items-center px-2 py-1.5 rounded-md transition-colors cursor-pointer group ${
-                currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-100'
+            className={`doco-sidebar-doc-row flex items-center rounded-md px-2 py-1.5 transition-colors cursor-pointer group ${
+                currentDocId === doc.id ? 'is-active' : ''
             }`}
             onClick={() => navigateToDoc(doc.id)}
             onContextMenu={e => showDocMenu(e, doc, folderId, kbId)}>
             {doc.document_type === 'spreadsheet'
-                ? <Sheet aria-label="电子表格" size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-[var(--accent)]' : 'text-gray-400'}`} />
-                : <FileText size={13} className={`mr-2 shrink-0 ${currentDocId === doc.id ? 'text-blue-500' : 'text-gray-400'}`} />}
+                ? <Sheet aria-label="电子表格" size={14} className="mr-2 shrink-0" />
+                : <FileText size={14} className="mr-2 shrink-0" />}
             {editingItem?.type === 'doc' && editingItem.id === doc.id ? (
                 <InlineEdit value={doc.title}
                     onSave={v => renameDoc(doc.id, v)}
                     onCancel={() => setEditingItem(null)} />
             ) : (
-                <span className="flex-1 text-xs truncate">{doc.title}</span>
+                <span className="flex-1 truncate text-base">{doc.title}</span>
             )}
             <button onClick={e => {
                     e.stopPropagation();
@@ -638,19 +638,19 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
     // ---- 递归渲染文件夹 ----
     const renderFolder = (folder: any, kbId: number, parentId?: number) => (
         <div key={folder.id}>
-            <div className="flex items-center px-2 py-1.5 hover:bg-gray-100 group cursor-pointer rounded-md transition-colors"
+            <div className="doco-sidebar-folder-row flex items-center rounded-md px-2 py-1.5 transition-colors group cursor-pointer"
                 onClick={() => toggleFolder(folder.id)}
                 onContextMenu={e => showFolderMenu(e, folder, kbId, parentId)}>
                 <span className="mr-1 text-gray-400">
-                    {expandedFolders[folder.id] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    {expandedFolders[folder.id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                 </span>
-                <Folder size={14} className="mr-2 text-amber-500 shrink-0" />
+                <Folder size={15} className="mr-2 shrink-0 text-amber-500" />
                 {editingItem?.type === 'folder' && editingItem.id === folder.id ? (
                     <InlineEdit value={folder.name}
                         onSave={v => renameFolder(folder.id, v)}
                         onCancel={() => setEditingItem(null)} />
                 ) : (
-                    <span className="flex-1 text-xs truncate font-medium text-gray-600">{folder.name}</span>
+                    <span className="flex-1 truncate text-base font-medium">{folder.name}</span>
                 )}
                 <button onClick={e => {
                         e.stopPropagation();
@@ -688,7 +688,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             </div>
 
             {expandedFolders[folder.id] && (
-                <div className="ml-5">
+                <div className="doco-sidebar-tree-children doco-sidebar-tree-children-nested">
                     {(content[`folder_${folder.id}_subfolders`] || []).map((sub: any) =>
                         renderFolder(sub, kbId, folder.id)
                     )}
@@ -699,10 +699,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             )}
         </div>
     );
-    if (collapsed) return null;
-
     return (
-        <aside id="doco-sidebar" className="doco-sidebar absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col border-r shadow-xl select-none md:static md:w-64 md:shadow-none">
+        <aside
+            id="doco-sidebar"
+            aria-hidden={collapsed}
+            inert={collapsed}
+            className={`doco-sidebar absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col overflow-hidden border-r shadow-xl select-none md:static md:shadow-none ${collapsed ? 'is-collapsed' : ''}`}
+        >
             {/* 搜索栏 */}
             <div className="px-3 pt-3 pb-2">
                 <div className="relative">
@@ -711,7 +714,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="搜索文档..."
-                        className="w-full pl-8 pr-8 py-1.5 text-sm bg-gray-100 border-none rounded-md outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 transition-colors placeholder:text-gray-400"
+                        className="w-full pl-8 pr-8 py-1.5 text-base bg-gray-100 border-none rounded-md outline-none focus:bg-white focus:ring-1 focus:ring-gray-300 transition-colors placeholder:text-gray-400"
                     />
                     {searchQuery && (
                         <button onClick={() => setSearchQuery('')}
@@ -725,13 +728,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
             {/* 搜索结果 */}
             {searchResults !== null ? (
                 <div className="flex-1 overflow-y-auto px-2 pb-2">
-                    <div className="px-3 py-1.5 text-xs text-gray-400">
+                    <div className="px-3 py-1.5 text-sm text-gray-400">
                         {searchResults.length > 0 ? `找到 ${searchResults.length} 个文档` : '无匹配结果'}
                     </div>
                     {searchResults.map(doc => (
                         <button key={doc.id}
                             onClick={() => { navigateToDoc(doc.id); setSearchQuery(''); }}
-                            className={`flex items-center px-3 py-2 w-full text-left text-sm rounded-md transition-colors ${
+                            className={`flex items-center px-3 py-2 w-full text-left text-base rounded-md transition-colors ${
                                 currentDocId === doc.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                             }`}>
                             {doc.document_type === 'spreadsheet'
@@ -745,7 +748,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                 /* 文档树 */
                 <div className="flex-1 overflow-y-auto px-2 pb-2">
                     <div className="px-3 mb-2 flex justify-between items-center">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">知识库</span>
+                        <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider">知识库</span>
                         <button onClick={addKb} className="p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors">
                             <Plus size={14} />
                         </button>
@@ -754,19 +757,19 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
                     {kbs.map(kb => (
                         <div key={kb.id} className="mb-0.5">
                             {/* 知识库行 */}
-                            <div className="flex items-center px-2 py-1.5 hover:bg-gray-100 group cursor-pointer rounded-md transition-colors"
+                            <div className="doco-sidebar-kb-row flex items-center rounded-md px-2 py-2 transition-colors group cursor-pointer"
                                 onClick={() => toggleKb(kb.id)}
                                 onContextMenu={e => showKbMenu(e, kb)}>
                                 <span className="mr-1 text-gray-400">
                                     {expandedKbs[kb.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </span>
-                                <Library size={15} className="mr-2 text-indigo-500 shrink-0" />
+                                <Library size={16} className="mr-2 shrink-0" />
                                 {editingItem?.type === 'kb' && editingItem.id === kb.id ? (
                                     <InlineEdit value={kb.name}
                                         onSave={v => renameKb(kb.id, v)}
                                         onCancel={() => setEditingItem(null)} />
                                 ) : (
-                                    <span className="flex-1 text-sm truncate font-medium text-gray-700">{kb.name}</span>
+                                    <span className="flex-1 truncate text-[17px] font-semibold">{kb.name}</span>
                                 )}
                                 <button onClick={e => {
                                         e.stopPropagation();
@@ -805,7 +808,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed }: { collapsed?: boo
 
                             {/* 知识库内容：文件夹 + 直属文档 */}
                             {expandedKbs[kb.id] && (
-                                <div className="ml-3">
+                                <div className="doco-sidebar-tree-children">
                                     {(content[`kb_${kb.id}_folders`] || []).map((folder: any) =>
                                         renderFolder(folder, kb.id)
                                     )}

@@ -52,6 +52,23 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
   await expect(page.locator('#doco-sidebar')).toBeVisible()
   await expect(page.getByText('测试知识库')).toBeVisible()
 
+  const sidebar = page.locator('#doco-sidebar')
+  const sidebarResizer = page.getByRole('separator', { name: '调整侧边栏宽度' })
+  const [sidebarBoxBeforeResize, resizerBox] = await Promise.all([
+    sidebar.boundingBox(),
+    sidebarResizer.boundingBox(),
+  ])
+  if (!sidebarBoxBeforeResize || !resizerBox) throw new Error('侧边栏分隔线不可用')
+  await page.mouse.move(resizerBox.x + resizerBox.width / 2, resizerBox.y + 120)
+  await page.mouse.down()
+  await page.mouse.move(resizerBox.x + resizerBox.width / 2 + 48, resizerBox.y + 120)
+  await page.mouse.up()
+  await expect.poll(async () => (await sidebar.boundingBox())?.width || 0).toBeGreaterThan(sidebarBoxBeforeResize.width + 40)
+  await page.reload()
+  await expect(sidebar).toBeVisible()
+  await expect.poll(async () => (await sidebar.boundingBox())?.width || 0).toBeGreaterThan(sidebarBoxBeforeResize.width + 40)
+  await page.screenshot({ path: '/tmp/doco-sidebar-resizer.png' })
+
   const kbRow = page.getByText('测试知识库').locator('..')
   await kbRow.getByRole('button').first().click()
   const newSpreadsheetEntry = page.getByRole('button', { name: '新建电子表格' })
@@ -67,6 +84,20 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
   const fileInput = page.locator('input[type="file"][accept*=".md"]')
   await fileInput.setInputFiles({ name: 'import.md', mimeType: 'text/markdown', buffer: Buffer.from('# API v1\n\n导入内容') })
   await expect(page.locator('.ProseMirror')).toContainText('导入内容')
+
+  const tocTrigger = page.locator('.toc-trigger')
+  await expect(tocTrigger).toBeVisible()
+  await page.getByRole('button', { name: '收起侧边栏' }).click()
+  await expect(page.locator('#doco-sidebar')).toBeHidden()
+  await expect.poll(async () => {
+    const [tocBox, canvasBox] = await Promise.all([
+      tocTrigger.boundingBox(),
+      documentCanvas.boundingBox(),
+    ])
+    return Boolean(tocBox && canvasBox && tocBox.x + tocBox.width <= canvasBox.x)
+  }).toBe(true)
+  await page.getByRole('button', { name: '展开侧边栏' }).click()
+  await expect(page.locator('#doco-sidebar')).toBeVisible()
 
   await page.locator('.ProseMirror').click()
   await page.keyboard.press('Control+End')

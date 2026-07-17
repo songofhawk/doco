@@ -128,6 +128,237 @@ body {
 .doco-sidebar {
   border-color: var(--border-subtle);
   background: var(--surface-sidebar);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease-out,
+    visibility 0s linear 0s;
+  visibility: visible;
+  will-change: transform, opacity;
+}
+
+.doco-sidebar.is-collapsed {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-100%);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease-out,
+    visibility 0s linear 220ms;
+  visibility: hidden;
+}
+
+.doco-sidebar-kb-row {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+.doco-sidebar-kb-row:hover {
+  background: var(--surface-hover);
+}
+
+.doco-sidebar-kb-row > svg {
+  color: var(--accent);
+}
+
+.doco-sidebar-folder-row {
+  color: var(--text-secondary);
+}
+
+.doco-sidebar-folder-row:hover,
+.doco-sidebar-doc-row:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.doco-sidebar-doc-row {
+  color: var(--text-secondary);
+}
+
+.doco-sidebar-doc-row > svg {
+  color: var(--text-muted);
+}
+
+.doco-sidebar-doc-row.is-active {
+  background: var(--surface-selected);
+  color: var(--accent-strong);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.doco-sidebar-doc-row.is-active > svg {
+  color: var(--accent);
+}
+
+.doco-sidebar-tree-children {
+  margin-left: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.doco-sidebar-tree-children-nested {
+  margin-left: 1rem;
+}
+
+.doco-sidebar-toggle-rail {
+  width: 0;
+  height: 100%;
+  flex: 0 0 auto;
+  border-right: 1px solid transparent;
+  background: var(--surface-sidebar);
+  transition:
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 140ms ease-out;
+}
+
+.doco-sidebar-toggle-rail.is-visible {
+  width: 0.5rem;
+  border-right-color: var(--border-subtle);
+}
+
+.doco-sidebar-edge-toggle {
+  position: absolute;
+  top: 50%;
+  left: calc(min(16rem, calc(100vw - 3rem)) - 0.5rem);
+  z-index: 40;
+  display: flex;
+  width: 1rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: translateY(-50%);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  background: var(--surface-sidebar);
+  color: var(--text-secondary);
+  box-shadow: none;
+  transition:
+    left 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 140ms ease-out,
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.doco-sidebar-edge-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  box-shadow: 0 2px 6px var(--shadow-ring);
+}
+
+.doco-sidebar-edge-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.doco-sidebar-edge-toggle.is-collapsed {
+  left: 0;
+}
+
+.doco-sidebar-toggle-triangle {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.doco-sidebar-toggle-triangle.points-left {
+  border-right: 5px solid currentColor;
+}
+
+.doco-sidebar-toggle-triangle.points-right {
+  border-left: 5px solid currentColor;
+}
+
+.doco-sidebar-resizer {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .doco-sidebar {
+    width: var(--doco-sidebar-width, 16rem);
+    transition:
+      width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 140ms ease-out,
+      border-color 140ms ease-out,
+      visibility 0s linear 0s;
+    will-change: width, transform, opacity;
+  }
+
+  .doco-sidebar.is-collapsed {
+    width: 0;
+    border-right-color: transparent;
+    transform: translateX(-1rem);
+    transition:
+      width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 140ms ease-out,
+      border-color 140ms ease-out,
+      visibility 0s linear 220ms;
+  }
+
+  .doco-sidebar-edge-toggle {
+    left: calc(var(--doco-sidebar-width, 16rem) - 0.5rem);
+  }
+
+  .doco-sidebar-edge-toggle.is-collapsed {
+    left: 0;
+  }
+
+  .doco-sidebar-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--doco-sidebar-width, 16rem);
+    z-index: 35;
+    display: block;
+    width: 8px;
+    padding: 0;
+    transform: translateX(-50%);
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .doco-sidebar-resizer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    background: transparent;
+    transition: background-color 140ms ease-out;
+  }
+
+  .doco-sidebar-resizer:hover::after,
+  .doco-sidebar-resizer:focus-visible::after,
+  .is-sidebar-resizing .doco-sidebar-resizer::after {
+    background: var(--accent);
+  }
+
+  .doco-sidebar-resizer.is-hidden {
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .is-sidebar-resizing .doco-sidebar,
+  .is-sidebar-resizing .doco-sidebar-edge-toggle {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doco-sidebar {
+    transition-duration: 0.01ms;
+  }
+
+  .doco-sidebar-toggle-rail,
+  .doco-sidebar-edge-toggle,
+  .doco-sidebar-resizer::after {
+    transition-duration: 0.01ms;
+  }
 }
 
 .doco-menu,
