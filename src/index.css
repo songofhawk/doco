@@ -208,7 +208,6 @@ body {
 .doco-sidebar-doc-row.is-active {
   background: var(--surface-selected);
   color: var(--accent-strong);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .doco-sidebar-doc-row.is-active > svg {

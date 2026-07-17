@@ -592,9 +592,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             x: e.clientX, y: e.clientY,
             items: [
                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
-                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(undefined, kb.id, 'spreadsheet') },
-                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
+                'divider',
                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
             ]
         });
@@ -606,9 +604,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             x: e.clientX, y: e.clientY,
             items: [
                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
-                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(folder.id, undefined, 'spreadsheet') },
-                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
+                'divider',
                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
             ]
         });
@@ -697,9 +693,6 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                             x: rect.left, y: rect.bottom + 2,
                             items: [
                                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(folder.id) },
-                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(folder.id, undefined, 'spreadsheet') },
-                                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kbId, folder.id) },
                                 'divider',
                                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
                             ]
@@ -816,9 +809,6 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                                             x: rect.left, y: rect.bottom + 2,
                                             items: [
                                                 { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                                                { label: '新建文档', icon: <FileText size={14} />, onClick: () => addDoc(undefined, kb.id) },
-                                                { label: '新建电子表格', icon: <Sheet size={14} />, onClick: () => addDoc(undefined, kb.id, 'spreadsheet') },
-                                                { label: '新建文件夹', icon: <Plus size={14} />, onClick: () => addFolder(kb.id) },
                                                 'divider',
                                                 { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
                                             ]
