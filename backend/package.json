@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.js",
-    "start": "node server.js",
+    "dev": "node --env-file-if-exists=.env.local --watch server.js",
+    "start": "node --env-file-if-exists=.env.local server.js",
     "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "dependencies": {
