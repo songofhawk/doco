@@ -19,6 +19,6 @@ echo "== 更新 Caddy 路由 =="
 scp -i "$KEY" -o StrictHostKeyChecking=accept-new \
   backend/deploy/Caddyfile "$TARGET:/tmp/doco-Caddyfile"
 ssh -i "$KEY" -o StrictHostKeyChecking=accept-new "$TARGET" \
-  'caddy validate --config /tmp/doco-Caddyfile && install -m 644 /tmp/doco-Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy'
+  'caddy validate --adapter caddyfile --config /tmp/doco-Caddyfile && install -m 644 /tmp/doco-Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy'
 
 echo "== 直连前端部署完成 =="
