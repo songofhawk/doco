@@ -39,6 +39,7 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
   await expect(page).toHaveTitle('测试知识库')
 
   await page.goto('/doc/doc_test')
+  await expect(page).toHaveURL('/doc/doc_test')
   await expect(page.getByText('E2E 用户')).toBeVisible()
   await expect(page.getByText('测试知识库')).toBeVisible()
   await expect(page.getByPlaceholder('无标题')).toHaveValue('测试文档')
@@ -47,6 +48,10 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
   await expect(documentCanvas.getByRole('button', { name: '导入文档' })).toBeVisible()
   await expect(documentCanvas.getByRole('button', { name: '导出文档' })).toBeVisible()
   await expect(page.locator('header').getByRole('button', { name: '导入文档' })).toHaveCount(0)
+
+  await page.goto('/app/doc/doc_test')
+  await expect(page).toHaveURL('/doc/doc_test')
+  await expect(page.getByPlaceholder('无标题')).toHaveValue('测试文档')
 
   await page.getByRole('button', { name: '收起侧边栏' }).click()
   await expect(page.locator('#doco-sidebar')).toBeHidden()
@@ -169,7 +174,7 @@ test('登录页只提供邮箱验证码和 Google 登录', async ({ page }) => {
   })
 
   await page.goto('/')
-  await expect(page.getByText('使用邮箱或 Google 账号登录')).toBeVisible()
+  await expect(page.getByText('使用邮箱或 Google 账号继续')).toBeVisible()
   await expect(page.getByText('密码登录')).toHaveCount(0)
   await page.getByLabel('邮箱地址').fill('google.user@example.com')
   await page.getByRole('button', { name: '发送验证码' }).click()

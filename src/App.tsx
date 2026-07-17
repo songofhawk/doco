@@ -483,10 +483,13 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
           <span className={`doco-sidebar-toggle-triangle ${sidebarCollapsed ? 'points-right' : 'points-left'}`} />
         </button>
         <main className="doco-app-main min-w-0 flex-1 overflow-y-auto">
-          <Routes>
-            <Route path="/app" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} onActiveDocumentTitleChange={setActiveDocumentTitle} />} />
-            <Route path="/app/doc/:id" element={<EditorPage exportRef={exportRef} externalTitle={externalTitle} user={user} onImportRequest={handleImport} onActiveDocumentTitleChange={setActiveDocumentTitle} />} />
-          </Routes>
+          <EditorPage
+            exportRef={exportRef}
+            externalTitle={externalTitle}
+            user={user}
+            onImportRequest={handleImport}
+            onActiveDocumentTitleChange={setActiveDocumentTitle}
+          />
         </main>
       </div>
       {logoutConfirmOpen && (
@@ -500,10 +503,10 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
   )
 }
 
-/** 旧版 /doc/:id 链接兼容：重定向到 /app/doc/:id（未登录时会先落到首页，登录后跳回）。 */
-const LegacyDocRedirect = () => {
+/** 短期兼容新版曾生成的 /app/doc/:id 链接，文档永久地址仍为 /doc/:id。 */
+const AppDocRedirect = () => {
   const { id } = useParams<{ id: string }>()
-  return <Navigate to={`/app/doc/${id}`} replace />
+  return <Navigate to={`/doc/${id}`} replace />
 }
 
 function Root() {
@@ -512,18 +515,16 @@ function Root() {
 
   if (loading) return <LoadingScreen />
 
+  const workspace = user
+    ? <WorkspaceShell user={user} />
+    : <Navigate to="/" replace state={{ from: `${location.pathname}${location.search}` }} />
+
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/doc/:id" element={<LegacyDocRedirect />} />
-      <Route
-        path="/app/*"
-        element={
-          user
-            ? <WorkspaceShell user={user} />
-            : <Navigate to="/" replace state={{ from: `${location.pathname}${location.search}` }} />
-        }
-      />
+      <Route path="/app/doc/:id" element={<AppDocRedirect />} />
+      <Route path="/doc/:id" element={workspace} />
+      <Route path="/app" element={workspace} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

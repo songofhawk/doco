@@ -202,7 +202,7 @@ type SidebarProps = {
 /* ---- 主侧边栏 ---- */
 export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBaseChange }: SidebarProps) => {
     const location = useLocation();
-    const currentDocId = location.pathname.startsWith('/app/doc/') ? location.pathname.slice(9) : undefined;
+    const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : undefined;
     const [kbs, setKbs] = useState<any[]>([]);
     const [activeKbId, setActiveKbId] = useState<number | null>(null);
     const [expandedKbs, setExpandedKbs] = useState<Record<number, boolean>>({});
@@ -221,7 +221,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
     const navigateToDoc = (docId: string) => {
-        navigate(`/app/doc/${docId}`);
+        navigate(`/doc/${docId}`);
         if (window.innerWidth < 768) onToggle?.();
     };
 
@@ -611,7 +611,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     };
 
     const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
-        { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/app/doc/${doc.id}`) },
+        { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/doc/${doc.id}`) },
         { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId, doc.document_type || 'document') },
         'divider',
         { label: '移动到…', icon: <FolderInput size={14} />, onClick: () => startMoveDoc(doc.id, folderId, kbId) },

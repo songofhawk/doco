@@ -32,8 +32,8 @@
 doco/
 ├── src/
 │   ├── main.tsx                       # 应用入口
-│   ├── App.tsx                        # 根组件，路由管理（/ 首页、/app 工作区、/app/doc/:id 文档，
-│   │                                  #   旧 /doc/:id 自动重定向），工作区外壳，导入/导出
+│   ├── App.tsx                        # 根组件，路由管理（/ 首页、/app 工作区、/doc/:id 文档，
+│   │                                  #   /app/doc/:id 兼容重定向），工作区外壳，导入/导出
 │   ├── components/
 │   │   ├── HomePage.tsx               # 落地首页：品牌展示 + 登录面板（邮箱验证码 / Google），
 │   │   │                              #   登录后跳转 /app；未登录访问 /app 会带回跳参数
