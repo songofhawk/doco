@@ -72,7 +72,7 @@ curl -i http://127.0.0.1:8000/api/auth/me   # 未登录时应返回 401
 生产服务默认只接受指定前端的浏览器请求：
 
 ```ini
-Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev
+Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev,https://doco.showme.talk
 Environment=GOOGLE_CLIENT_ID=321174610881-tv7v2e0e1u0300pqkk0t9dv2v4esl7f2.apps.googleusercontent.com
 Environment=COOKIE_SAMESITE=none
 Environment=COOKIE_SECURE=true

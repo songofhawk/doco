@@ -27,7 +27,7 @@ const PORT = Number(process.env.PORT) || 8000;
 // 生产环境由反向代理（Caddy）对外，服务本身只绑 127.0.0.1（systemd 里设 HOST）
 const HOST = process.env.HOST || '0.0.0.0';
 const DEFAULT_ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
-  ? ['https://doco-editor.pages.dev']
+  ? ['https://doco-editor.pages.dev', 'https://doco.showme.talk']
   : [
       'http://localhost:5173',
       'http://localhost:5174',
