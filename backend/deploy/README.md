@@ -72,7 +72,7 @@ curl -i http://127.0.0.1:8000/api/auth/me   # 未登录时应返回 401
 生产服务默认只接受指定前端的浏览器请求：
 
 ```ini
-Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev,https://doco.showme.talk
+Environment=ALLOWED_ORIGINS=https://doco-editor.pages.dev,https://doco.showme.talk,https://doco-editor.showme.talk
 Environment=GOOGLE_CLIENT_ID=321174610881-tv7v2e0e1u0300pqkk0t9dv2v4esl7f2.apps.googleusercontent.com
 Environment=COOKIE_SAMESITE=none
 Environment=COOKIE_SECURE=true
@@ -164,7 +164,29 @@ VITE_API_BASE=https://doco-124-156-169-69.sslip.io/api
 
 然后 `pnpm run deploy`。
 
-## 7. 日常运维
+## 7. 服务器直连前端（Cloudflare Pages 备用入口）
+
+为不经过 Cloudflare 的访问准备独立域名：
+
+```text
+doco-editor.showme.talk
+```
+
+在 DNS 服务商处添加 `A` 记录，将主机名 `doco-editor` 指向服务器公网 IP `124.156.169.69`。DNS 生效后，首次部署会让 Caddy 自动申请 HTTPS 证书。
+
+直连前端使用同域接口：`/app-api/v1` 与 `/ws` 都由 Caddy 反代到本机后端，因此不依赖浏览器跨域访问。部署命令为：
+
+```bash
+pnpm run deploy:server -- root@124.156.169.69 ~/terminal/tt_hk.pem
+```
+
+Google OAuth 客户端还需保留原域名，并新增已获授权的 JavaScript 来源：
+
+```text
+https://doco-editor.showme.talk
+```
+
+## 8. 日常运维
 
 ```bash
 journalctl -u doco-backend -f          # 看日志

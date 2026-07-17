@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:server": "vite build --mode server-production",
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "vite build --mode production && wrangler pages deploy dist --project-name=doco-editor --branch=main --commit-dirty=true",
+    "deploy:server": "bash backend/deploy/deploy-frontend-from-local.sh",
     "test:backend": "npm --prefix backend test",
     "test:e2e": "playwright test"
   },

@@ -4,3 +4,19 @@ doco-124-156-169-69.sslip.io {
 	# WebSocket 与 REST 都走同一个后端，Caddy 自动处理 WS 升级
 	reverse_proxy 127.0.0.1:8000
 }
+
+# 直连前端：静态页面与后端 API/协同 WebSocket 使用同一来源，适合作为 Cloudflare Pages 的备用入口。
+doco-editor.showme.talk {
+	encode zstd gzip
+
+	@backend path /app-api/* /ws*
+	handle @backend {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * /opt/doco/frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
