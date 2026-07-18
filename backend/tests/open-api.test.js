@@ -90,6 +90,37 @@ test('个人可以查看当前工作区的配额与用量', async () => {
   assert.equal(response.body.folder_depth_limit, 20);
 });
 
+test('页面上传 GIF 时保留原始动图字节和 MIME 类型', async () => {
+  const kb = db.prepare('INSERT INTO knowledge_bases (name, workspace_id) VALUES (?, ?)')
+    .run('GIF KB', 'workspace-user-1').lastInsertRowid;
+  db.prepare('INSERT INTO documents (id, title, kb_id) VALUES (?, ?, ?)')
+    .run('gif-upload-doc', 'GIF upload', kb);
+  const gif = Buffer.from(
+    '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024401003b',
+    'hex',
+  );
+
+  const uploaded = await request(app).post('/app-api/v1/attachments/upload')
+    .set('Cookie', cookie1)
+    .field('document_id', 'gif-upload-doc')
+    .attach('file', gif, { filename: 'animated.gif', contentType: 'image/gif' })
+    .expect(201);
+  assert.match(uploaded.body.id, /^att_/);
+
+  const downloaded = await request(app).get(`/app-api/v1/attachments/${uploaded.body.id}`)
+    .set('Cookie', cookie1)
+    .buffer(true)
+    .parse((res, callback) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => callback(null, Buffer.concat(chunks)));
+    })
+    .expect('Content-Type', /image\/gif/)
+    .expect(200);
+  assert.deepEqual(downloaded.body, gif);
+  assert.match(downloaded.body.toString('ascii'), /NETSCAPE2\.0/);
+});
+
 test('旧文档块 ID 懒迁移幂等并立即持久化', async () => {
   const { documentSchema } = await import('../document-schema.js');
   const { yDocService } = await import('../ydoc-service.js');
