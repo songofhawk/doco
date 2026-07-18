@@ -48,3 +48,8 @@ playwright-report/
 .pnpm-store/
 .playwright-mcp/
 .wrangler/
+
+# Local deployment notes
+/README.deploy.md
+/README.cloudflare.md
+/backend/deploy/README.md
