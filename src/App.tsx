@@ -15,6 +15,8 @@ import { ApiDocsPage } from './components/ApiDocsPage'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
+const isHeadingNumbered = (value: unknown) => value === true || value === 1 || value === '1'
+
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center h-full text-gray-400 select-none">
     <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-5">
@@ -131,7 +133,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onNativeE
         docId: id,
         title: d.title,
         documentType: d.document_type || 'document',
-        headingNumbered: d.heading_numbered,
+        headingNumbered: isHeadingNumbered(d.heading_numbered),
         bgColor: d.bg_color,
         collapsedBlocks: d.collapsed_blocks ? d.collapsed_blocks.split(',').filter(Boolean) : [],
       })
@@ -428,7 +430,7 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
   return (
     <div className="doco-app h-screen flex flex-col overflow-hidden">
       <header className="doco-app-header z-40 flex h-12 shrink-0 items-center px-4">
-        <Link to="/app" className="doco-wordmark-link" aria-label="Doco 工作区">
+        <Link to="/" className="doco-wordmark-link" aria-label="Doco 首页">
           <DocoWordmark />
         </Link>
         <div className="ml-auto flex items-center text-sm text-gray-500">

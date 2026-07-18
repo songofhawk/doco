@@ -241,7 +241,7 @@
   }
 
   .image-toolbar-btn.active {
-    background-color: #eff6ff;
+    background-color: var(--color-primary-50);
     color: var(--color-primary-600);
   }
 
@@ -270,7 +270,7 @@
     border-radius: 0.15rem;
     &:hover {
       color: var(--color-primary-500);
-      box-shadow: 0 0 0 2px #dbeafe;
+      box-shadow: 0 0 0 2px var(--color-primary-100);
     }
   }
 
@@ -455,16 +455,7 @@
 .doco-editor-root .toc-item {
   display: block;
   line-height: 1.6;
-  border-left: 2px solid transparent;
-  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
-}
-
-.doco-editor-root .toc-item:hover {
-  border-left-color: #d1d5db;
-}
-
-.doco-editor-root .toc-item.text-blue-600 {
-  border-left-color: #3b82f6;
+  transition: color 0.15s, background-color 0.15s;
 }
 
 /* ===== 表格样式 ===== */
@@ -498,7 +489,7 @@
 
 /* 选中单元格高亮 */
 .doco-editor-root .ProseMirror .selectedCell {
-  background-color: #dbeafe;
+  background-color: var(--color-primary-100);
 }
 
 /* 列拖拽调整宽度手柄 */
@@ -508,7 +499,7 @@
   top: 0;
   bottom: -2px;
   width: 4px;
-  background-color: #3b82f6;
+  background-color: var(--color-primary-500);
   pointer-events: none;
 }
 
@@ -533,7 +524,7 @@
 
 .doco-editor-root .table-handle:hover,
 .doco-editor-root .table-handle.active {
-  background: #3b82f6;
+  background: var(--color-primary-500);
   color: white;
 }
 
@@ -561,9 +552,9 @@
 }
 
 .doco-editor-root .table-add-btn:hover {
-  background: #eff6ff;
-  border-color: #3b82f6;
-  color: #3b82f6;
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-500);
 }
 
 .doco-editor-root .table-add-row {
@@ -1342,12 +1333,12 @@
 }
 
 .doco-editor-root .paste-md-btn-primary {
-  background: #3b82f6;
+  background: var(--color-primary-500);
   color: #fff;
 }
 
 .doco-editor-root .paste-md-btn-primary:hover {
-  background: #2563eb;
+  background: var(--color-primary-600);
 }
 
 .doco-editor-root .paste-md-btn-secondary {

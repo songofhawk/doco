@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
+  --color-primary-50: #fbe9e0;
+  --color-primary-100: #f5d8c9;
+  --color-primary-500: #b9552f;
+  --color-primary-600: #a0431f;
 
   /* 代码块 */
   --color-editor-codeblock-bg: #f8f9fa;
@@ -56,8 +56,8 @@ body {
   --surface-elevated: #ffffff;
   --surface-subtle: #f3f4f6;
   --surface-hover: #f3f4f6;
-  --surface-selected: #eff6ff;
-  --surface-selected-strong: #dbeafe;
+  --surface-selected: #fbe9e0;
+  --surface-selected-strong: #f5d8c9;
   --surface-grid-header: #f3f4f6;
   --surface-grid-cell: #ffffff;
   --surface-danger: #fef2f2;
@@ -66,9 +66,9 @@ body {
   --text-primary: #111827;
   --text-secondary: #4b5563;
   --text-muted: #9ca3af;
-  --accent: #3b82f6;
-  --accent-strong: #2563eb;
-  --accent-soft: #eff6ff;
+  --accent: #b9552f;
+  --accent-strong: #a0431f;
+  --accent-soft: #fbe9e0;
   --danger: #dc2626;
   --shadow-ring: rgba(17, 24, 39, 0.08);
   --font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -108,6 +108,12 @@ body {
   background: var(--surface-app);
   color: var(--text-primary);
   font-family: var(--font-ui);
+}
+
+/* 文本选中色跟随主题强调色（与首页一致的品牌陶土调） */
+.doco-app ::selection,
+.doco-editor-root ::selection {
+  background: var(--accent-soft);
 }
 
 .doco-app-header {
@@ -564,8 +570,8 @@ body {
 }
 
 .doco-sidebar-doc-row.is-active {
-  background: var(--surface-selected);
-  color: var(--accent-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
 }
 
 .doco-sidebar-doc-row.is-active > svg {

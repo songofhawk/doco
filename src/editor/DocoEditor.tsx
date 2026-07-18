@@ -195,7 +195,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     // 从 props 加载文档元数据
     useEffect(() => {
         if (initialMeta?.title) setTitle(initialMeta.title)
-        if (initialMeta?.headingNumbered !== undefined) setHeadingNumbered(initialMeta.headingNumbered)
+        if (initialMeta?.headingNumbered !== undefined) setHeadingNumbered(initialMeta.headingNumbered === true)
         if (initialMeta?.bgColor) setBgColor(initialMeta.bgColor)
     }, [docId, initialMeta])
 
@@ -503,13 +503,14 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         css += `  counter-reset: ${counterNames.join(' ')};\n`
         used.forEach((tag, i) => {
             const resets = counterNames.slice(i + 1)
-            if (resets.length) css += `  ${tag} { counter-reset: ${resets.join(' ')}; }\n`
+            css += `  ${tag} { counter-increment: ${counterNames[i]};`
+            if (resets.length) css += ` counter-reset: ${resets.join(' ')};`
+            css += ` }\n`
         })
         used.forEach((tag, i) => {
             const parts = counterNames.slice(0, i + 1).map(c => `counter(${c})`).join(' "."')
             const suffix = i === 0 ? ' ". "' : ' " "'
             css += `  ${tag}::before {\n`
-            css += `    counter-increment: ${counterNames[i]};\n`
             css += `    content: ${parts}${suffix};\n`
             css += `    color: #9ca3af; margin-right: 0.5rem;\n`
             css += `  }\n`

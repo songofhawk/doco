@@ -35,8 +35,13 @@ doco/
 │   ├── App.tsx                        # 根组件，路由管理（/ 首页、/app 工作区、/doc/:id 文档，
 │   │                                  #   /app/doc/:id 兼容重定向），工作区外壳，导入/导出
 │   ├── components/
-│   │   ├── HomePage.tsx               # 落地首页：品牌展示 + 登录面板（邮箱验证码 / Google），
-│   │   │                              #   登录后跳转 /app；未登录访问 /app 会带回跳参数
+│   │   ├── HomePage.tsx               # 落地首页（奢侈品宣传页风格，配套 HomePage.css）：
+│   │   │                              #   Hero/宣言/特性/图表与代码/协同/导入导出/数据 分区；登录为点击弹出的模态框
+│   │   │                              #   （Portal + Esc/遮罩关闭，邮箱验证码 / Google）；已登录用户
+│   │   │                              #   可自由浏览（入口变为「进入工作区」），仅被 /app 拦截回跳时
+│   │   │                              #   登录成功后续走来源页；
+│   │   │                              #   动效：IntersectionObserver + [data-reveal] 滚动浮现，
+│   │   │                              #   [data-parallax] rAF 视差（文字/图/背景幽灵大字错位漂移）
 │   │   └── Sidebar.tsx                # 知识库侧边栏（文档树管理）
 │   └── editor/                        # 编辑器模块（与 App 同仓同构建，无独立编译步骤）
 │       ├── DocoEditor.tsx             # 编辑器主组件（Yjs/Hocuspocus 初始化、扩展注册）
