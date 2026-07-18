@@ -723,7 +723,7 @@ body {
   .doco-sidebar-resizer:hover::after,
   .doco-sidebar-resizer:focus-visible::after,
   .is-sidebar-resizing .doco-sidebar-resizer::after {
-    background: var(--accent);
+    background: var(--accent-soft);
   }
 
   .doco-sidebar-resizer.is-hidden {

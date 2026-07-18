@@ -529,8 +529,13 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
           onDocRenamed={(docId, title) => setExternalTitle({ docId, title })}
           onActiveKnowledgeBaseChange={setActiveKnowledgeBaseTitle}
         />
-        <div
-          aria-hidden="true"
+        <button
+          type="button"
+          aria-label="展开侧边栏"
+          aria-controls="doco-sidebar"
+          aria-expanded={!sidebarCollapsed}
+          disabled={!sidebarCollapsed}
+          onClick={toggleSidebar}
           className={`doco-sidebar-toggle-rail ${sidebarCollapsed ? 'is-visible' : ''}`}
         />
         <div
