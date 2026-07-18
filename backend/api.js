@@ -1,5 +1,12 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
+import { mkdirSync } from 'fs';
+import { writeFile } from 'fs/promises';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
+import { fileTypeFromBuffer } from 'file-type';
+import { ulid } from 'ulid';
 import { db } from './database.js';
 import {
   clearSessionCookie,
@@ -141,6 +148,48 @@ api.delete('/api-tokens/:id', (req, res) => {
   } catch (error) {
     res.status(error.status || 400).json({ error: error.message, code: error.code });
   }
+});
+
+// ---- 附件 ----
+
+const attachmentDir = resolve(process.env.DOCO_ATTACHMENTS_PATH || join(dirname(fileURLToPath(import.meta.url)), 'attachments'));
+mkdirSync(attachmentDir, { recursive: true });
+const maxAttachmentBytes = Number(process.env.DOCO_MAX_ATTACHMENT_BYTES || 20 * 1024 * 1024);
+const attachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: maxAttachmentBytes, files: 1 } });
+const allowedImageMimes = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+// 编辑器图片上传（页面 Session）；开放 API 附件走 /api/v1/attachments。
+// document_id 必填：附件读取权限通过所属文档的工作区成员关系判定。
+api.post('/attachments/upload', (req, res) => {
+  attachmentUpload.single('file')(req, res, async (multerError) => {
+    if (multerError) {
+      const tooLarge = multerError.code === 'LIMIT_FILE_SIZE';
+      return res.status(tooLarge ? 413 : 400).json({ error: tooLarge ? '图片超过大小限制' : '上传请求不合法' });
+    }
+    try {
+      if (!req.file) return res.status(400).json({ error: '缺少文件' });
+      const docId = String(req.body?.document_id || '');
+      const doc = docId && getDocumentForUser(req.user.id, docId);
+      if (!doc) return res.status(400).json({ error: '文档不存在或无权限' });
+      if (!allowedImageMimes.has(req.file.mimetype)) {
+        return res.status(415).json({ error: '仅支持 PNG/JPEG/GIF/WebP 图片' });
+      }
+      const detected = await fileTypeFromBuffer(req.file.buffer);
+      if (!detected || !allowedImageMimes.has(detected.mime)) {
+        return res.status(415).json({ error: '文件内容与图片类型不符' });
+      }
+      const id = `att_${ulid()}`;
+      const filepath = join(attachmentDir, `${id}.${detected.ext}`);
+      await writeFile(filepath, req.file.buffer, { flag: 'wx' });
+      // busboy 按 latin1 解码文件名，中文名需转回 UTF-8
+      const originalName = Buffer.from(req.file.originalname || 'image', 'latin1').toString('utf8');
+      db.prepare('INSERT INTO attachments (id, filename, filepath, mime_type, size, doc_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, originalName.slice(0, 255), filepath, detected.mime, req.file.size, docId);
+      res.status(201).json({ id, url: `/app-api/v1/attachments/${id}` });
+    } catch (error) {
+      res.status(500).json({ error: error.message || '上传失败' });
+    }
+  });
 });
 
 // 页面通过 Session Cookie 读取附件；开放 API 的同一资源仍只接受 Bearer Token。

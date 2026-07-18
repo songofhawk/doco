@@ -103,6 +103,10 @@ useEffect(() => {
 
 - 单文档：`GET /api/docs/{id}/export.md`（内存实时文档优先，永远是最新状态）
 - 知识库打包：`GET /api/kb/{id}/export.zip`（目录结构 = 文件夹结构）
+- 文件夹打包：`GET /api/folders/{id}/export.zip`（含嵌套子文件夹）；
+  前端入口为侧边栏知识库/文件夹右键菜单（或悬停 "⋯"）→「导出 Markdown (ZIP)」
+- zip 打包时图片一并导出：附件引用（`/attachments/{id}`）和 data URI 图片写入
+  **文档同目录的 `assets/`**，markdown 里的链接重写为相对路径；外链图片保持原 URL 不动
 - 实现：[backend/markdown.js](../backend/markdown.js)，schema 与前端扩展一致；
   **前端新增自定义节点时，需同步在 markdown.js 里补 schema 定义和序列化规则**。
 - 前端手动导出（工具栏按钮）用 tiptap-markdown；自定义节点（Mermaid/PlantUML/Callout）已通过

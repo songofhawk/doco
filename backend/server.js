@@ -4,13 +4,16 @@ import { WebSocketServer } from 'ws';
 import { Hocuspocus, IncomingMessage, MessageReceiver, MessageType } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import JSZip from 'jszip';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { db } from './database.js';
 import { api } from './api.js';
 import { getSessionUserFromCookieHeader, requireAuth } from './auth.js';
 import { stateToMarkdown } from './markdown.js';
 import {
+  getAttachmentForUser,
   getDocumentForUser,
+  getFolderForUser,
   getKnowledgeBaseForUser,
   listFolderDocsForUser,
   listRootDocsForUser,
@@ -200,6 +203,8 @@ app.use(cors({
     callback(null, isOriginAllowed(origin) ? origin || false : false);
   },
   credentials: true,
+  // 前端需要读取 Content-Disposition 来还原导出文件名
+  exposedHeaders: ['Content-Disposition'],
 }));
 app.use('/api/v1', requestContext);
 app.use(express.json({ limit: '10mb' }));
@@ -224,12 +229,59 @@ const exportMarkdown = (req, res) => {
 app.get('/app-api/v1/docs/:id/export.md', requireAuth, exportMarkdown);
 app.get('/api/docs/:id/export.md', requireAuth, exportMarkdown); // 发布过渡期兼容路径
 
-const exportKnowledgeBase = async (req, res) => {
-  const kb = getKnowledgeBaseForUser(req.user.id, req.params.id);
-  if (!kb) return res.status(404).json({ error: 'Not found' });
-
+// 导出 zip 构建器：addDoc 写单个文档，walkFolder 递归写文件夹（含嵌套子文件夹）。
+// 文档里的图片（附件引用或 data URI）一并打包进同目录 assets/，markdown 链接重写为相对路径。
+const createExportZip = (userId) => {
   const zip = new JSZip();
   const usedNames = new Set();
+  const assetsUsedByDir = new Map(); // 目录前缀 -> 已占用的图片文件名
+  const imageNameCache = new Map();  // `${目录前缀}:${图片key}` -> 文件名（同一图片重复引用只存一份）
+
+  const uniqueImageName = (prefix, base) => {
+    let used = assetsUsedByDir.get(prefix);
+    if (!used) assetsUsedByDir.set(prefix, (used = new Set()));
+    let name = base;
+    const dot = base.lastIndexOf('.');
+    for (let i = 2; used.has(name); i++) {
+      name = dot > 0 ? `${base.slice(0, dot)}-${i}${base.slice(dot)}` : `${base}-${i}`;
+    }
+    used.add(name);
+    return name;
+  };
+
+  const storeImage = (prefix, key, base, data) => {
+    const cacheKey = `${prefix}:${key}`;
+    let name = imageNameCache.get(cacheKey);
+    if (!name) {
+      name = uniqueImageName(prefix, base);
+      imageNameCache.set(cacheKey, name);
+      zip.file(`${prefix}assets/${name}`, data);
+    }
+    return `assets/${name}`;
+  };
+
+  const bundleImages = (markdown, prefix) =>
+    markdown.replace(/!\[[^\]]*\]\((\S+?)((?:\s+"[^"]*")?)\)/g, (full, url) => {
+      const attachmentMatch = url.match(/\/attachments\/([\w-]+)/);
+      if (attachmentMatch) {
+        const attachment = getAttachmentForUser(userId, attachmentMatch[1]);
+        if (!attachment) return full;
+        let data;
+        try { data = readFileSync(attachment.filepath); } catch { return full; }
+        const name = storeImage(prefix, `att:${attachment.id}`, sanitizeFilename(attachment.filename), data);
+        return full.replace(url, name);
+      }
+      const dataUriMatch = url.match(/^data:image\/([\w.+-]+);base64,(.+)$/);
+      if (dataUriMatch) {
+        const ext = dataUriMatch[1].replace('svg+xml', 'svg').replace(/[^a-z0-9]/gi, '') || 'png';
+        const data = Buffer.from(dataUriMatch[2], 'base64');
+        if (!data.length) return full;
+        const key = `data:${data.length}:${dataUriMatch[2].slice(-64)}`;
+        const name = storeImage(prefix, key, `image.${ext}`, data);
+        return full.replace(url, name);
+      }
+      return full;
+    });
 
   const addDoc = (doc, prefix) => {
     const ydoc = getLatestDocState(doc.id);
@@ -238,36 +290,59 @@ const exportKnowledgeBase = async (req, res) => {
     for (let i = 2; usedNames.has(name); i++) name = `${base}-${i}.md`;
     usedNames.add(name);
     try {
-      zip.file(name, stateToMarkdown(Y.encodeStateAsUpdate(ydoc)));
+      zip.file(name, bundleImages(stateToMarkdown(Y.encodeStateAsUpdate(ydoc)), prefix));
     } catch (error) {
       zip.file(`${base}.error.txt`, `导出失败: ${error.message}`);
     }
   };
 
   const walkFolder = (folderId, prefix) => {
-    for (const doc of listFolderDocsForUser(req.user.id, folderId)) {
+    for (const doc of listFolderDocsForUser(userId, folderId)) {
       addDoc(doc, prefix);
     }
-    for (const sub of listSubfoldersForUser(req.user.id, folderId)) {
+    for (const sub of listSubfoldersForUser(userId, folderId)) {
       walkFolder(sub.id, `${prefix}${sanitizeFilename(sub.name)}/`);
     }
   };
 
+  return { zip, addDoc, walkFolder };
+};
+
+const sendZip = async (res, zip, filename) => {
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+  res.set('Content-Type', 'application/zip');
+  res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(sanitizeFilename(filename))}.zip`);
+  res.send(buffer);
+};
+
+const exportKnowledgeBase = async (req, res) => {
+  const kb = getKnowledgeBaseForUser(req.user.id, req.params.id);
+  if (!kb) return res.status(404).json({ error: 'Not found' });
+
+  const { zip, addDoc, walkFolder } = createExportZip(req.user.id);
   for (const doc of listRootDocsForUser(req.user.id, kb.id)) {
     addDoc(doc, '');
   }
   for (const folder of listRootFoldersForUser(req.user.id, kb.id)) {
     walkFolder(folder.id, `${sanitizeFilename(folder.name)}/`);
   }
-
-  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-  res.set('Content-Type', 'application/zip');
-  res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(sanitizeFilename(kb.name))}.zip`);
-  res.send(buffer);
+  await sendZip(res, zip, kb.name);
 };
 
 app.get('/app-api/v1/kb/:id/export.zip', requireAuth, exportKnowledgeBase);
 app.get('/api/kb/:id/export.zip', requireAuth, exportKnowledgeBase); // 发布过渡期兼容路径
+
+const exportFolder = async (req, res) => {
+  const folder = getFolderForUser(req.user.id, req.params.id);
+  if (!folder) return res.status(404).json({ error: 'Not found' });
+
+  const { zip, walkFolder } = createExportZip(req.user.id);
+  walkFolder(folder.id, '');
+  await sendZip(res, zip, folder.name);
+};
+
+app.get('/app-api/v1/folders/:id/export.zip', requireAuth, exportFolder);
+app.get('/api/folders/:id/export.zip', requireAuth, exportFolder); // 发布过渡期兼容路径
 
 app.get('/api/openapi.json', (_req, res) => res.json(getOpenApiDocument()));
 app.use('/api/v1', openApi, openApiNotFound, openApiErrorHandler);

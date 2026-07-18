@@ -2,11 +2,9 @@ import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
 import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb, Sheet } from 'lucide-react'
-import { API_BASE, apiFetch } from '../../auth'
+import { uploadEditorImage } from '../imageUpload'
 
-const API_ORIGIN = API_BASE.replace(/\/app-api\/v1\/?$/, '')
-
-export const getSuggestionItems = ({ query }: { query: string }) => {
+export const getSuggestionItems = ({ query, docId }: { query: string; docId?: string }) => {
     return [
         {
             title: '一级标题 (H1)',
@@ -86,18 +84,13 @@ export const getSuggestionItems = ({ query }: { query: string }) => {
                     const file = (e.target as HTMLInputElement).files?.[0]
                     if (!file || uploading) return
                     uploading = true
-                    const formData = new FormData()
-                    formData.append('file', file)
                     try {
-                        const res = await apiFetch('/attachments/upload', {
-                            method: 'POST',
-                            body: formData
-                        })
-                        const data = await res.json()
-                        const src = new URL(data.url, `${API_ORIGIN}/`).toString()
-                        editor.chain().focus().setImage({ src }).run()
+                        if (!docId) throw new Error('当前文档尚未就绪')
+                        const image = await uploadEditorImage(file, docId)
+                        editor.chain().focus().setImage({ src: image.src, attachmentId: image.id }).run()
                     } catch (err) {
                         console.error('Upload failed:', err)
+                        alert(err instanceof Error ? err.message : '图片上传失败')
                     } finally {
                         uploading = false
                     }

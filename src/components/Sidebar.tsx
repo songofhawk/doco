@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Folder, FileText, ChevronRight, ChevronDown, Plus, Library,
-    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy, Sheet
+    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy, Sheet, Download
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../auth';
@@ -236,6 +236,25 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             // 非 JSON 错误响应使用通用提示。
         }
         setOperationError(message);
+    };
+
+    // 导出 zip：请求导出接口并触发浏览器下载，文件名取自 Content-Disposition
+    const exportZip = async (path: string) => {
+        try {
+            const res = await apiFetch(path);
+            if (!res.ok) { await reportFailedResponse(res); return; }
+            const disposition = res.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename\*=UTF-8''([^;]+)/);
+            const filename = match ? decodeURIComponent(match[1]) : 'export.zip';
+            const url = URL.createObjectURL(await res.blob());
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            setOperationError('导出失败，请稍后重试');
+        }
     };
 
     const navigateToDoc = (docId: string) => {
@@ -605,28 +624,28 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     };
 
     // ---- 右键菜单构建 ----
+    const buildKbMenuItems = (kb: any): MenuItem[] => [
+        { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
+        { label: '导出 Markdown (ZIP)', icon: <Download size={14} />, onClick: () => exportZip(`/kb/${kb.id}/export.zip`) },
+        'divider',
+        { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
+    ];
+
     const showKbMenu = (e: React.MouseEvent, kb: any) => {
         e.preventDefault(); e.stopPropagation();
-        setCtxMenu({
-            x: e.clientX, y: e.clientY,
-            items: [
-                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                'divider',
-                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
-            ]
-        });
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: buildKbMenuItems(kb) });
     };
+
+    const buildFolderMenuItems = (folder: any, kbId: number, parentId?: number): MenuItem[] => [
+        { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
+        { label: '导出 Markdown (ZIP)', icon: <Download size={14} />, onClick: () => exportZip(`/folders/${folder.id}/export.zip`) },
+        'divider',
+        { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
+    ];
 
     const showFolderMenu = (e: React.MouseEvent, folder: any, kbId: number, parentId?: number) => {
         e.preventDefault(); e.stopPropagation();
-        setCtxMenu({
-            x: e.clientX, y: e.clientY,
-            items: [
-                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                'divider',
-                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
-            ]
-        });
+        setCtxMenu({ x: e.clientX, y: e.clientY, items: buildFolderMenuItems(folder, kbId, parentId) });
     };
 
     const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
@@ -709,14 +728,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                 <button onClick={e => {
                         e.stopPropagation();
                         const rect = (e.target as HTMLElement).getBoundingClientRect();
-                        setCtxMenu({
-                            x: rect.left, y: rect.bottom + 2,
-                            items: [
-                                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-                                'divider',
-                                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
-                            ]
-                        });
+                        setCtxMenu({ x: rect.left, y: rect.bottom + 2, items: buildFolderMenuItems(folder, kbId, parentId) });
                     }}
                     className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                     <MoreHorizontal size={12} />
@@ -825,14 +837,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                                 <button onClick={e => {
                                         e.stopPropagation();
                                         const rect = (e.target as HTMLElement).getBoundingClientRect();
-                                        setCtxMenu({
-                                            x: rect.left, y: rect.bottom + 2,
-                                            items: [
-                                                { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-                                                'divider',
-                                                { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
-                                            ]
-                                        });
+                                        setCtxMenu({ x: rect.left, y: rect.bottom + 2, items: buildKbMenuItems(kb) });
                                     }}
                                     className="p-1 text-gray-400 transition-opacity hover:bg-gray-200 rounded md:opacity-0 md:group-hover:opacity-100">
                                     <MoreHorizontal size={14} />

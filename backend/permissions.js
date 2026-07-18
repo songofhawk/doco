@@ -58,6 +58,17 @@ export function userCanAccessDocument(userId, docId) {
   return !!getDocumentForUser(userId, docId);
 }
 
+export function getAttachmentForUser(userId, attachmentId) {
+  return db.prepare(`
+    SELECT a.* FROM attachments a
+    JOIN documents d ON d.id = a.doc_id
+    LEFT JOIN folders f ON f.id = d.folder_id
+    JOIN knowledge_bases kb ON kb.id = COALESCE(d.kb_id, f.kb_id)
+    JOIN workspace_members wm ON wm.workspace_id = kb.workspace_id
+    WHERE a.id = ? AND wm.user_id = ?
+  `).get(attachmentId, userId);
+}
+
 export function listRootFoldersForUser(userId, kbId) {
   return db.prepare(`
     SELECT f.*

@@ -188,8 +188,10 @@ openApi.post('/attachments', requireScopes('attachments:write'), upload.single('
   const suffix = detected?.ext || extname(req.file.originalname).slice(1).replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin';
   const filepath = join(attachmentDir, `${id}.${suffix}`);
   await import('fs/promises').then(({ writeFile }) => writeFile(filepath, req.file.buffer, { flag: 'wx' }));
+  // busboy 按 latin1 解码文件名，中文名需转回 UTF-8
+  const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
   db.prepare('INSERT INTO attachments (id, filename, filepath, mime_type, size, doc_id) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, req.file.originalname.slice(0, 255), filepath, req.file.mimetype, req.file.size, documentId);
+    .run(id, originalName.slice(0, 255), filepath, req.file.mimetype, req.file.size, documentId);
   res.status(201); sendData(res, attachmentMetadata(db.prepare('SELECT * FROM attachments WHERE id = ?').get(id)));
 })));
 openApi.get('/attachments/:id/metadata', requireScopes('attachments:read'), (req, res) => sendData(res, ownedAttachment(req.user.id, req.params.id)));

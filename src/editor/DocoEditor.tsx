@@ -45,6 +45,7 @@ import { WeChatExportDialog } from './components/WeChatExportDialog'
 import { ListNormalizationExtension } from './components/ListNormalizationExtension'
 import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
 import { countVisibleCharacters, DOCUMENT_CHARACTER_LIMIT, DocumentLimitExtension } from './documentLimits'
+import { gifFileFromSource, pastedGifSource, uploadEditorImage } from './imageUpload'
 import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
 
 const lowlight = createLowlight(common)
@@ -304,7 +305,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             TableCell,
             SlashCommand.configure({
                 suggestion: {
-                    items: getSuggestionItems,
+                    items: ({ query }: { query: string }) => getSuggestionItems({ query, docId }),
                     render: renderItems,
                 },
             }),
@@ -316,7 +317,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
         if (extraExtensions) exts.push(...extraExtensions)
         return exts
-    }, [ydoc, isCollaborative, placeholderText, extraExtensions, handleCollapseChange, handleDocumentLimit])
+    }, [ydoc, docId, isCollaborative, placeholderText, extraExtensions, handleCollapseChange, handleDocumentLimit])
 
     const editor = useEditor({
         extensions,
@@ -332,32 +333,58 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 const file = event.dataTransfer.files[0]
                 if (!file.type.startsWith('image/')) return false
                 event.preventDefault()
-                const reader = new FileReader()
-                reader.onload = () => {
-                    const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
-                    if (!dropPos) return
+                const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
+                if (!dropPos) return true
+                void uploadEditorImage(file, docId).then((image) => {
                     editor?.chain().focus().insertContentAt(dropPos.pos, {
                         type: 'image',
-                        attrs: { src: reader.result as string },
+                        attrs: { src: image.src, attachmentId: image.id },
                     }).run()
-                }
-                reader.readAsDataURL(file)
+                }).catch((error) => alert(error instanceof Error ? error.message : '图片上传失败'))
                 return true
             },
-            handlePaste(_view, event) {
+            handlePaste(view, event) {
                 const items = event.clipboardData?.items
                 if (!items) return false
+                const insertPos = view.state.selection.from
+
+                // 浏览器复制动图时经常同时提供原始 GIF 的 HTML 和一张静态 PNG 快照。
+                // 必须优先读取 HTML 中的 GIF 地址，否则会把首帧误当成普通图片粘贴。
+                const gifSource = pastedGifSource(event.clipboardData?.getData('text/html') || '')
+                if (gifSource) {
+                    event.preventDefault()
+                    void gifFileFromSource(gifSource)
+                        .then((file) => uploadEditorImage(file, docId))
+                        .then((image) => {
+                            editor?.chain().focus().insertContentAt(insertPos, {
+                                type: 'image',
+                                attrs: { src: image.src, attachmentId: image.id },
+                            }).run()
+                        })
+                        .catch((error) => {
+                            // 某些站点禁止跨域读取原图；保留原 GIF 地址仍可维持动画。
+                            if (/^https?:\/\//i.test(gifSource)) {
+                                editor?.chain().focus().insertContentAt(insertPos, {
+                                    type: 'image', attrs: { src: gifSource },
+                                }).run()
+                            } else {
+                                alert(error instanceof Error ? error.message : 'GIF 粘贴失败')
+                            }
+                        })
+                    return true
+                }
                 // 图片粘贴
                 for (const item of items) {
                     if (item.type.startsWith('image/')) {
                         event.preventDefault()
                         const file = item.getAsFile()
                         if (!file) return false
-                        const reader = new FileReader()
-                        reader.onload = () => {
-                            editor?.chain().focus().setImage({ src: reader.result as string }).run()
-                        }
-                        reader.readAsDataURL(file)
+                        void uploadEditorImage(file, docId).then((image) => {
+                            editor?.chain().focus().insertContentAt(insertPos, {
+                                type: 'image',
+                                attrs: { src: image.src, attachmentId: image.id },
+                            }).run()
+                        }).catch((error) => alert(error instanceof Error ? error.message : '图片上传失败'))
                         return true
                     }
                 }
@@ -559,7 +586,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                             <button type="button" role="menuitem" onClick={() => { exportMarkdown(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Markdown</button>
                             <button type="button" role="menuitem" onClick={() => { void exportWord(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Word</button>
                             <button type="button" role="menuitem" onClick={() => { exportPDF(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">PDF</button>
-                            <button type="button" role="menuitem" onClick={() => { setWechatExportOpen(true); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">公众号</button>
+                            <button type="button" role="menuitem" onClick={() => { setWechatExportOpen(true); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">HTML</button>
                         </div>
                     )}
                 </div>
@@ -627,7 +654,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 onChoice={pasteDialog.handleChoice}
             />
 
-            {/* 公众号导出弹窗 */}
+            {/* HTML 导出弹窗 */}
             <WeChatExportDialog
                 open={wechatExportOpen}
                 title={title}
