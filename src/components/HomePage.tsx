@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, FileDown, FolderTree, LoaderCircle, Mail, MonitorSmartphone, Workflow } from 'lucide-react'
 import { useAuth } from '../auth'
 import { DocoLogo, DocoWordmark } from './DocoLogo'
@@ -221,9 +221,15 @@ export const HomePage = () => {
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface-app)', color: 'var(--text-primary)' }}>
       <header className="flex h-16 shrink-0 items-center px-6 sm:px-10">
         <a href="/" aria-label="Doco 首页"><DocoWordmark /></a>
+        <Link
+          to="/api-docs"
+          className="ml-auto mr-4 text-sm text-gray-500 transition hover:text-gray-900"
+        >
+          API 文档
+        </Link>
         <a
           href="#login"
-          className="ml-auto rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
+          className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800"
         >
           登录
         </a>

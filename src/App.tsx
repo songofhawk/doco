@@ -11,6 +11,7 @@ import { ApiTokenDialog } from './components/ApiTokenDialog'
 import { QuotaDialog } from './components/QuotaDialog'
 import { DocoLogo, DocoWordmark } from './components/DocoLogo'
 import { HomePage } from './components/HomePage'
+import { ApiDocsPage } from './components/ApiDocsPage'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
@@ -426,7 +427,7 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-800"
                 >
                   <KeyRound size={16} />
-                  API Token
+                  API 管理
                 </button>
                 <button
                   type="button"
@@ -525,7 +526,7 @@ function Root() {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) return <LoadingScreen />
+  if (loading && location.pathname !== '/api-docs') return <LoadingScreen />
 
   const workspace = user
     ? <WorkspaceShell user={user} />
@@ -534,6 +535,7 @@ function Root() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/api-docs" element={<ApiDocsPage />} />
       <Route path="/app/doc/:id" element={<AppDocRedirect />} />
       <Route path="/doc/:id" element={workspace} />
       <Route path="/app" element={workspace} />

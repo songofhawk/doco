@@ -1,5 +1,48 @@
 import { expect, test } from '@playwright/test'
 
+test('开放 API 文档公开渲染并保留可供 Agent 获取的 Markdown 原文', async ({ page, request }) => {
+  await page.goto('/api-docs')
+
+  await expect(page).toHaveTitle('Doco 开放 API 文档')
+  await expect(page.getByRole('heading', { name: 'Doco 开放 API v1', exact: true })).toBeVisible()
+  await expect(page.locator('.api-docs-hero')).toHaveCount(0)
+  const toc = page.getByLabel('文档目录')
+  await expect(toc).toBeVisible()
+  const quickStartLink = toc.getByRole('link', { name: '快速开始', exact: true })
+  await expect(quickStartLink).toBeVisible()
+  await quickStartLink.click()
+  await expect(page.getByRole('heading', { name: '快速开始', exact: true })).toHaveAttribute('id', '快速开始')
+  await expect(quickStartLink).toHaveClass(/is-active/)
+  await expect(page.getByRole('link', { name: 'Markdown 原文' })).toHaveAttribute('href', '/api-docs.md')
+  const openApiLink = page.getByRole('link', { name: /OpenAPI 3.1 JSON/ })
+  await expect(openApiLink).toHaveAttribute('href', 'http://localhost:8001/api/openapi.json')
+  await expect(openApiLink).toHaveAttribute('target', '_blank')
+
+  const markdown = await request.get('/api-docs.md')
+  expect(markdown.ok()).toBeTruthy()
+  expect(markdown.headers()['content-type']).toContain('text/markdown')
+  expect(await markdown.text()).toContain('# Doco 开放 API v1')
+  await page.screenshot({ path: '/tmp/doco-api-docs.png', fullPage: true })
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Doco 开放 API v1', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
+  await page.screenshot({ path: '/tmp/doco-api-docs-mobile.png', fullPage: true })
+
+  await page.route('http://localhost:8001/api/openapi.json', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ openapi: '3.1.0', info: { title: 'Doco Open API' } }),
+  }))
+  const popupPromise = page.waitForEvent('popup')
+  await openApiLink.click()
+  const popup = await popupPromise
+  await expect(popup).toHaveURL('http://localhost:8001/api/openapi.json')
+  await expect(popup.locator('body')).toContainText('Doco Open API')
+  await popup.close()
+})
+
 test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async ({ page }) => {
   let createdSpreadsheet = false
   let tokens: Array<{ id: string; name: string; scopes: string[]; created_at: number; revoked_at: null }> = []
@@ -127,18 +170,26 @@ test('Session 恢复、知识库页面、Markdown 导入和 Token 管理', async
   await expect(cells.nth(2)).toHaveText('30')
 
   await page.getByRole('button', { name: '账户菜单' }).click()
-  await page.getByRole('menuitem', { name: 'API Token' }).click()
-  await expect(page.getByRole('dialog', { name: '开放 API Token' })).toBeVisible()
+  await page.getByRole('menuitem', { name: 'API 管理' }).click()
+  const apiDialog = page.getByRole('dialog', { name: 'API 管理' })
+  await expect(apiDialog).toBeVisible()
+  const apiDocsLink = apiDialog.getByRole('link', { name: '查看 API 文档' })
+  await expect(apiDocsLink).toHaveAttribute('target', '_blank')
+  const apiDocsPopupPromise = page.waitForEvent('popup')
+  await apiDocsLink.click()
+  const apiDocsPopup = await apiDocsPopupPromise
+  await expect(apiDocsPopup).toHaveURL('/api-docs')
+  await apiDocsPopup.close()
   await page.getByPlaceholder('例如：本地 Agent').fill('E2E Agent')
   await page.getByRole('button', { name: '创建 Token' }).click()
   await expect(page.getByText('请立即复制，关闭后无法再次查看')).toBeVisible()
   await expect(page.getByText(/doco_tok_01ARZ3NDEKTSV4RRFFQ69G5FAV/)).toBeVisible()
   await expect(page.getByText('E2E Agent')).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '开放 API Token' }).getByTitle('撤销').click()
+  await apiDialog.getByTitle('撤销').click()
   await expect(page.getByText('尚未创建 Token')).toBeVisible()
   await page.getByRole('button', { name: '关闭' }).click()
-  await expect(page.getByRole('dialog', { name: '开放 API Token' })).toBeHidden()
+  await expect(apiDialog).toBeHidden()
 
   await page.reload()
   await expect(page.getByText('E2E 用户')).toBeVisible()

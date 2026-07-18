@@ -46,6 +46,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.11.0",
+    "marked": "^16.4.2",
     "mermaid": "^11.12.3",
     "pdfjs-dist": "^5.4.624",
     "plantuml-encoder": "^1.4.0",

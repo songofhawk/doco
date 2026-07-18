@@ -101,6 +101,9 @@ importers:
       mammoth:
         specifier: ^1.11.0
         version: 1.11.0
+      marked:
+        specifier: ^16.4.2
+        version: 16.4.2
       mermaid:
         specifier: ^11.12.3
         version: 11.12.3

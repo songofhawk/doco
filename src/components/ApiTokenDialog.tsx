@@ -64,11 +64,21 @@ export function ApiTokenDialog({ onClose }: { onClose: () => void }) {
       <div role="dialog" aria-modal="true" aria-labelledby="api-token-title" className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
         <div className="flex items-center border-b border-gray-100 px-5 py-4">
           <KeyRound size={18} className="mr-2 text-blue-600" />
-          <h2 id="api-token-title" className="font-semibold text-gray-800">开放 API Token</h2>
+          <h2 id="api-token-title" className="font-semibold text-gray-800">API 管理</h2>
           <button onClick={onClose} className="ml-auto rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="关闭"><X size={18} /></button>
         </div>
         <div className="overflow-y-auto p-5">
-          <p className="mb-4 text-sm leading-6 text-gray-500">Token 仅用于 <code>/api/v1/*</code>，完整值只会显示一次。请像密码一样妥善保存。</p>
+          <p className="mb-4 text-sm leading-6 text-gray-500">
+            Token 仅用于 <code>/api/v1/*</code>，完整值只会显示一次。请像密码一样妥善保存。
+            <a
+              href="/api-docs"
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1 text-blue-600 hover:underline"
+            >
+              查看 API 文档
+            </a>
+          </p>
           <div className="flex flex-col gap-2 rounded-lg bg-gray-50 p-3 sm:flex-row">
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：本地 Agent" maxLength={100} className="min-h-10 flex-1 rounded-md border border-gray-200 bg-white px-3 text-sm outline-none focus:border-blue-400" />
             <select value={access} onChange={(event) => setAccess(event.target.value as typeof access)} className="min-h-10 rounded-md border border-gray-200 bg-white px-3 text-sm">
