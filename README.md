@@ -1,123 +1,220 @@
-# Doco Editor
+# Doco
 
-基于 Tiptap v3 + React 18 + Vite 的富文本协同编辑器，编辑器能力已直接集成在当前项目内，支持多端实时同步（Yjs CRDT）。
+> 📖 [中文版](README.zh-CN.md)
 
-## 功能特性
+An open-source rich-text collaborative editor that puts your data back in your hands — real-time sync, knowledge base management, text-to-diagram, spreadsheets, and multi-format export.
 
-- 富文本编辑：标题、列表、引用、任务列表、代码块（语法高亮）、表格、图片等
-- [电子表格](docs/电子表格.md)：公式、格式、排序筛选、冻结、合并及 CSV 导入导出
-- 实时协同：基于 Yjs CRDT + WebSocket，多人同时编辑自动合并
-- Markdown 支持：序列化/反序列化，支持粘贴 Markdown 内容
-- 图表支持：Mermaid 流程图、PlantUML 图表
-- 导出功能：Markdown / PDF / Word
-- 斜杠命令面板、浮动工具栏、块操作手柄
-- 文档持久化：后端 SQLite 存储 Yjs 增量更新
+![](docs/assets/readme/product-editor.png)
 
-## 技术栈
+## Features
 
-| 层     | 技术                                            |
-| ------ | ----------------------------------------------- |
-| 前端   | React 18 + Vite + TypeScript + Tailwind CSS v4  |
-| 编辑器 | Tiptap v3（ProseMirror）                         |
-| 协同   | Yjs + y-websocket                                |
-| 后端   | Python FastAPI + ypy-websocket + SQLite          |
+### Editing Experience
 
-## 快速开始
+- **Rich text editing**: headings, lists, blockquotes, task lists, code blocks (syntax highlighting), tables, images, links, text styling, and more
+- **`/` slash command**: type `/` to open the command palette with fuzzy search — supports pinyin abbreviations for Chinese users
+- **Floating toolbar**: auto-appears on text selection, all formatting actions within two centimeters of your cursor
+- **Block drag-and-drop**: hover the left edge of any paragraph to reveal a drag handle — reorder content like building blocks
+- **Collapsible sections**: fold away sections you're not working on; collapse state persists across sessions
+- **Auto heading numbering**: one-click toggle — H1–H4 headings automatically maintain hierarchical numbering (`1.` `1.1` `1.1.1`)
+- **Keyboard shortcuts**: `⌥↑/↓` move blocks, `⌘D` duplicate blocks, `⌘⌥1/2/3/0` switch heading levels
 
-### 环境要求
+### Text-to-Diagram
+
+Write Mermaid or PlantUML source code directly in your document. Diagrams render in place. Double-click to edit, fullscreen view, pinch-to-zoom — no more export-import-replace cycles with draw.io.
+
+- **Mermaid**: flowcharts, sequence diagrams, class diagrams, Gantt charts, state diagrams, and more
+- **PlantUML**: sequence diagrams, class diagrams, use case diagrams, component diagrams, and more
+
+### Spreadsheet
+
+A full spreadsheet engine embedded in your documents:
+- Formula evaluation, cell formatting
+- Freeze panes, sort & filter
+- Cell merge / split
+- CSV import / export
+
+Use it inline as a content block, or pop it out as a standalone full-screen spreadsheet.
+
+### Knowledge Base
+
+- Knowledge Base → Folders (nestable) → Documents — a three-level structure
+- Drag-and-drop reordering, renaming, and moving in the sidebar
+- Whole-KB ZIP export preserving folder hierarchy, with bundled images
+
+### Real-time Collaboration
+
+Built on the Yjs CRDT algorithm:
+- No save button — changes sync automatically
+- Offline-first: browser IndexedDB is the primary store; the server holds a snapshot. Edit without a network, merge automatically when reconnected
+- Seamless device switching: close your laptop, pick up your phone, keep writing
+
+### Import / Export
+
+| Format | Import | Export |
+|--------|--------|--------|
+| Markdown | ✅ Paste / file upload | ✅ Single doc & KB bundle |
+| Word (DOCX) | ✅ | ✅ |
+| PDF | ✅ | ✅ |
+| HTML | ✅ | — |
+| WeChat Official Account | — | ✅ (with theme preview) |
+| Images (in-document) | ✅ (paste / drag-drop) | ✅ (bundled in ZIP) |
+
+### API
+
+A full REST API (OpenAPI 3.1 spec, Bearer Token auth, ETag versioning). Turn your docs into programmable assets — script your own backups, let an agent organize your knowledge base, pipe docs from your publishing workflow to your blog.
+
+Built-in API documentation page, ready to use out of the box.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend Framework | React 18 + Vite + TypeScript |
+| CSS | Tailwind CSS v4 |
+| Editor | Tiptap v3 (ProseMirror) |
+| Collaboration | Yjs (CRDT) + Hocuspocus |
+| Diagrams | Mermaid + PlantUML |
+| Backend | Node.js + Express + Hocuspocus Server |
+| Database | better-sqlite3 (SQLite, WAL mode) |
+| UI Components | Radix UI, Lucide React, Tippy.js |
+
+## Quick Start
+
+### Prerequisites
 
 - Node.js >= 18
 - pnpm
-- Python >= 3.9
 
-### 前端
+### Install & Run
 
 ```bash
-# 安装依赖
+# Install frontend dependencies
 pnpm install
 
-# 启动开发服务器
+# Install backend dependencies
+cd backend && npm install && cd ..
+
+# Start the frontend dev server (Vite, default :5173)
 pnpm run dev
+
+# In another terminal, start the backend (Express + WebSocket, default :8000)
+cd backend
+npm run dev
 ```
 
-### 后端
+Open `http://localhost:5173` — it will auto-connect to the backend WebSocket service.
+
+### Build & Deploy
 
 ```bash
+# Frontend build
+pnpm run build          # output → dist/
+pnpm run deploy         # deploy to Cloudflare Pages
+
+# Backend (production)
 cd backend
-
-# 创建虚拟环境并安装依赖
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# 初始化数据库
-python init_db.py
-
-# 启动服务
-python main.py
-# WebSocket 地址：ws://127.0.0.1:8000/ws/{room-name}
+npm start
 ```
 
-### 构建部署
-
-```bash
-# 前端构建
-pnpm run build
-# 产物输出到 dist/，可部署到任意静态服务器（Nginx、Caddy 等）
-
-# 后端部署
-cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-## 编辑器位置
-
-Doco Editor 的核心组件位于 `src/editor/`，主应用直接从项目内部模块引用：
-
-```tsx
-import { DocoEditor } from './editor'
-
-// DocoEditor 通过 forwardRef 暴露以下方法：
-// - exportMarkdown()  导出 Markdown
-// - exportPDF()       导出 PDF
-// - exportWord()      导出 Word
-const editorRef = useRef(null)
-
-<DocoEditor ref={editorRef} docId="doc-001" />
-```
-
-使用时只需要配置好后端 WebSocket 服务地址，不再需要额外构建或发布独立 editor 包。
-
-## 目录结构
+## Project Structure
 
 ```
 doco/
 ├── src/
-│   ├── App.tsx                          # 根组件
-│   ├── main.tsx                         # 入口
+│   ├── main.tsx                      # App entry point
+│   ├── App.tsx                       # Root component, routing, import/export
 │   ├── components/
-│   │   └── Sidebar.tsx                  # 侧边栏
-│   └── editor/
-│       ├── index.ts                     # 编辑器入口
-│       ├── DocoEditor.tsx               # 编辑器主组件（Yjs 初始化 + 扩展注册）
-│       ├── components/
-│       │   ├── BubbleMenu.tsx           # 选区浮动工具栏
-│       │   ├── BlockHandle.tsx          # 块级操作手柄
-│       │   ├── CodeBlockComponent.tsx   # 代码块（语法高亮 + 复制）
-│       │   ├── MermaidBlock.ts          # Mermaid 节点定义
-│       │   ├── MermaidComponent.tsx     # Mermaid 渲染
-│       │   ├── PlantUMLBlock.ts         # PlantUML 节点定义
-│       │   ├── PlantUMLComponent.tsx    # PlantUML 渲染
-│       │   ├── SlashCommand.ts          # / 命令扩展
-│       │   ├── suggestions.ts           # / 菜单数据
-│       │   └── CommandList.tsx          # / 菜单 UI
-│       └── styles/
-│           └── editor.css               # 编辑器样式
+│   │   └── Sidebar.tsx               # KB sidebar (document tree)
+│   └── editor/                       # Editor module
+│       ├── index.ts                  # Entry, exports DocoEditor component
+│       ├── DocoEditor.tsx            # Editor core (Yjs/Hocuspocus init, extension registration)
+│       ├── types.ts                  # DocoEditor Props/Ref type definitions
+│       └── components/
+│           ├── BubbleMenu.tsx        # Selection floating toolbar
+│           ├── BlockHandle.tsx       # Block drag handle
+│           ├── SlashCommand.ts       # / command palette
+│           ├── CommandList.tsx       # Command palette UI
+│           ├── suggestions.ts        # Command menu data
+│           ├── CollapseExtension.ts  # Block collapse extension
+│           ├── DocSettings.tsx       # Document settings (heading numbering, background)
+│           ├── MermaidBlock.ts       # Mermaid node definition
+│           ├── MermaidComponent.tsx  # Mermaid renderer
+│           ├── PlantUMLBlock.ts      # PlantUML node definition
+│           ├── PlantUMLComponent.tsx # PlantUML renderer
+│           ├── CalloutBlock.ts       # Callout block definition
+│           ├── CalloutComponent.tsx  # Callout renderer
+│           ├── SpreadsheetBlock.ts   # Spreadsheet node definition
+│           ├── SpreadsheetComponent.tsx  # Spreadsheet renderer
+│           ├── spreadsheetEngine.ts  # Spreadsheet calculation engine
+│           ├── WeChatExportDialog.tsx # WeChat Official Account export
+│           ├── KeyboardShortcuts.ts  # Keyboard shortcuts
+│           ├── TableOfContents.tsx   # Table of contents
+│           ├── CodeBlockComponent.tsx # Code block (highlight + copy)
+│           └── ImageComponent.tsx    # Image renderer
 ├── backend/
-│   ├── main.py                          # FastAPI 服务入口
-│   ├── models.py                        # 数据模型
-│   ├── database.py                      # 数据库配置
-│   ├── init_db.py                       # 数据库初始化
-│   └── requirements.txt                 # Python 依赖
-└── index.css                            # 全局样式
+│   ├── server.js                     # Entry: Express + Hocuspocus + export routes
+│   ├── database.js                   # better-sqlite3 init & schema
+│   ├── api.js                        # KB / folder / document REST API
+│   ├── auth.js                       # Auth (OAuth + Email + API Token)
+│   ├── markdown.js                   # YDoc → Markdown server-side export
+│   ├── permissions.js                # Permission management
+│   ├── quota.js                      # Quota management
+│   ├── openapi.js                    # OpenAPI spec definition
+│   └── tests/                        # Backend tests
+└── docs/                             # Design docs & proposals
 ```
+
+## Editor Component Usage
+
+```tsx
+import { DocoEditor } from './editor'
+import type { DocoEditorRef } from './editor/types'
+
+const editorRef = useRef<DocoEditorRef>(null)
+
+<DocoEditor
+  ref={editorRef}
+  docId="doc-001"
+  userId="user-001"
+  collaboration={{
+    websocketUrl: 'ws://localhost:8000',
+  }}
+  onTitleChange={(docId, title) => console.log('Title changed:', title)}
+  placeholder="Start writing…"
+/>
+
+{/* Call export methods via ref */}
+<button onClick={() => editorRef.current?.exportMarkdown()}>Export MD</button>
+```
+
+## Collaboration Architecture
+
+```
+Browser IndexedDB (y-indexeddb)  ← local primary store
+       ↕
+Browser Y.Doc  ← @hocuspocus/provider (WebSocket)
+       ↕  Yjs binary delta messages
+Server @hocuspocus/server  →  SQLite ydoc_state (one merged snapshot per doc)
+```
+
+- The browser IndexedDB is the primary store; the server snapshot is auxiliary. If the server snapshot is lost, simply open the document in the browser to repopulate it.
+- Offline editing works seamlessly; changes sync automatically when the network returns.
+- Collaborative cursors: supported by the framework, not enabled by default.
+
+## Markdown Export
+
+Both single documents and KB bundles support Markdown export, generated on-the-fly from YDoc on the server:
+
+```bash
+# Single document export
+curl http://localhost:8000/api/docs/{id}/export.md
+
+# KB ZIP bundle
+curl http://localhost:8000/api/kb/{id}/export.zip
+```
+
+Custom nodes (Mermaid, PlantUML, Callout, etc.) have corresponding serialization rules in `backend/markdown.js`. When adding new custom nodes, update the server-side serializer accordingly.
+
+## License
+
+MIT
