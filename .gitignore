@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment files may contain deployment credentials or machine-specific settings.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -32,6 +38,7 @@ backend/*.db
 backend/*.db-*
 backend/*.db.backup-*
 backend/backups/
+/doco.db
 exports/
 secret/
 test-results/

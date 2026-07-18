@@ -22,4 +22,4 @@ echo "📄 部署前端到 Cloudflare Pages..."
 wrangler pages deploy dist --project-name=doco
 
 echo "✅ 部署完成！"
-echo "📝 请在 .env.production 中更新 VITE_WS_URL 为你的 Workers 地址"
+echo "📝 请复制 .env.production.example 为 .env.production，并更新 VITE_WS_URL"

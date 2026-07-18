@@ -44,7 +44,13 @@ wrangler deploy
 
 ### 4. 更新前端配置
 
-编辑 [.env.production](.env.production)，将 Worker URL 填入：
+先复制模板，再编辑不会提交到 Git 的 `.env.production`：
+
+```bash
+cp .env.production.example .env.production
+```
+
+将 Worker URL 填入：
 ```
 VITE_WS_URL=wss://doco-backend.your-account.workers.dev/ws
 ```

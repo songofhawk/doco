@@ -155,7 +155,13 @@ DNS：域名 A 记录 → 服务器 IP。若 DNS 托管在 Cloudflare，**先用
 
 ## 6. 前端指向新后端
 
-`.env.production`：
+从模板创建本地生产配置（该文件不会提交到 Git）：
+
+```bash
+cp .env.production.example .env.production
+```
+
+然后编辑 `.env.production`：
 
 ```
 VITE_WS_URL=wss://doco-124-156-169-69.sslip.io/ws
