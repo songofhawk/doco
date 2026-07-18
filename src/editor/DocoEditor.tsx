@@ -592,7 +592,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 }}
                 placeholder="无标题"
                 rows={1}
-                className="doco-document-title mb-4 w-full resize-none border-none bg-transparent pr-32 text-2xl font-bold leading-snug outline-none sm:text-3xl"
+                className="doco-document-title mb-4 w-full resize-none overflow-hidden border-none bg-transparent pr-32 text-2xl font-bold leading-snug outline-none sm:text-3xl"
             />
 
             <div className="tiptap-editor-container relative">
