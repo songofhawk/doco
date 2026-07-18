@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Folder, FileText, ChevronRight, ChevronDown, Plus, Library,
-    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy, Sheet, Download
+    Search, Pencil, Trash2, X, MoreHorizontal, Link, FolderInput, Copy, Sheet, Download, Upload
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { apiFetch } from '../auth';
 
 /* ---- 右键菜单 ---- */
-type MenuItem = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean } | 'divider';
+type MenuAction = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean };
+type MenuGroup = { label: string; icon: React.ReactNode; children: MenuAction[] };
+type MenuItem = MenuAction | MenuGroup | 'divider';
 
 const ContextMenu = ({ x, y, items, onClose }: {
     x: number; y: number;
@@ -16,6 +18,7 @@ const ContextMenu = ({ x, y, items, onClose }: {
     onClose: () => void;
 }) => {
     const ref = useRef<HTMLDivElement>(null);
+    const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) onClose();
@@ -25,11 +28,51 @@ const ContextMenu = ({ x, y, items, onClose }: {
     }, [onClose]);
 
     return createPortal(
-        <div ref={ref} className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[160px] text-sm"
+        <div ref={ref} className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[190px] text-sm"
             style={{ top: y, left: x }}>
             {items.map((item, i) =>
                 item === 'divider' ? (
                     <div key={i} className="my-1 border-t border-gray-100" />
+                ) : 'children' in item ? (
+                    <div
+                        key={i}
+                        className="relative"
+                        onMouseEnter={() => setOpenSubmenu(i)}
+                        onMouseLeave={() => setOpenSubmenu(current => current === i ? null : current)}
+                    >
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-gray-700 transition-colors hover:bg-gray-100"
+                            aria-haspopup="menu"
+                            aria-expanded={openSubmenu === i}
+                            onClick={() => setOpenSubmenu(current => current === i ? null : i)}
+                        >
+                            {item.icon}
+                            <span className="flex-1 text-left">{item.label}</span>
+                            <ChevronRight size={14} className="text-gray-400" />
+                        </button>
+                        {openSubmenu === i && (
+                            <div
+                                role="menu"
+                                aria-label={item.label}
+                                className={`absolute top-0 z-10 min-w-[190px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl ${
+                                    x + 390 > window.innerWidth ? 'right-full mr-1' : 'left-full ml-1'
+                                }`}
+                            >
+                                {item.children.map(child => (
+                                    <button
+                                        key={child.label}
+                                        type="button"
+                                        role="menuitem"
+                                        className="flex w-full items-center gap-2 whitespace-nowrap px-3 py-1.5 text-gray-700 transition-colors hover:bg-gray-100"
+                                        onClick={() => { child.onClick(); onClose(); }}
+                                    >
+                                        {child.icon}{child.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ) : (
                     <button key={i}
                         className={`flex items-center gap-2 w-full px-3 py-1.5 transition-colors ${item.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100'}`}
@@ -214,18 +257,27 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     const [editingItem, setEditingItem] = useState<{ type: string; id: number | string } | null>(null);
     const [movingDoc, setMovingDoc] = useState<{ docId: string; fromFolderId?: number; fromKbId?: number } | null>(null);
     const [operationError, setOperationError] = useState('');
+    const [operationNotice, setOperationNotice] = useState('');
     const [inputDialog, setInputDialog] = useState<{
         title: string; placeholder?: string;
         onConfirm: (value: string) => void;
     } | null>(null);
     const navigate = useNavigate();
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    const nativeImportInputRef = useRef<HTMLInputElement>(null);
+    const nativeImportTargetRef = useRef<{ kbId?: number; folderId?: number }>({});
 
     useEffect(() => {
         if (!operationError) return;
         const timer = setTimeout(() => setOperationError(''), 5000);
         return () => clearTimeout(timer);
     }, [operationError]);
+
+    useEffect(() => {
+        if (!operationNotice) return;
+        const timer = setTimeout(() => setOperationNotice(''), 5000);
+        return () => clearTimeout(timer);
+    }, [operationNotice]);
 
     const reportFailedResponse = async (response: Response) => {
         let message = '操作失败，请稍后重试';
@@ -254,6 +306,34 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             URL.revokeObjectURL(url);
         } catch {
             setOperationError('导出失败，请稍后重试');
+        }
+    };
+
+    const startNativeImport = (target: { kbId?: number; folderId?: number } = {}) => {
+        nativeImportTargetRef.current = target;
+        nativeImportInputRef.current?.click();
+    };
+
+    const handleNativeImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        const form = new FormData();
+        form.append('file', file);
+        const target = nativeImportTargetRef.current;
+        if (target.kbId) form.append('target_kb_id', String(target.kbId));
+        if (target.folderId) form.append('target_folder_id', String(target.folderId));
+        try {
+            const res = await apiFetch('/native-transfer/import', { method: 'POST', body: form });
+            if (!res.ok) { await reportFailedResponse(res); return; }
+            const result = await res.json();
+            setContent({});
+            await fetchKbs();
+            if (result.knowledge_base_id) setActiveKbId(Number(result.knowledge_base_id));
+            setOperationNotice('Doco 原生迁移包已无损导入为副本');
+            if (result.document_ids?.[0]) navigateToDoc(result.document_ids[0]);
+        } catch {
+            setOperationError('导入失败，请稍后重试');
         }
     };
 
@@ -626,7 +706,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     // ---- 右键菜单构建 ----
     const buildKbMenuItems = (kb: any): MenuItem[] => [
         { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'kb', id: kb.id }) },
-        { label: '导出 Markdown (ZIP)', icon: <Download size={14} />, onClick: () => exportZip(`/kb/${kb.id}/export.zip`) },
+        { label: '导入 Doco 文件', icon: <Upload size={14} />, onClick: () => startNativeImport({ kbId: kb.id }) },
+        {
+            label: '导出', icon: <Download size={14} />, children: [
+                { label: 'Doco 压缩包', icon: <Download size={14} />, onClick: () => exportZip(`/native-transfer/knowledge-base/${kb.id}/export`) },
+                { label: 'Markdown 压缩包', icon: <Download size={14} />, onClick: () => exportZip(`/kb/${kb.id}/export.zip`) },
+            ],
+        },
         'divider',
         { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteKb(kb.id), danger: true },
     ];
@@ -638,7 +724,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
 
     const buildFolderMenuItems = (folder: any, kbId: number, parentId?: number): MenuItem[] => [
         { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'folder', id: folder.id }) },
-        { label: '导出 Markdown (ZIP)', icon: <Download size={14} />, onClick: () => exportZip(`/folders/${folder.id}/export.zip`) },
+        { label: '导入 Doco 文件', icon: <Upload size={14} />, onClick: () => startNativeImport({ kbId, folderId: folder.id }) },
+        {
+            label: '导出', icon: <Download size={14} />, children: [
+                { label: 'Doco 压缩包', icon: <Download size={14} />, onClick: () => exportZip(`/native-transfer/folder/${folder.id}/export`) },
+                { label: 'Markdown 压缩包', icon: <Download size={14} />, onClick: () => exportZip(`/folders/${folder.id}/export.zip`) },
+            ],
+        },
         'divider',
         { label: '删除', icon: <Trash2 size={14} />, onClick: () => deleteFolder(folder.id, kbId, parentId), danger: true },
     ];
@@ -651,6 +743,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     const buildDocMenuItems = (doc: any, folderId?: number, kbId?: number): MenuItem[] => [
         { label: '复制链接', icon: <Link size={14} />, onClick: () => navigator.clipboard.writeText(`${window.location.origin}/doc/${doc.id}`) },
         { label: '复制', icon: <Copy size={14} />, onClick: () => addDoc(folderId, kbId, doc.document_type || 'document') },
+        { label: '导出 Doco 文件', icon: <Download size={14} />, onClick: () => exportZip(`/native-transfer/document/${doc.id}/export`) },
         'divider',
         { label: '移动到…', icon: <FolderInput size={14} />, onClick: () => startMoveDoc(doc.id, folderId, kbId) },
         { label: '重命名', icon: <Pencil size={14} />, onClick: () => setEditingItem({ type: 'doc', id: doc.id }) },
@@ -754,6 +847,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             inert={collapsed}
             className={`doco-sidebar absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col overflow-hidden border-r shadow-xl select-none md:static md:shadow-none ${collapsed ? 'is-collapsed' : ''}`}
         >
+            <input
+                ref={nativeImportInputRef}
+                type="file"
+                accept=".doco,.zip,.doco.zip,application/zip"
+                className="hidden"
+                onChange={handleNativeImport}
+            />
             {/* 搜索栏 */}
             <div className="px-3 pt-3 pb-2">
                 <div className="relative">
@@ -797,9 +897,19 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
                 <div className="flex-1 overflow-y-auto px-2 pb-2">
                     <div className="px-3 mb-2 flex justify-between items-center">
                         <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider">知识库</span>
-                        <button onClick={addKb} className="p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors">
-                            <Plus size={14} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => startNativeImport()}
+                                title="导入 Doco 知识库"
+                                aria-label="导入 Doco 知识库"
+                                className="p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <Upload size={14} />
+                            </button>
+                            <button onClick={addKb} title="新建知识库" aria-label="新建知识库" className="p-0.5 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 transition-colors">
+                                <Plus size={14} />
+                            </button>
+                        </div>
                     </div>
 
                     {kbs.map(kb => (
@@ -889,6 +999,13 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
             {operationError && createPortal(
                 <div className="fixed bottom-6 left-1/2 z-[100] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-red-600 px-4 py-3 text-sm text-white shadow-xl" role="alert">
                     {operationError}
+                </div>,
+                document.body,
+            )}
+
+            {operationNotice && createPortal(
+                <div className="fixed bottom-6 left-1/2 z-[100] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-emerald-600 px-4 py-3 text-sm text-white shadow-xl" role="status">
+                    {operationNotice}
                 </div>,
                 document.body,
             )}

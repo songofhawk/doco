@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { BrowserRouter, Link, Navigate, Routes, Route, useLocation, useParams } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Routes, Route, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { DocoEditor, StandaloneSpreadsheetPage } from './editor'
 import { Sidebar } from './components/Sidebar'
 import { FileText, ChevronDown, LogOut, KeyRound, Check, Gauge } from 'lucide-react'
@@ -106,11 +106,12 @@ const LogoutConfirmDialog = ({ onConfirm, onClose }: {
 
 type ExternalDocTitle = { docId: string; title: string }
 
-const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onActiveDocumentTitleChange }: {
+const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onNativeExportRequest, onActiveDocumentTitleChange }: {
   exportRef: any
   externalTitle?: ExternalDocTitle
   user: CurrentUser
-  onImportRequest: () => void
+  onImportRequest: (format: 'document' | 'doco') => void
+  onNativeExportRequest: (docId: string) => void
   onActiveDocumentTitleChange: (title?: string) => void
 }) => {
   const { id } = useParams<{ id: string }>()
@@ -191,6 +192,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onActiveD
         }).catch(() => {})
       }}
       onImportRequest={onImportRequest}
+      onNativeExportRequest={onNativeExportRequest}
       externalTitle={renamedTitle}
     />
   )
@@ -218,10 +220,13 @@ const getInitialSidebarWidth = () => {
 /** 登录后的工作区外壳：顶栏 + 侧边栏 + 编辑器。仅由 Root 在已登录时渲染。 */
 function WorkspaceShell({ user }: { user: CurrentUser }) {
   const { signOut, updateAppearance } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [apiTokenOpen, setApiTokenOpen] = useState(false)
   const [quotaOpen, setQuotaOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [transferError, setTransferError] = useState('')
   const [appearanceTheme, setAppearanceTheme] = useState<AppearanceTheme>(() => {
     const stored = window.localStorage.getItem('doco-appearance-theme')
     return stored === 'paper' ? 'paper' : 'simple'
@@ -261,6 +266,12 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
     return () => document.removeEventListener('mousedown', onClick)
   }, [accountMenuOpen])
 
+  useEffect(() => {
+    if (!transferError) return
+    const timer = window.setTimeout(() => setTransferError(''), 5000)
+    return () => window.clearTimeout(timer)
+  }, [transferError])
+
   const handleAppearanceChange = useCallback((theme: AppearanceTheme) => {
     setAppearanceTheme(theme)
     setAccountMenuOpen(false)
@@ -269,13 +280,66 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
     })
   }, [updateAppearance])
 
-  const handleImport = () => fileInputRef.current?.click()
+  const handleImport = (format: 'document' | 'doco') => {
+    const input = fileInputRef.current
+    if (!input) return
+    input.dataset.importFormat = format
+    input.accept = format === 'doco'
+      ? '.doco,.zip,.doco.zip,application/zip'
+      : '.md,.markdown,.txt,.docx,.pdf'
+    input.click()
+  }
+
+  const responseError = async (response: Response, fallback: string) => {
+    try {
+      const body = await response.json()
+      return body.error?.message || body.error || fallback
+    } catch { return fallback }
+  }
+
+  const downloadNativeDocument = useCallback(async (docId: string) => {
+    try {
+      const response = await apiFetch(`/native-transfer/document/${docId}/export`)
+      if (!response.ok) throw new Error(await responseError(response, 'Doco 导出失败'))
+      const disposition = response.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)/)
+      const url = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = url
+      link.download = match ? decodeURIComponent(match[1]) : 'document.doco.zip'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setTransferError(error instanceof Error ? error.message : 'Doco 导出失败')
+    }
+  }, [])
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const importFormat = e.target.dataset.importFormat || 'document'
     const ext = file.name.split('.').pop()?.toLowerCase()
 
-    if (ext === 'md' || ext === 'markdown' || ext === 'txt') {
+    if (importFormat === 'doco') {
+      try {
+        const currentDocId = location.pathname.startsWith('/doc/') ? location.pathname.slice(5) : ''
+        if (!currentDocId) throw new Error('请先打开一个文档，再导入单文档 Doco 包')
+        const pathResponse = await apiFetch(`/docs/${currentDocId}/path`)
+        if (!pathResponse.ok) throw new Error(await responseError(pathResponse, '无法确定当前文档位置'))
+        const path = await pathResponse.json()
+        const form = new FormData()
+        form.append('file', file)
+        form.append('expected_root_type', 'document')
+        if (path.folder_id) form.append('target_folder_id', String(path.folder_id))
+        else form.append('target_kb_id', String(path.kb_id))
+        const response = await apiFetch('/native-transfer/import', { method: 'POST', body: form })
+        if (!response.ok) throw new Error(await responseError(response, 'Doco 导入失败'))
+        const result = await response.json()
+        if (result.document_ids?.[0]) navigate(`/doc/${result.document_ids[0]}`)
+      } catch (error) {
+        setTransferError(error instanceof Error ? error.message : 'Doco 导入失败')
+      }
+    } else if (ext === 'md' || ext === 'markdown' || ext === 'txt') {
       const text = await file.text()
       exportRef.current?.importMarkdown(text)
     } else if (ext === 'docx') {
@@ -500,6 +564,7 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
             externalTitle={externalTitle}
             user={user}
             onImportRequest={handleImport}
+            onNativeExportRequest={downloadNativeDocument}
             onActiveDocumentTitleChange={setActiveDocumentTitle}
           />
         </main>
@@ -512,6 +577,12 @@ function WorkspaceShell({ user }: { user: CurrentUser }) {
       )}
       {apiTokenOpen && <ApiTokenDialog onClose={() => setApiTokenOpen(false)} />}
       {quotaOpen && <QuotaDialog onClose={() => setQuotaOpen(false)} />}
+      {transferError && createPortal(
+        <div className="fixed bottom-6 left-1/2 z-[100] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-red-600 px-4 py-3 text-sm text-white shadow-xl" role="alert">
+          {transferError}
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

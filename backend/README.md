@@ -68,6 +68,7 @@ COOKIE_SECURE=true
 | resource-service.js | 页面与开放能力使用的资源业务规则 |
 | quota.js | 工作区资源配额、文件夹深度和文档容量约束 |
 | ydoc-service.js | 在线/离线 Y.Doc 统一加载、事务和立即持久化 |
+| native-transfer.js | 文档/文件夹/知识库原生 `.doco.zip` 无损导入导出、校验与 ID 重映射 |
 | document-schema.js / markdown.js | 共享 Schema、格式转换与 Markdown 序列化 |
 | migrate.js | 一次性迁移旧版 ydoc_updates 增量表 → ydoc_state 快照表 |
 | schema.sql | 表结构参考（实际建表由 database.js 完成） |
@@ -81,6 +82,23 @@ curl -b cookies.txt http://localhost:8000/app-api/v1/docs/{doc_id}/export.md
 # 整个知识库打包（目录结构 = 文件夹结构；需登录 cookie）
 curl -b cookies.txt -O http://localhost:8000/app-api/v1/kb/{kb_id}/export.zip
 ```
+
+## Doco 原生无损迁移
+
+原生包保存 Yjs 完整状态、目录树、文档设置、独立电子表格和附件。导入始终创建副本并生成新的资源 ID；附件地址会在导入事务中重映射。整库包直接创建新知识库，文档和文件夹包必须指定目标知识库或目标文件夹。
+
+```bash
+# 导出文档、文件夹或知识库
+curl -b cookies.txt -O http://localhost:8000/app-api/v1/native-transfer/document/{doc_id}/export
+curl -b cookies.txt -O http://localhost:8000/app-api/v1/native-transfer/folder/{folder_id}/export
+curl -b cookies.txt -O http://localhost:8000/app-api/v1/native-transfer/knowledge-base/{kb_id}/export
+
+# 导入整库；文档/文件夹包另加 target_kb_id 或 target_folder_id 表单字段
+curl -b cookies.txt -F file=@backup.doco.zip \
+  http://localhost:8000/app-api/v1/native-transfer/import
+```
+
+默认压缩包及解压后读取总量上限为 250 MiB、ZIP 条目上限为 20,000；可通过 `DOCO_MAX_TRANSFER_BYTES` 和 `DOCO_MAX_TRANSFER_ENTRIES` 调整。
 
 ## 持久化模型
 

@@ -40,6 +40,7 @@ Use it inline as a content block, or pop it out as a standalone full-screen spre
 - Knowledge Base → Folders (nestable) → Documents — a three-level structure
 - Drag-and-drop reordering, renaming, and moving in the sidebar
 - Whole-KB ZIP export preserving folder hierarchy, with bundled images
+- Lossless native `.doco.zip` transfer for a document, folder, or whole knowledge base
 
 ### Real-time Collaboration
 
@@ -52,6 +53,7 @@ Built on the Yjs CRDT algorithm:
 
 | Format | Import | Export |
 |--------|--------|--------|
+| Doco native package | ✅ Document / folder / KB | ✅ Lossless document / folder / KB |
 | Markdown | ✅ Paste / file upload | ✅ Single doc & KB bundle |
 | Word (DOCX) | ✅ | ✅ |
 | PDF | ✅ | ✅ |
@@ -214,6 +216,12 @@ curl http://localhost:8000/api/kb/{id}/export.zip
 ```
 
 Custom nodes (Mermaid, PlantUML, Callout, etc.) have corresponding serialization rules in `backend/markdown.js`. When adding new custom nodes, update the server-side serializer accordingly.
+
+## Lossless Doco Transfer
+
+Use **Export Doco File** in a document, folder, or knowledge-base menu. The resulting `.doco.zip` contains the original Yjs state, hierarchy, document settings, standalone spreadsheets, and attachments. Importing always creates a copy with fresh resource and attachment IDs, so it can safely move between independent Doco deployments without colliding with existing data.
+
+Use the upload button beside the knowledge-base heading to import a whole knowledge base. To import a document or folder package, choose **Import Doco File** from the destination knowledge base or folder menu.
 
 ## License
 

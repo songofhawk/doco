@@ -52,7 +52,7 @@ const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     docId, userId, initialMeta, collaboration, onTitleChange, onSettingsChange,
-    onImportRequest, externalTitle, extraExtensions, placeholder: placeholderText, className, style
+    onImportRequest, onNativeExportRequest, externalTitle, extraExtensions, placeholder: placeholderText, className, style
 }, ref) => {
     const [title, setTitle] = useState('')
     const [wordCount, setWordCount] = useState(0)
@@ -65,7 +65,9 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const collaborationProviderRef = useRef<HocuspocusProvider | null>(null)
     const saveRequestRef = useRef<string | null>(null)
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
+    const importMenuRef = useRef<HTMLDivElement>(null)
     const exportMenuRef = useRef<HTMLDivElement>(null)
+    const [importOpen, setImportOpen] = useState(false)
     const [exportOpen, setExportOpen] = useState(false)
     const [wechatExportOpen, setWechatExportOpen] = useState(false)
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -79,13 +81,14 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const isPersistenceReady = !isCollaborative || readyPersistenceKey === persistenceKey
 
     useEffect(() => {
-        if (!exportOpen) return
+        if (!exportOpen && !importOpen) return
         const handleOutsideClick = (event: MouseEvent) => {
+            if (!importMenuRef.current?.contains(event.target as Node)) setImportOpen(false)
             if (!exportMenuRef.current?.contains(event.target as Node)) setExportOpen(false)
         }
         document.addEventListener('mousedown', handleOutsideClick)
         return () => document.removeEventListener('mousedown', handleOutsideClick)
-    }, [exportOpen])
+    }, [exportOpen, importOpen])
 
     // 保存文档设置
     const patchDocSettings = useCallback((patch: Partial<DocMeta>) => {
@@ -560,14 +563,26 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             {editor && isPersistenceReady && <TableOfContents editor={editor} headingNumbered={headingNumbered} />}
             {/* 文档级操作 */}
             <div className="document-title-actions absolute right-3 top-3 z-10 transition-opacity sm:right-4 sm:top-4 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
-                <button
-                    type="button"
-                    onClick={onImportRequest}
-                    title="导入文档"
-                    aria-label="导入文档"
-                >
-                    <Upload size={16} />
-                </button>
+                <div ref={importMenuRef} className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setImportOpen(value => !value)}
+                        className="document-title-action-menu"
+                        title="导入文档"
+                        aria-label="导入文档"
+                        aria-haspopup="menu"
+                        aria-expanded={importOpen}
+                    >
+                        <Upload size={16} />
+                        <ChevronDown size={12} />
+                    </button>
+                    {importOpen && (
+                        <div className="doco-menu absolute right-0 top-full z-50 mt-2 min-w-44 rounded-lg p-1 shadow-lg" role="menu">
+                            <button type="button" role="menuitem" onClick={() => { onImportRequest?.('doco'); setImportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Doco（无损副本）</button>
+                            <button type="button" role="menuitem" onClick={() => { onImportRequest?.('document'); setImportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Markdown / Word / PDF</button>
+                        </div>
+                    )}
+                </div>
                 <div ref={exportMenuRef} className="relative">
                     <button
                         type="button"
@@ -583,6 +598,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                     </button>
                     {exportOpen && (
                         <div className="doco-menu absolute right-0 top-full z-50 mt-2 min-w-32 rounded-lg p-1 shadow-lg" role="menu">
+                            <button type="button" role="menuitem" onClick={() => { onNativeExportRequest?.(docId); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Doco</button>
                             <button type="button" role="menuitem" onClick={() => { exportMarkdown(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Markdown</button>
                             <button type="button" role="menuitem" onClick={() => { void exportWord(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Word</button>
                             <button type="button" role="menuitem" onClick={() => { exportPDF(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">PDF</button>
