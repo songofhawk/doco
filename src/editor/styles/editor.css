@@ -732,7 +732,8 @@
   gap: 2px;
 }
 
-.doco-editor-root .document-title-actions button {
+.doco-editor-root .document-title-actions > button,
+.doco-editor-root .document-title-actions > .relative > button {
   display: inline-flex;
   min-width: 32px;
   height: 32px;
@@ -752,24 +753,28 @@
   padding: 0 7px;
 }
 
-.doco-editor-root .document-title-actions button:hover {
+.doco-editor-root .document-title-actions > button:hover,
+.doco-editor-root .document-title-actions > .relative > button:hover {
   background: var(--surface-hover);
   color: var(--text-primary);
   box-shadow: none;
 }
 
-.doco-editor-root .document-title-actions button:focus-visible {
+.doco-editor-root .document-title-actions > button:focus-visible,
+.doco-editor-root .document-title-actions > .relative > button:focus-visible {
   outline: 2px solid #3898ec;
   outline-offset: 1px;
 }
 
-.doco-editor-root .document-title-actions button:disabled {
+.doco-editor-root .document-title-actions > button:disabled,
+.doco-editor-root .document-title-actions > .relative > button:disabled {
   color: var(--text-muted);
   cursor: not-allowed;
   opacity: 0.45;
 }
 
-.doco-editor-root .document-title-actions button:disabled:hover {
+.doco-editor-root .document-title-actions > button:disabled:hover,
+.doco-editor-root .document-title-actions > .relative > button:disabled:hover {
   background: transparent;
   color: var(--text-muted);
 }
