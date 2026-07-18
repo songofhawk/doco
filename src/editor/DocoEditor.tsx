@@ -41,6 +41,7 @@ import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
 import { SpreadsheetBlock } from './components/SpreadsheetBlock'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
+import { WeChatExportDialog } from './components/WeChatExportDialog'
 import { ListNormalizationExtension } from './components/ListNormalizationExtension'
 import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
 import { countVisibleCharacters, DOCUMENT_CHARACTER_LIMIT, DocumentLimitExtension } from './documentLimits'
@@ -65,6 +66,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     const titleInputRef = useRef<HTMLTextAreaElement>(null)
     const exportMenuRef = useRef<HTMLDivElement>(null)
     const [exportOpen, setExportOpen] = useState(false)
+    const [wechatExportOpen, setWechatExportOpen] = useState(false)
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
     const [limitMessage, setLimitMessage] = useState('')
     const pasteDialog = usePasteMarkdownDialog()
@@ -482,6 +484,11 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         return () => { style!.textContent = '' }
     }, [headingNumbered, minHeadingLevel])
 
+    const getMarkdown = useCallback(() => {
+        if (!editor) return ''
+        return (editor.storage as any).markdown.getMarkdown()
+    }, [editor])
+
     const exportMarkdown = useCallback(() => {
         if (!editor) return
         const md = (editor.storage as any).markdown.getMarkdown()
@@ -552,6 +559,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                             <button type="button" role="menuitem" onClick={() => { exportMarkdown(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Markdown</button>
                             <button type="button" role="menuitem" onClick={() => { void exportWord(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">Word</button>
                             <button type="button" role="menuitem" onClick={() => { exportPDF(); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">PDF</button>
+                            <button type="button" role="menuitem" onClick={() => { setWechatExportOpen(true); setExportOpen(false) }} className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-gray-100">公众号</button>
                         </div>
                     )}
                 </div>
@@ -617,6 +625,14 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 visible={pasteDialog.state.visible}
                 text={pasteDialog.state.text}
                 onChoice={pasteDialog.handleChoice}
+            />
+
+            {/* 公众号导出弹窗 */}
+            <WeChatExportDialog
+                open={wechatExportOpen}
+                title={title}
+                getMarkdown={getMarkdown}
+                onClose={() => setWechatExportOpen(false)}
             />
 
             {/* 底部状态栏 */}

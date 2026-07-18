@@ -1,0 +1,196 @@
+/* 方案二：Notion Elegance (Notion 优雅手帐风) */
+/* 沉静温婉、米黄背景、左段落线强调设计 */
+
+:root {
+    --bg-main: #FFFCF8;
+    --text-main: #37352F;
+    --text-gray: #9B9A97;
+    --accent-orange: #D9730D;
+    --accent-green: #0F7B6C;
+    --bg-quote: #F7F6F3;
+    --highlight: rgba(255, 212, 0, 0.4);
+}
+
+#MdWechat {
+    line-height: 1.7;
+    color: #37352F;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif;
+    background: #FFFCF8;
+    padding: 15px 10px;
+    font-size: 16px;
+}
+
+/* 基础段落 */
+#MdWechat p {
+    color: #37352F;
+    margin: 0.8em 0;
+    line-height: 1.7;
+}
+
+/* 一级标题：沉稳无修饰大字 */
+#MdWechat h1 {
+    font-size: 30px;
+    font-weight: 700;
+    color: #37352F;
+    margin: 1.2em 0 0.5em 0;
+}
+
+#MdWechat h1 .content {
+    display: block;
+}
+
+/* 二级标题：底部自带马克笔高光下划线 */
+#MdWechat h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #37352F;
+    margin: 1.5em 0 0.5em 0;
+    position: relative;
+}
+
+#MdWechat h2 .content {
+    display: inline-block;
+    background: linear-gradient(180deg, transparent 65%, rgba(255, 212, 0, 0.4) 65%);
+    padding: 0 4px;
+}
+
+/* 三级标题 */
+#MdWechat h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #37352F;
+    margin: 1.2em 0 0.5em 0;
+}
+
+/* 列表缩进加大，Notion 特色 */
+#MdWechat ul,
+#MdWechat ol {
+    color: #37352F;
+    padding-left: 28px;
+    margin: 0.8em 0;
+}
+
+#MdWechat li {
+    margin: 0.3em 0;
+}
+
+#MdWechat li section {
+    color: #37352F;
+}
+
+/* 重点设计：引用块 (Blockquote) - Notion 经典左线 */
+#MdWechat blockquote {
+    background: transparent;
+    padding: 2px 2px 2px 14px;
+    margin: 1.2em 0;
+    border-left: 3px solid #37352F;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    border-radius: 0;
+}
+
+#MdWechat blockquote p {
+    color: #37352F;
+    font-size: 16px;
+    font-style: normal;
+}
+
+/* 强调文字 */
+#MdWechat strong {
+    font-weight: 600;
+    color: #37352F;
+}
+
+#MdWechat em {
+    font-style: italic;
+    color: #9B9A97;
+    background: transparent;
+}
+
+/* 链接色 */
+#MdWechat a {
+    color: #9B9A97;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(155, 154, 151, 0.4);
+}
+
+/* 行内代码：浅色底加橘红字 */
+#MdWechat p code,
+#MdWechat li code {
+    color: #EB5757;
+    background: rgba(135, 131, 120, 0.15);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 85%;
+}
+
+/* 重点设计：优雅的浅灰色代码块容器 */
+#MdWechat pre {
+    background: #F7F6F3;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 1.2em 0;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, Menlo, Courier, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    border: 1px solid rgba(223, 225, 228, 0.5);
+}
+
+#MdWechat pre code {
+    color: #37352F;
+    background: transparent;
+    padding: 0;
+}
+
+#MdWechat .code-snippet__fix {
+    background: #F7F6F3;
+    border-radius: 4px;
+}
+
+/* 分隔线：点状线 */
+#MdWechat hr {
+    height: 0;
+    border: none;
+    border-top: 1px dashed rgba(55, 53, 47, 0.16);
+    margin: 2em 0;
+}
+
+/* 图片 */
+#MdWechat img {
+    border-radius: 4px;
+    max-width: 100%;
+    margin: 1.2em auto;
+    display: block;
+}
+
+#MdWechat figcaption {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(55, 53, 47, 0.6);
+    margin-top: -0.5em;
+}
+
+/* 表格 */
+#MdWechat table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2em 0;
+}
+
+#MdWechat table tr th {
+    background: #F7F6F3;
+    color: #37352F;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(55, 53, 47, 0.16);
+}
+
+#MdWechat table tr td {
+    padding: 8px 12px;
+    color: #37352F;
+    border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}

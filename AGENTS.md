@@ -107,6 +107,9 @@ useEffect(() => {
   **前端新增自定义节点时，需同步在 markdown.js 里补 schema 定义和序列化规则**。
 - 前端手动导出（工具栏按钮）用 tiptap-markdown；自定义节点（Mermaid/PlantUML/Callout）已通过
   `addStorage().markdown.serialize` 提供规则，Mermaid/PlantUML 同时支持从 ```mermaid 围栏导入。
+- 公众号导出（导出菜单 → "公众号"）：`src/editor/wechat/wechatExport.ts` 用 marked + juice（按需动态
+  import）把 Markdown 转成全内联样式的公众号 HTML，并展开 `var(--xxx)`（微信不支持 CSS 变量）；
+  主题 CSS 在 `src/editor/wechat/themes/`，对话框 `WeChatExportDialog.tsx` 提供预览/换肤/富文本复制。
 
 ---
 
