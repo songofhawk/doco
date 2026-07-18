@@ -324,9 +324,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
 
     const editor = useEditor({
         extensions,
-        // IndexedDB 恢复前不挂载 EditorContent；这里同时显式使用真正的空 doc，
-        // 避免 Collaboration 初始化时把默认段落写入尚未恢复的 YDoc。
+        // 保持真正的空 doc，避免 Collaboration 初始化时把默认段落写入尚未恢复的 YDoc。
+        // EditorContent 会立即挂载，但在 IndexedDB 恢复前保持只读且不可见。
         content: { type: 'doc', content: [] },
+        editable: isPersistenceReady,
         editorProps: {
             attributes: {
                 class: 'focus:outline-none min-h-[500px] text-gray-800 leading-relaxed prose prose-blue sm:prose-base list-none tiptap-editor-container',
@@ -414,6 +415,10 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
             },
         },
     }, [extensions])
+
+    useEffect(() => {
+        editor?.setEditable(isPersistenceReady)
+    }, [editor, isPersistenceReady])
 
     // 从后端恢复折叠状态（需等 Yjs 文档同步完成后再执行）
     useEffect(() => {
@@ -652,11 +657,12 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                         onClose={() => setLinkPopover(null)}
                     />
                 )}
-                {isPersistenceReady ? (
+                <div className={isPersistenceReady ? '' : 'invisible pointer-events-none'} aria-hidden={!isPersistenceReady}>
                     <EditorContent editor={editor} />
-                ) : (
+                </div>
+                {!isPersistenceReady && (
                     <div
-                        className="min-h-[500px] animate-pulse rounded-lg bg-gray-50/60"
+                        className="absolute inset-0 min-h-[500px] animate-pulse rounded-lg bg-gray-50/60"
                         role="status"
                         aria-label="正在恢复本地文档"
                     />

@@ -1,0 +1,43 @@
+diff --git a/dist/y-tiptap.cjs b/dist/y-tiptap.cjs
+index 9fa3b14fd04b41a317445605e22a57069f31ab93..a8b440f8283f35626fcf68ebf8335e13bf6ffc19 100644
+--- a/dist/y-tiptap.cjs
++++ b/dist/y-tiptap.cjs
+@@ -548,7 +548,11 @@ class ProsemirrorBinding {
+         const clampedAnchor = math__namespace.min(math__namespace.max(sel.anchor, 0), tr.doc.content.size);
+         const clampedHead = math__namespace.min(math__namespace.max(sel.head, 0), tr.doc.content.size);
+ 
+-        tr.setSelection(prosemirrorState.TextSelection.create(tr.doc, clampedAnchor, clampedHead));
++        const $anchor = tr.doc.resolve(clampedAnchor);
++        const $head = tr.doc.resolve(clampedHead);
++        tr.setSelection($anchor.parent.inlineContent && $head.parent.inlineContent
++          ? prosemirrorState.TextSelection.create(tr.doc, clampedAnchor, clampedHead)
++          : prosemirrorState.Selection.near($head));
+       }
+       this.prosemirrorView.dispatch(
+         tr.setMeta(ySyncPluginKey, { isChangeOrigin: true, binding: this })
+diff --git a/dist/y-tiptap.js b/dist/y-tiptap.js
+index c5dcd06e143ed9114773d1e8f5b52b42bd62c822..4679e065e0341698a28dd81a54b41e24ccdef77c 100644
+--- a/dist/y-tiptap.js
++++ b/dist/y-tiptap.js
+@@ -1,7 +1,7 @@
+ import * as Y from 'yjs';
+ import { Item, ContentType, Text, XmlElement, UndoManager } from 'yjs';
+ import { DecorationSet, Decoration } from 'prosemirror-view';
+-import { PluginKey, Plugin, TextSelection, AllSelection, NodeSelection } from 'prosemirror-state';
++import { PluginKey, Plugin, TextSelection, AllSelection, NodeSelection, Selection } from 'prosemirror-state';
+ import 'y-protocols/awareness';
+ import { createMutex } from 'lib0/mutex';
+ import * as PModel from 'prosemirror-model';
+@@ -514,7 +514,11 @@ class ProsemirrorBinding {
+         const clampedAnchor = math.min(math.max(sel.anchor, 0), tr.doc.content.size);
+         const clampedHead = math.min(math.max(sel.head, 0), tr.doc.content.size);
+ 
+-        tr.setSelection(TextSelection.create(tr.doc, clampedAnchor, clampedHead));
++      const $anchor = tr.doc.resolve(clampedAnchor);
++      const $head = tr.doc.resolve(clampedHead);
++      tr.setSelection($anchor.parent.inlineContent && $head.parent.inlineContent
++        ? TextSelection.create(tr.doc, clampedAnchor, clampedHead)
++        : Selection.near($head));
+       }
+       this.prosemirrorView.dispatch(
+         tr.setMeta(ySyncPluginKey, { isChangeOrigin: true, binding: this })

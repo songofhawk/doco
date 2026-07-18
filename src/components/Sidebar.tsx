@@ -264,6 +264,7 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     } | null>(null);
     const navigate = useNavigate();
     const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+    const sidebarRef = useRef<HTMLElement>(null);
     const nativeImportInputRef = useRef<HTMLInputElement>(null);
     const nativeImportTargetRef = useRef<{ kbId?: number; folderId?: number }>({});
 
@@ -344,6 +345,12 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
 
     // 加载知识库列表
     useEffect(() => { fetchKbs(); }, []);
+
+    // React 18 会把 inert 当作普通 DOM 属性，直接传 boolean 会产生控制台告警。
+    // 用 DOM property 设置既保留原生语义，也能在展开时真正移除 inert 状态。
+    useEffect(() => {
+        if (sidebarRef.current) sidebarRef.current.inert = collapsed;
+    }, [collapsed]);
 
     useEffect(() => {
         const activeKb = kbs.find(kb => kb.id === activeKbId);
@@ -842,9 +849,9 @@ export const Sidebar = ({ collapsed, onToggle, onDocRenamed, onActiveKnowledgeBa
     );
     return (
         <aside
+            ref={sidebarRef}
             id="doco-sidebar"
             aria-hidden={collapsed}
-            inert={collapsed}
             className={`doco-sidebar absolute inset-y-0 left-0 z-30 flex h-full w-[min(16rem,calc(100vw-3rem))] shrink-0 flex-col overflow-hidden border-r shadow-xl select-none md:static md:shadow-none ${collapsed ? 'is-collapsed' : ''}`}
         >
             <input

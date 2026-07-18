@@ -2,3 +2,5 @@ packages: []
 allowBuilds:
   core-js: true
   esbuild: true
+patchedDependencies:
+  '@tiptap/y-tiptap@3.0.2': patches/@tiptap__y-tiptap@3.0.2.patch
