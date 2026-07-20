@@ -106,7 +106,36 @@ npm run dev
 
 Open `http://localhost:5173` — it will auto-connect to the backend WebSocket service.
 
-### Build & Deploy
+## Docker Deployment (recommended)
+
+The complete self-hosted package includes a Caddy frontend, Node.js collaboration backend, persistent SQLite storage, health checks, and a same-origin WebSocket proxy. The public images support both `linux/amd64` and `linux/arm64`.
+
+```bash
+git clone https://github.com/songofhawk/doco.git
+cd doco
+cp .env.docker.example .env.docker
+
+# Review .env.docker first, then start with prebuilt Docker Hub images
+docker compose --env-file .env.docker up -d
+
+# Verify the deployment
+docker compose --env-file .env.docker ps
+curl --fail http://localhost:8080/healthz
+```
+
+Open `http://localhost:8080` by default. Set `ALLOWED_ORIGINS`, `COOKIE_SECURE`, Google OAuth, and SMTP values in `.env.docker` for your environment. These values are injected when the containers start and are not baked into the images. Application data is stored in the `doco-data` named volume.
+
+Docker Hub: [`songofhawkg/doco-frontend`](https://hub.docker.com/r/songofhawkg/doco-frontend) · [`songofhawkg/doco-backend`](https://hub.docker.com/r/songofhawkg/doco-backend)
+
+To build the same images from source instead:
+
+```bash
+docker compose --env-file .env.docker up -d --build
+```
+
+See the [Docker deployment guide](docs/Docker部署.md) for all configuration options, HTTPS, logs, backup, restore, and upgrades. Do not run `docker compose down -v` unless you intend to delete the database and attachments.
+
+## Manual Build & Deployment
 
 ```bash
 # Frontend build

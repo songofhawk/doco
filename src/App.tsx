@@ -12,6 +12,7 @@ import { QuotaDialog } from './components/QuotaDialog'
 import { DocoLogo, DocoWordmark } from './components/DocoLogo'
 import { HomePage } from './components/HomePage'
 import { ApiDocsPage } from './components/ApiDocsPage'
+import { getWebSocketUrl } from './runtimeConfig'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href
 
@@ -148,7 +149,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onNativeE
         docId={id}
         userId={user.id}
         title={activeTitle}
-        websocketUrl={import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}
+        websocketUrl={getWebSocketUrl()}
         onTitleChange={(title) => {
           setMeta((current: any) => current ? { ...current, title } : current)
           apiFetch(`/docs/${id}`, {
@@ -166,7 +167,7 @@ const EditorPage = ({ exportRef, externalTitle, user, onImportRequest, onNativeE
       userId={user.id}
       key={`${user.id}:${id}`}
       initialMeta={meta}
-      collaboration={{ websocketUrl: import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws' }}
+      collaboration={{ websocketUrl: getWebSocketUrl() }}
       onTitleChange={(docId, title) => {
         setMeta((current: any) => current ? { ...current, title } : current)
         apiFetch(`/docs/${docId}`, {

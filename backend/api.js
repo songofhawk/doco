@@ -50,6 +50,12 @@ function sendServiceError(res, error, fallbackStatus = 400) {
 
 // ---- 认证 ----
 
+api.get('/config/public', (_req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '',
+  });
+});
+
 api.get('/auth/me', requireAuth, (req, res) => {
   res.json({ user: req.user });
 });

@@ -8,11 +8,9 @@ import syncAbstractImage from '../assets/landing/sync-abstract.webp'
 import { DocoWordmark } from './DocoLogo'
 import './HomePage.css'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-
 /** 邮箱验证码 + Google 登录面板，登录成功后由 HomePage 根据 user 状态跳转。 */
 const LoginPanel = () => {
-  const { signInWithGoogleCredential, requestEmailCode, signInWithEmailCode } = useAuth()
+  const { googleClientId, signInWithGoogleCredential, requestEmailCode, signInWithEmailCode } = useAuth()
   const buttonRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -28,14 +26,14 @@ const LoginPanel = () => {
   }, [cooldown])
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return
+    if (!googleClientId) return
 
     let cancelled = false
     const renderButton = () => {
       if (cancelled || !buttonRef.current || !window.google) return
       buttonRef.current.innerHTML = ''
       window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: async (response) => {
           if (!response.credential) return
           try {
@@ -76,7 +74,7 @@ const LoginPanel = () => {
       cancelled = true
       script?.removeEventListener('load', renderButton)
     }
-  }, [signInWithGoogleCredential])
+  }, [googleClientId, signInWithGoogleCredential])
 
   const sendEmailCode = async () => {
     if (submitting || cooldown > 0) return
@@ -175,7 +173,7 @@ const LoginPanel = () => {
         )}
       </form>
 
-      {GOOGLE_CLIENT_ID && (
+      {googleClientId && (
         <>
           <div className="lp-login-divider">或</div>
           <div ref={buttonRef} className="lp-login-google" />

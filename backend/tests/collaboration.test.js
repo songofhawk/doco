@@ -45,6 +45,20 @@ async function api(path, options = {}) {
   return { response, body };
 }
 
+test('健康检查确认服务和数据库可用', async () => {
+  const response = await fetch(`${baseUrl}/healthz`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: 'ok' });
+});
+
+test('公开运行时配置只暴露前端所需的 Google Client ID', async () => {
+  const response = await fetch(`${baseUrl}/app-api/v1/config/public`);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(Object.keys(body), ['googleClientId']);
+  assert.equal(typeof body.googleClientId, 'string');
+});
+
 before(async () => {
   ({ db } = await import('../database.js'));
   const { createApiToken } = await import('../open-api/tokens.js');

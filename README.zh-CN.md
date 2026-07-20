@@ -104,7 +104,36 @@ npm run dev
 
 前端启动后访问 `http://localhost:5173`，会自动连接后端 WebSocket 服务。
 
-### 构建与部署
+## Docker 部署（推荐）
+
+完整自托管包包含 Caddy 前端、Node.js 协同后端、SQLite 持久化数据卷、健康检查和 WebSocket 同源代理。公开镜像同时支持 `linux/amd64` 和 `linux/arm64`。
+
+```bash
+git clone https://github.com/songofhawk/doco.git
+cd doco
+cp .env.docker.example .env.docker
+
+# 先检查 .env.docker，再使用 Docker Hub 预构建镜像启动
+docker compose --env-file .env.docker up -d
+
+# 验证服务
+docker compose --env-file .env.docker ps
+curl --fail http://localhost:8080/healthz
+```
+
+默认访问 `http://localhost:8080`。请在 `.env.docker` 中按实际环境配置 `ALLOWED_ORIGINS`、`COOKIE_SECURE`、Google OAuth 和 SMTP。这些配置只在容器启动时注入，不会写入镜像；应用数据保存在 `doco-data` 命名卷中。
+
+Docker Hub：[`songofhawkg/doco-frontend`](https://hub.docker.com/r/songofhawkg/doco-frontend) · [`songofhawkg/doco-backend`](https://hub.docker.com/r/songofhawkg/doco-backend)
+
+如果需要从当前源码自行构建：
+
+```bash
+docker compose --env-file .env.docker up -d --build
+```
+
+完整配置、HTTPS、日志、备份、恢复和升级方式见 [Docker 部署说明](docs/Docker部署.md)。除非明确要删除数据库和附件，否则不要执行 `docker compose down -v`。
+
+## 手动构建与部署
 
 ```bash
 # 前端构建

@@ -184,7 +184,17 @@ function sanitizeFilename(name) {
 }
 
 export const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+
+app.get('/healthz', (_req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok' });
+  } catch {
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
 
 function isOriginAllowed(origin) {
   // curl、健康检查、同源反代等请求通常没有 Origin；只拦浏览器跨源来源。

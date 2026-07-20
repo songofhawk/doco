@@ -79,10 +79,9 @@ function publicUser(row) {
 }
 
 function cookieOptions(req, expiresAt) {
-  const secure =
-    process.env.COOKIE_SECURE === 'true' ||
-    process.env.NODE_ENV === 'production' ||
-    req?.get?.('x-forwarded-proto') === 'https';
+  const secure = process.env.COOKIE_SECURE === undefined
+    ? process.env.NODE_ENV === 'production' || req?.get?.('x-forwarded-proto') === 'https'
+    : process.env.COOKIE_SECURE === 'true';
   const sameSite = process.env.COOKIE_SAMESITE || (secure ? 'none' : 'lax');
   return {
     httpOnly: true,

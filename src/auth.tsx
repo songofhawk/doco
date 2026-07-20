@@ -15,6 +15,7 @@ export type AppearanceTheme = 'simple' | 'paper'
 type AuthContextValue = {
   user: CurrentUser | null
   loading: boolean
+  googleClientId: string
   signInWithGoogleCredential(credential: string): Promise<void>
   requestEmailCode(email: string): Promise<{ expiresInSeconds: number; retryAfterSeconds: number }>
   signInWithEmailCode(email: string, code: string): Promise<void>
@@ -48,6 +49,7 @@ export function apiFetch(path: string, init: RequestInit = {}) {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [googleClientId, setGoogleClientId] = useState('')
 
   const refresh = useCallback(async () => {
     try {
@@ -68,6 +70,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    apiFetch('/config/public')
+      .then(async (res) => res.ok ? res.json() : null)
+      .then((data) => setGoogleClientId(typeof data?.googleClientId === 'string' ? data.googleClientId : ''))
+      .catch(() => setGoogleClientId(''))
+  }, [])
 
   const signInWithGoogleCredential = useCallback(async (credential: string) => {
     const res = await apiFetch('/auth/google', {
@@ -131,6 +140,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo<AuthContextValue>(() => ({
     user,
     loading,
+    googleClientId,
     signInWithGoogleCredential,
     requestEmailCode,
     signInWithEmailCode,
@@ -140,6 +150,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }), [
     user,
     loading,
+    googleClientId,
     signInWithGoogleCredential,
     requestEmailCode,
     signInWithEmailCode,

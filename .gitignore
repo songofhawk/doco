@@ -53,3 +53,4 @@ playwright-report/
 /README.deploy.md
 /README.cloudflare.md
 /backend/deploy/README.md
+/release/

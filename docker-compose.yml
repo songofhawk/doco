@@ -1,13 +1,71 @@
-version: '3.8'
+name: doco
 
 services:
-  doco:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend/doco.db:/app/backend/doco.db
-      - ./exports:/app/exports
+  backend:
+    image: ${DOCO_IMAGE_NAMESPACE:-songofhawkg}/doco-backend:${DOCO_IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: backend
+    env_file:
+      - path: ${DOCO_PROJECT_ENV_FILE:-.env}
+        required: false
+      - path: ${DOCO_BACKEND_ENV_FILE:-backend/.env.local}
+        required: false
+      - path: ${DOCO_ENV_FILE:-.env.docker}
+        required: true
     environment:
-      - PYTHONUNBUFFERED=1
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8000
+      DOCO_DB_PATH: /data/doco.db
+      DOCO_ATTACHMENTS_PATH: /data/attachments
+    volumes:
+      - doco-data:/data
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  frontend:
+    image: ${DOCO_IMAGE_NAMESPACE:-songofhawkg}/doco-frontend:${DOCO_IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: frontend
+      args:
+        VITE_API_BASE: /app-api/v1
+        VITE_MAX_DOCUMENT_CHARACTERS: ${DOCO_MAX_DOCUMENT_CHARACTERS:-100000}
+        VITE_MAX_YDOC_SNAPSHOT_BYTES: ${DOCO_MAX_YDOC_SNAPSHOT_BYTES:-5242880}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${DOCO_HTTP_PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /config:size=1m,uid=65534,gid=65533
+      - /data:size=1m,uid=65534,gid=65533
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  doco-data:
+    name: ${DOCO_DATA_VOLUME:-doco-data}

@@ -1,14 +1,14 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "🚀 开始部署 Doco..."
+cd "$(dirname "$0")"
 
-# 构建 Docker 镜像
-echo "🐳 构建 Docker 镜像..."
-docker-compose build
+if [[ ! -f .env.docker ]]; then
+  echo "缺少 .env.docker，请先执行：cp .env.docker.example .env.docker" >&2
+  exit 1
+fi
 
-# 启动服务
-echo "✨ 启动服务..."
-docker-compose up -d
+echo "正在构建并启动 Doco..."
+docker compose --env-file .env.docker up -d --build
 
-echo "✅ 部署完成！访问 http://localhost:8000"
+echo "Doco 已启动。请使用 .env.docker 中 DOCO_HTTP_PORT 配置的端口访问。"
