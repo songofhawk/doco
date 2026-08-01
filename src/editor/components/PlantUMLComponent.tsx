@@ -1,12 +1,11 @@
-import { NodeViewWrapper } from '@tiptap/react'
+import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Maximize2, Edit3 } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import plantumlEncoder from 'plantuml-encoder'
+import type { PlantUMLBlockOptions } from './PlantUMLBlock'
 
-const PLANTUML_SERVER = 'https://www.plantuml.com/plantuml/svg'
-
-export const PlantUMLComponent = (props: any) => {
+export const PlantUMLComponent = (props: NodeViewProps) => {
+    const renderer = (props.extension.options as PlantUMLBlockOptions).renderer
     const [code, setCode] = useState(props.node.attrs.code)
     const [svgUrl, setSvgUrl] = useState<string>('')
     const [error, setError] = useState<string | null>(null)
@@ -30,11 +29,8 @@ export const PlantUMLComponent = (props: any) => {
 
         setLoading(true)
         try {
-            const encoded = plantumlEncoder.encode(source)
-            const url = `${PLANTUML_SERVER}/${encoded}`
-            const res = await fetch(url, { signal: controller.signal })
-            if (!res.ok) throw new Error(`PlantUML 服务返回 ${res.status}`)
-            const svg = await res.text()
+            if (!renderer) throw new Error('未配置 PlantUML 渲染器')
+            const svg = await renderer(source, controller.signal)
             if (svg.includes('<svg')) {
                 // 放大 SVG 2 倍
                 try {
@@ -61,14 +57,14 @@ export const PlantUMLComponent = (props: any) => {
             } else {
                 setError('PlantUML 语法错误')
             }
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                setError(err.message || '渲染失败')
+        } catch (error: unknown) {
+            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+                setError(error instanceof Error ? error.message : '渲染失败')
             }
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [renderer])
 
     useEffect(() => {
         const timer = setTimeout(() => renderDiagram(code), 500)

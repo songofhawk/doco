@@ -44,7 +44,7 @@ type ShortcutEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey
 export function matchesSpreadsheetShortcut(event: ShortcutEvent, id: SpreadsheetShortcutId): boolean {
     const shortcut = SPREADSHEET_SHORTCUTS[id]
     const parts = shortcut.split('-')
-    const key = parts.at(-1) || ''
+    const key = parts[parts.length - 1] || ''
     const requiresMod = parts.includes('Mod')
     const requiresCtrl = parts.includes('Ctrl')
     const requiresAlt = parts.includes('Alt')

@@ -1,54 +1,25 @@
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Placeholder from '@tiptap/extension-placeholder'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
-import { Markdown } from 'tiptap-markdown'
-import { SlashCommand } from './components/SlashCommand'
-import { MermaidBlock } from './components/MermaidBlock'
-import { CalloutBlock } from './components/CalloutBlock'
-import { PlantUMLBlock } from './components/PlantUMLBlock'
-import { getSuggestionItems, renderItems } from './components/suggestions'
 import { forwardRef, useImperativeHandle, useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import * as Y from 'yjs'
 import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import Collaboration from '@tiptap/extension-collaboration'
-import { Table } from '@tiptap/extension-table'
-import { TableRow } from '@tiptap/extension-table-row'
-import { TableHeader } from '@tiptap/extension-table-header'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { ResizableImage } from './components/ResizableImage'
 import html2pdf from 'html2pdf.js'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import { common, createLowlight } from 'lowlight'
-import 'highlight.js/styles/github.css'
-import { TextStyle } from '@tiptap/extension-text-style'
-import { Color } from '@tiptap/extension-color'
-import { Highlight } from '@tiptap/extension-highlight'
-import { TextAlign } from '@tiptap/extension-text-align'
-import { ReactNodeViewRenderer } from '@tiptap/react'
-import { CodeBlockComponent } from './components/CodeBlockComponent'
 import { FloatingToolbar } from './components/BubbleMenu'
 import { BlockHandle } from './components/BlockHandle'
-import { CollapseExtension } from './components/CollapseExtension'
-import { KeyboardShortcuts } from './components/KeyboardShortcuts'
 import { InlineMarkToolbar } from './components/InlineMarkToolbar'
 import { LinkPopover } from './components/LinkPopover'
 import { DocSettings } from './components/DocSettings'
 import { ChevronDown, Download, Upload } from 'lucide-react'
 import { TableOfContents } from './components/TableOfContents'
 import { TableToolbar } from './components/TableToolbar'
-import { SpreadsheetBlock } from './components/SpreadsheetBlock'
 import { detectMarkdown, usePasteMarkdownDialog, PasteMarkdownDialog } from './components/PasteMarkdownDialog'
 import { WeChatExportDialog } from './components/WeChatExportDialog'
-import { ListNormalizationExtension } from './components/ListNormalizationExtension'
-import { BlockIdExtension, DocoDocument } from './components/BlockIdExtension'
-import { countVisibleCharacters, DOCUMENT_CHARACTER_LIMIT, DocumentLimitExtension } from './documentLimits'
-import { gifFileFromSource, pastedGifSource, uploadEditorImage } from './imageUpload'
+import { countVisibleCharacters, DOCUMENT_CHARACTER_LIMIT } from './documentLimits'
+import { createDocoEditorExtensions } from './editorExtensions'
+import { renderPlantUMLWithPublicServer } from './plantUML'
+import { gifFileFromSource, pastedGifSource, resolveDocoImageSrc, uploadEditorImage } from './imageUpload'
 import type { DocoEditorProps, DocoEditorRef, DocMeta } from './types'
-
-const lowlight = createLowlight(common)
 
 export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
     docId, userId, initialMeta, collaboration, onTitleChange, onSettingsChange,
@@ -256,71 +227,24 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
         setLimitMessage(`正文最多允许 ${limit.toLocaleString()} 个非空白可见字符`)
     }, [])
 
+    const uploadImage = useCallback((file: File) => uploadEditorImage(file, docId), [docId])
+
     const extensions = useMemo(() => {
-        const exts: any[] = [
-            (StarterKit as any).configure({
-                document: false,
-                codeBlock: false,
-                undoRedo: !isCollaborative,
-                link: {
-                    openOnClick: false,
-                    HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
-                },
-            }),
-        ]
-
-        // Collaboration 必须在自定义节点之前注册
-        if (isCollaborative) {
-            exts.push(Collaboration.configure({ document: ydoc, field: 'default' }))
-        }
-
-        exts.push(
-            CodeBlockLowlight.extend({
-                addNodeView() {
-                    return ReactNodeViewRenderer(CodeBlockComponent as any)
-                }
-            }).configure({ lowlight }),
-            TextStyle,
-            Color,
-            Highlight,
-            TextAlign.configure({ types: ['heading', 'paragraph'] }),
-            DocoDocument,
-            BlockIdExtension,
-            DocumentLimitExtension.configure({
-                limit: DOCUMENT_CHARACTER_LIMIT,
-                onLimit: handleDocumentLimit,
-            }),
-            ResizableImage.configure({ inline: false, allowBase64: true }),
-            Placeholder.configure({
-                placeholder: placeholderText || '输入 / 唤起菜单，或直接开始写作...',
-            }),
-            TaskList,
-            TaskItem.configure({ nested: true }),
-            ListNormalizationExtension,
-            Markdown,
-            MermaidBlock,
-            PlantUMLBlock,
-            CalloutBlock,
-            SpreadsheetBlock,
-            Table.configure({ resizable: true }),
-            TableRow,
-            TableHeader,
-            TableCell,
-            SlashCommand.configure({
-                suggestion: {
-                    items: ({ query }: { query: string }) => getSuggestionItems({ query, docId }),
-                    render: renderItems,
-                },
-            }),
-            KeyboardShortcuts,
-            CollapseExtension.configure({
-                onCollapseChange: handleCollapseChange,
-            }),
-        )
-
-        if (extraExtensions) exts.push(...extraExtensions)
-        return exts
-    }, [ydoc, docId, isCollaborative, placeholderText, extraExtensions, handleCollapseChange, handleDocumentLimit])
+        return createDocoEditorExtensions({
+            placeholder: placeholderText || '输入 / 唤起菜单，或直接开始写作...',
+            uploadImage,
+            resolveImageSrc: resolveDocoImageSrc,
+            undoRedo: !isCollaborative,
+            beforeCustomExtensions: isCollaborative
+                ? [Collaboration.configure({ document: ydoc, field: 'default' })]
+                : [],
+            extraExtensions,
+            characterLimit: DOCUMENT_CHARACTER_LIMIT,
+            onLimit: handleDocumentLimit,
+            onCollapseChange: handleCollapseChange,
+            renderPlantUML: renderPlantUMLWithPublicServer,
+        })
+    }, [ydoc, isCollaborative, placeholderText, extraExtensions, handleCollapseChange, handleDocumentLimit, uploadImage])
 
     const editor = useEditor({
         extensions,
@@ -339,7 +263,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 event.preventDefault()
                 const dropPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
                 if (!dropPos) return true
-                void uploadEditorImage(file, docId).then((image) => {
+                void uploadImage(file).then((image) => {
                     editor?.chain().focus().insertContentAt(dropPos.pos, {
                         type: 'image',
                         attrs: { src: image.src, attachmentId: image.id },
@@ -358,7 +282,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                 if (gifSource) {
                     event.preventDefault()
                     void gifFileFromSource(gifSource)
-                        .then((file) => uploadEditorImage(file, docId))
+                        .then(uploadImage)
                         .then((image) => {
                             editor?.chain().focus().insertContentAt(insertPos, {
                                 type: 'image',
@@ -383,7 +307,7 @@ export const DocoEditor = forwardRef<DocoEditorRef, DocoEditorProps>(({
                         event.preventDefault()
                         const file = item.getAsFile()
                         if (!file) return false
-                        void uploadEditorImage(file, docId).then((image) => {
+                        void uploadImage(file).then((image) => {
                             editor?.chain().focus().insertContentAt(insertPos, {
                                 type: 'image',
                                 attrs: { src: image.src, attachmentId: image.id },

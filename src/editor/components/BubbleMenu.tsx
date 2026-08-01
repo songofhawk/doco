@@ -140,7 +140,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
     const copySelectionAsMarkdown = () => {
         const { from, to } = editor.state.selection
         const text = editor.state.doc.textBetween(from, to, '\n')
-        const markdownStorage = editor.storage.markdown as MarkdownStorage | undefined
+        const markdownStorage = (editor.storage as unknown as { markdown?: MarkdownStorage }).markdown
         const markdown = markdownStorage?.getMarkdown?.() || text
         const firstLine = text.split('\n')[0]?.slice(0, 20)
         const matched = firstLine

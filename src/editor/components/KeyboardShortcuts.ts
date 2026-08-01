@@ -178,7 +178,7 @@ export const KeyboardShortcuts = Extension.create({
                 if (from === undefined || to === undefined) return false
                 const text = editor.state.doc.textBetween(from, to, '\n')
                 if (!text) return false
-                const markdownStorage = editor.storage.markdown as MarkdownStorage | undefined
+                const markdownStorage = (editor.storage as unknown as { markdown?: MarkdownStorage }).markdown
                 const markdown = markdownStorage?.getMarkdown?.() || text
                 const lines = markdown.split('\n')
                 const firstLine = text.split('\n')[0]?.slice(0, 20)

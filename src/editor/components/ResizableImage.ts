@@ -1,8 +1,23 @@
-import Image from '@tiptap/extension-image'
+import Image, { type ImageOptions } from '@tiptap/extension-image'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { ImageComponent } from './ImageComponent'
 
-export const ResizableImage = Image.extend({
+export type ResizableImageOptions = ImageOptions & {
+    resolveSrc: (src: string, attachmentId?: string | null) => string
+}
+
+export const ResizableImage = Image.extend<ResizableImageOptions>({
+    addOptions() {
+        return {
+            inline: false,
+            allowBase64: false,
+            HTMLAttributes: {},
+            resize: false,
+            ...(this.parent?.() || {}),
+            resolveSrc: (src) => src,
+        }
+    },
+
     addAttributes() {
         return {
             ...this.parent?.(),

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:editor": "vite build --config vite.editor.config.ts",
     "build:server": "vite build --mode server-production",
     "lint": "eslint .",
     "preview": "vite preview",

@@ -20,6 +20,53 @@
   --color-editor-hr: #e5e7eb;
 }
 
+/* 可跨项目使用的纯前端编辑器外壳。只依赖本文件中的作用域变量，不继承 Doco 页面布局。 */
+.doco-text-editor {
+  width: 100%;
+  color: var(--text-primary, #141413);
+  font-family: var(--font-ui, Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+}
+
+.doco-text-editor-surface {
+  position: relative;
+  min-height: 360px;
+  padding: 24px 28px 12px;
+  background: var(--surface-canvas, #faf9f5);
+  border: 1px solid var(--border-subtle, #e8e6dc);
+  border-radius: 12px;
+  box-shadow: rgba(20, 20, 19, 0.05) 0 4px 24px;
+}
+
+.doco-text-editor-content {
+  min-height: 320px;
+  color: var(--text-primary, #141413);
+  line-height: 1.6;
+}
+
+.doco-text-editor-status {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #f0eee6);
+  color: var(--text-muted, #87867f);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.doco-text-editor-error {
+  margin-left: 12px;
+  color: var(--danger, #b53333);
+}
+
+@media (max-width: 640px) {
+  .doco-text-editor-surface {
+    padding: 20px 18px 10px;
+    border-radius: 8px;
+  }
+}
+
 /* Base Tiptap Editor Styles */
 .doco-editor-root .ProseMirror {
   outline: none;
