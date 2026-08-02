@@ -193,7 +193,44 @@ doco/
 └── docs/                             # 设计文档与方案
 ```
 
-## 编辑器组件用法
+## 独立纯前端组件
+
+编辑器核心已作为 [`doco-text-editor`](https://www.npmjs.com/package/doco-text-editor) 发布到 npm。它包含 Doco 完整的编辑能力和内置样式，但不依赖 Doco 账号、REST API、协同服务或 IndexedDB。内容保存在内存、浏览器、本项目后端，还是 ClickUp 等外部系统，完全由宿主应用决定。
+
+```bash
+npm install doco-text-editor
+```
+
+```tsx
+import { useRef } from 'react'
+import {
+  DocoTextEditor,
+  type DocoTextEditorRef,
+} from 'doco-text-editor'
+import 'doco-text-editor/style.css'
+
+const editorRef = useRef<DocoTextEditorRef>(null)
+
+<DocoTextEditor
+  ref={editorRef}
+  defaultValue="# 浏览器里的草稿"
+  format="markdown"
+  onChange={({ steps }) => {
+    // 只包含本次事务实际修改的 ProseMirror 增量步骤。
+    queueIncrementalChanges(steps)
+  }}
+/>
+
+// 仅在需要时读取指定格式的完整文档。
+const json = editorRef.current?.getContent('tiptap-json')
+const markdown = editorRef.current?.getContent('markdown')
+const html = editorRef.current?.getContent('html')
+const text = editorRef.current?.getContent('text')
+```
+
+组件支持标题、行内格式、引用、无序/有序/任务列表、代码块、图片、表格、高亮块、Mermaid、可选 PlantUML 渲染和嵌入式电子表格。完整 API 与接入说明见 [`src/editor/README.md`](src/editor/README.md)。
+
+## 完整 Doco 编辑器组件用法
 
 ```tsx
 import { DocoEditor } from './editor'

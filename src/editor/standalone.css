@@ -1,4 +1,33 @@
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 @source "./";
+
+/*
+ * 独立组件不能依赖宿主是否加载 Tailwind Preflight。
+ * 放在 base layer 中，保证组件自身的 utilities 和专用 CSS 仍可正常覆盖。
+ */
+@layer base {
+  .doco-editor-root :where(button),
+  .doco-editor-floating-ui :where(button) {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .doco-editor-root :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select),
+  .doco-editor-floating-ui :where(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+    margin: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    letter-spacing: inherit;
+  }
+}
+
 @import "./styles/editor.css";

@@ -42,24 +42,22 @@ export interface DocoEditorProps {
 }
 
 export type DocoTextEditorFormat = 'tiptap-json' | 'html' | 'markdown'
+export type DocoTextEditorOutputFormat = DocoTextEditorFormat | 'text'
 export type DocoTextEditorValue = string | JSONContent
 
-export interface DocoTextEditorSnapshot {
-  json: JSONContent
-  html: string
-  markdown: string
-  text: string
-  characterCount: number
+/** ProseMirror 的可序列化增量步骤；只包含本次事务实际修改的内容。 */
+export type DocoTextEditorStep = Record<string, unknown>
+
+export interface DocoTextEditorChange {
+  steps: DocoTextEditorStep[]
 }
 
 export interface DocoTextEditorRef {
   focus(position?: 'start' | 'end'): void
   clear(): void
   setContent(value: DocoTextEditorValue, format?: DocoTextEditorFormat): void
-  getJSON(): JSONContent | null
-  getHTML(): string
-  getMarkdown(): string
-  getText(): string
+  getContent(format: 'tiptap-json'): JSONContent | null
+  getContent(format: Exclude<DocoTextEditorOutputFormat, 'tiptap-json'>): string
   getEditor(): Editor | null
   getRootElement(): HTMLDivElement | null
 }
@@ -72,9 +70,10 @@ export interface DocoTextEditorProps {
   format?: DocoTextEditorFormat
   editable?: boolean
   placeholder?: string
-  onChange?(snapshot: DocoTextEditorSnapshot): void
+  /** 文档发生变化时，仅返回本次事务的增量步骤。 */
+  onChange?(change: DocoTextEditorChange): void
   onReady?(editor: Editor): void
-  onBlur?(snapshot: DocoTextEditorSnapshot): void
+  onBlur?(): void
   onError?(error: Error): void
   /** undefined 时以内嵌 data URL 保存图片；null 时关闭本地图片选择、拖放与粘贴。 */
   uploadImage?: EditorImageUploader | null

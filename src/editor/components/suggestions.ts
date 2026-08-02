@@ -1,10 +1,18 @@
 import { ReactRenderer } from '@tiptap/react'
 import tippy from 'tippy.js'
 import CommandList from './CommandList'
-import { Heading1, Heading2, Heading3, List, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb, Sheet } from 'lucide-react'
+import { Heading1, Heading2, Heading3, List, ListOrdered, ListTodo, Quote, Code, Network, ImageIcon, FileCode, Table, Minus, Lightbulb, Sheet } from 'lucide-react'
 import type { EditorImageUploader } from '../imageUtils'
 
-export const getSuggestionItems = ({ query, uploadImage }: { query: string; uploadImage?: EditorImageUploader | null }) => {
+export const getSuggestionItems = ({
+    query,
+    uploadImage,
+    plantUMLAvailable = false,
+}: {
+    query: string
+    uploadImage?: EditorImageUploader | null
+    plantUMLAvailable?: boolean
+}) => {
     const items = [
         {
             title: '一级标题 (H1)',
@@ -40,6 +48,15 @@ export const getSuggestionItems = ({ query, uploadImage }: { query: string; uplo
             icon: List,
             command: ({ editor, range }: any) => {
                 editor.chain().focus().deleteRange(range).toggleBulletList().run()
+            },
+        },
+        {
+            title: '有序列表',
+            description: '带序号的项目列表',
+            keywords: ['ordered', 'numbered', 'list', 'yxlb'],
+            icon: ListOrdered,
+            command: ({ editor, range }: any) => {
+                editor.chain().focus().deleteRange(range).toggleOrderedList().run()
             },
         },
         {
@@ -118,6 +135,7 @@ export const getSuggestionItems = ({ query, uploadImage }: { query: string; uplo
             description: '文本绘制 UML 图表',
             keywords: ['plantuml', 'uml', 'sequence'],
             icon: FileCode,
+            hidden: !plantUMLAvailable,
             command: ({ editor, range }: any) => {
                 editor.chain().focus().deleteRange(range).insertContent({
                     type: 'plantUMLBlock',
@@ -202,13 +220,15 @@ export const renderItems = () => {
                 interactive: true,
                 trigger: 'manual',
                 placement: 'bottom-start',
+                maxWidth: 'none',
+                offset: [0, 6],
             })
         },
 
         onUpdate(props: any) {
-            component.updateProps(props)
+            component?.updateProps(props)
 
-            if (!props.clientRect) {
+            if (!props.clientRect || !popup?.[0]) {
                 return
             }
 
@@ -219,16 +239,18 @@ export const renderItems = () => {
 
         onKeyDown(props: any) {
             if (props.event.key === 'Escape') {
-                popup[0].hide()
+                popup?.[0]?.hide()
                 return true
             }
 
-            return component.ref?.onKeyDown(props)
+            return component?.ref?.onKeyDown(props) ?? false
         },
 
         onExit() {
-            popup[0].destroy()
-            component.destroy()
+            popup?.[0]?.destroy()
+            component?.destroy()
+            popup = undefined
+            component = undefined
         },
     }
 }

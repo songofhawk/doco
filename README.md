@@ -195,7 +195,44 @@ doco/
 └── docs/                             # Design docs & proposals
 ```
 
-## Editor Component Usage
+## Standalone Frontend Component
+
+The editor core is also published as [`doco-text-editor`](https://www.npmjs.com/package/doco-text-editor). It contains the full Doco editing experience and built-in styles, but has no dependency on Doco authentication, REST APIs, collaboration services, or IndexedDB. The host application decides whether content lives in memory, browser storage, its own backend, or an external system such as ClickUp.
+
+```bash
+npm install doco-text-editor
+```
+
+```tsx
+import { useRef } from 'react'
+import {
+  DocoTextEditor,
+  type DocoTextEditorRef,
+} from 'doco-text-editor'
+import 'doco-text-editor/style.css'
+
+const editorRef = useRef<DocoTextEditorRef>(null)
+
+<DocoTextEditor
+  ref={editorRef}
+  defaultValue="# Browser-only draft"
+  format="markdown"
+  onChange={({ steps }) => {
+    // Only the ProseMirror steps changed by this transaction.
+    queueIncrementalChanges(steps)
+  }}
+/>
+
+// Read the complete document only when needed.
+const json = editorRef.current?.getContent('tiptap-json')
+const markdown = editorRef.current?.getContent('markdown')
+const html = editorRef.current?.getContent('html')
+const text = editorRef.current?.getContent('text')
+```
+
+The package includes headings, inline formatting, blockquotes, ordered/unordered/task lists, code blocks, images, tables, callouts, Mermaid, optional PlantUML rendering, and embedded spreadsheets. See [`src/editor/README.md`](src/editor/README.md) for the complete API and integration notes.
+
+## Full Doco Editor Component Usage
 
 ```tsx
 import { DocoEditor } from './editor'

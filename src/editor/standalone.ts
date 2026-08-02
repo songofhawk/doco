@@ -8,10 +8,12 @@ export { DocoTextEditor } from './DocoTextEditor'
 export { embedEditorImage, fileToDataUrl } from './imageUtils'
 export { PUBLIC_PLANTUML_SERVER, renderPlantUMLWithPublicServer } from './plantUML'
 export type {
+  DocoTextEditorChange,
   DocoTextEditorFormat,
+  DocoTextEditorOutputFormat,
   DocoTextEditorProps,
   DocoTextEditorRef,
-  DocoTextEditorSnapshot,
+  DocoTextEditorStep,
   DocoTextEditorValue,
 } from './types'
 export type { EditorImageUploader, UploadedEditorImage } from './imageUtils'

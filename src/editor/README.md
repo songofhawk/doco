@@ -15,17 +15,22 @@
 ## 最小用法
 
 ```tsx
-import { useState } from 'react'
-import { DocoTextEditor } from './editor/standalone'
+import { useRef } from 'react'
+import { DocoTextEditor, type DocoTextEditorRef } from 'doco-text-editor'
+import 'doco-text-editor/style.css'
 
 export function DescriptionEditor() {
-  const [markdown, setMarkdown] = useState('# 任务说明')
+  const editorRef = useRef<DocoTextEditorRef>(null)
 
   return (
     <DocoTextEditor
-      value={markdown}
+      ref={editorRef}
+      defaultValue="# 任务说明"
       format="markdown"
-      onChange={(snapshot) => setMarkdown(snapshot.markdown)}
+      onChange={(change) => {
+        // 高频回调只包含本次 ProseMirror 增量步骤。
+        enqueueChanges(change.steps)
+      }}
     />
   )
 }
@@ -54,16 +59,34 @@ import { DocoTextEditor, renderPlantUMLWithPublicServer } from './editor/standal
 ```
 
 涉及私密文档时应传入自托管实现，不要使用公共渲染服务。
+仓库中的独立 Demo 为了展示完整能力，显式启用了上述公共服务适配器；正文内容仍只保存在浏览器 IndexedDB。
 
 ## 内容与保存
 
 - `format="tiptap-json"`：无损保留全部 Doco 节点，适合作为编辑态主格式。
 - `format="markdown"`：适合 ClickUp 等只接收 Markdown 的后端。
 - `format="html"`：适合普通富文本接口。
-- `onChange` 同时返回 JSON、HTML、Markdown、纯文本和字符数；宿主自行决定防抖和保存策略。
-- `ref.getJSON()` 可取得无损文档；`ref.getRootElement()` 可取得对应 DOM。
+- `onChange({ steps })` 只返回本次事务的 ProseMirror JSON 增量步骤，不在每次输入时生成整篇文档。
+- `ref.getContent(format)` 按需取得完整内容，支持 `tiptap-json`、`markdown`、`html` 和 `text`。
+- `ref.getRootElement()` 可取得对应 DOM。
 
-未来对接 ClickUp 时，建议以 Tiptap JSON 作为本地编辑态，通过 `ref.getJSON()` 找出 ClickUp 不支持的节点，再用节点的 `data-block-id` 在 `ref.getRootElement()` 中定位 DOM、渲染成图片、上传后替换成 Markdown 图片。这个转换属于 ClickUp Adapter，不应写进编辑器核心。
+```tsx
+const json = editorRef.current?.getContent('tiptap-json')
+const markdown = editorRef.current?.getContent('markdown')
+const html = editorRef.current?.getContent('html')
+const text = editorRef.current?.getContent('text')
+```
+
+如果后端只接受完整文档，可以在 `onChange` 中仅安排一次防抖保存，定时器真正执行时再调用
+`getContent('tiptap-json')`；如果后端支持增量同步，则可以直接保存或传输 `steps`。
+
+未来对接 ClickUp 时，建议以 Tiptap JSON 作为本地编辑态，通过 `ref.getContent('tiptap-json')` 找出 ClickUp 不支持的节点，再用节点的 `data-block-id` 在 `ref.getRootElement()` 中定位 DOM、渲染成图片、上传后替换成 Markdown 图片。这个转换属于 ClickUp Adapter，不应写进编辑器核心。
+
+## 样式与主题
+
+独立入口自带完整的编辑器 CSS、浏览器控件 reset 和纸张主题变量。使用构建产物时，宿主只需在应用入口引入一次 `style.css`，不需要为标题、引用、列表、代码块、表格或浮层重复编写样式。
+
+默认主题定义在 `.doco-text-editor` 上；宿主可通过更具体的类名或组件 `style` 覆盖 `--surface-*`、`--border-*`、`--text-*`、`--accent`、`--font-ui` 和 `--font-heading` 等变量。
 
 ## 与 DocoEditor 的关系
 

@@ -9,10 +9,12 @@ export type {
   DocoEditorRef,
   DocMeta,
   CollaborationConfig,
+  DocoTextEditorChange,
   DocoTextEditorFormat,
+  DocoTextEditorOutputFormat,
   DocoTextEditorProps,
   DocoTextEditorRef,
-  DocoTextEditorSnapshot,
+  DocoTextEditorStep,
   DocoTextEditorValue,
 } from './types'
 export type { EditorImageUploader, UploadedEditorImage } from './imageUtils'

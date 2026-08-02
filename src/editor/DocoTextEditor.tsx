@@ -11,10 +11,11 @@ import { countVisibleCharacters } from './documentLimits'
 import { createDocoEditorExtensions } from './editorExtensions'
 import { embedEditorImage, gifFileFromSource, pastedGifSource } from './imageUtils'
 import type {
+    DocoTextEditorChange,
     DocoTextEditorFormat,
+    DocoTextEditorOutputFormat,
     DocoTextEditorProps,
     DocoTextEditorRef,
-    DocoTextEditorSnapshot,
     DocoTextEditorValue,
 } from './types'
 
@@ -40,14 +41,14 @@ function parseContent(editor: NonNullable<ReturnType<typeof useEditor>>, value: 
     return value
 }
 
-function snapshotFor(editor: NonNullable<ReturnType<typeof useEditor>>): DocoTextEditorSnapshot {
-    return {
-        json: editor.getJSON(),
-        html: editor.getHTML(),
-        markdown: markdownStorage(editor)?.getMarkdown?.() || editor.getText(),
-        text: editor.getText(),
-        characterCount: countVisibleCharacters(editor.state.doc),
-    }
+function contentFor(
+    editor: NonNullable<ReturnType<typeof useEditor>>,
+    format: DocoTextEditorOutputFormat,
+): JSONContent | string {
+    if (format === 'tiptap-json') return editor.getJSON()
+    if (format === 'html') return editor.getHTML()
+    if (format === 'markdown') return markdownStorage(editor)?.getMarkdown?.() || editor.getText()
+    return editor.getText()
 }
 
 function comparableValue(value: DocoTextEditorValue, format: DocoTextEditorFormat) {
@@ -62,10 +63,9 @@ function comparableValue(value: DocoTextEditorValue, format: DocoTextEditorForma
     return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
-function comparableSnapshot(snapshot: DocoTextEditorSnapshot, format: DocoTextEditorFormat) {
-    if (format === 'markdown') return snapshot.markdown
-    if (format === 'html') return snapshot.html
-    return JSON.stringify(snapshot.json)
+function comparableEditorContent(editor: NonNullable<ReturnType<typeof useEditor>>, format: DocoTextEditorFormat) {
+    const content = contentFor(editor, format)
+    return typeof content === 'string' ? content : JSON.stringify(content)
 }
 
 export const DocoTextEditor = forwardRef<DocoTextEditorRef, DocoTextEditorProps>(({
@@ -224,15 +224,18 @@ export const DocoTextEditor = forwardRef<DocoTextEditorRef, DocoTextEditorProps>
                 return true
             },
         },
-        onUpdate: ({ editor: currentEditor }) => {
-            const snapshot = snapshotFor(currentEditor)
-            setCharacterCount(snapshot.characterCount)
-            if (characterLimit === false || snapshot.characterCount < characterLimit) setLimitMessage('')
+        onUpdate: ({ editor: currentEditor, transaction }) => {
+            const nextCharacterCount = countVisibleCharacters(currentEditor.state.doc)
+            setCharacterCount(nextCharacterCount)
+            if (characterLimit === false || nextCharacterCount < characterLimit) setLimitMessage('')
             if (!readyForUpdatesRef.current) return
-            onChangeRef.current?.(snapshot)
+            const change: DocoTextEditorChange = {
+                steps: transaction.steps.map(step => step.toJSON() as Record<string, unknown>),
+            }
+            onChangeRef.current?.(change)
         },
-        onBlur: ({ editor: currentEditor }) => {
-            if (readyForUpdatesRef.current) onBlurRef.current?.(snapshotFor(currentEditor))
+        onBlur: () => {
+            if (readyForUpdatesRef.current) onBlurRef.current?.()
         },
     }, [extensions])
 
@@ -256,8 +259,7 @@ export const DocoTextEditor = forwardRef<DocoTextEditorRef, DocoTextEditorProps>
         }
 
         try {
-            const current = snapshotFor(editor)
-            if (comparableSnapshot(current, format) !== comparableValue(nextValue, format)) {
+            if (comparableEditorContent(editor, format) !== comparableValue(nextValue, format)) {
                 editor.commands.setContent(parseContent(editor, nextValue, format), { emitUpdate: false })
             }
             setCharacterCount(countVisibleCharacters(editor.state.doc))
@@ -279,7 +281,13 @@ export const DocoTextEditor = forwardRef<DocoTextEditorRef, DocoTextEditorProps>
         return () => window.removeEventListener('editor-link-edit', handler)
     }, [editor])
 
-    useImperativeHandle(ref, () => ({
+    useImperativeHandle(ref, () => {
+        const getContent = ((outputFormat: DocoTextEditorOutputFormat) => {
+            if (!editor) return outputFormat === 'tiptap-json' ? null : ''
+            return contentFor(editor, outputFormat)
+        }) as DocoTextEditorRef['getContent']
+
+        return {
         focus: (position = 'end') => { editor?.commands.focus(position) },
         clear: () => { editor?.commands.clearContent() },
         setContent: (nextValue, nextFormat = format) => {
@@ -290,13 +298,11 @@ export const DocoTextEditor = forwardRef<DocoTextEditorRef, DocoTextEditorProps>
                 reportError(error)
             }
         },
-        getJSON: () => editor?.getJSON() || null,
-        getHTML: () => editor?.getHTML() || '',
-        getMarkdown: () => markdownStorage(editor)?.getMarkdown?.() || editor?.getText() || '',
-        getText: () => editor?.getText() || '',
+        getContent,
         getEditor: () => editor,
         getRootElement: () => rootRef.current,
-    }), [editor, format, reportError])
+        }
+    }, [editor, format, reportError])
 
     return (
         <div

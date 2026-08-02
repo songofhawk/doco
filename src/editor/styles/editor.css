@@ -22,9 +22,42 @@
 
 /* 可跨项目使用的纯前端编辑器外壳。只依赖本文件中的作用域变量，不继承 Doco 页面布局。 */
 .doco-text-editor {
+  /* 独立组件自带完整默认主题，不依赖 Doco 应用层的 :root[data-theme]。 */
+  --surface-app: #f5f4ed;
+  --surface-header: #faf9f5;
+  --surface-canvas: #faf9f5;
+  --surface-elevated: #faf9f5;
+  --surface-subtle: #f0eee6;
+  --surface-hover: #e8e6dc;
+  --surface-selected: #f3e9e4;
+  --surface-selected-strong: #ead9d0;
+  --surface-grid-header: #f0eee6;
+  --surface-grid-cell: #faf9f5;
+  --surface-danger: #f8e8e5;
+  --border-subtle: #e8e6dc;
+  --border-strong: #d1cfc5;
+  --text-primary: #141413;
+  --text-secondary: #5e5d59;
+  --text-muted: #87867f;
+  --accent: #c96442;
+  --accent-strong: #b95b3b;
+  --accent-soft: #f3e9e4;
+  --danger: #b53333;
+  --shadow-ring: rgba(20, 20, 19, 0.08);
+  --font-ui: "Anthropic Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: "Anthropic Serif", Georgia, "Times New Roman", serif;
+  --heading-weight: 500;
   width: 100%;
-  color: var(--text-primary, #141413);
-  font-family: var(--font-ui, Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.doco-editor-root.doco-text-editor .ProseMirror h1,
+.doco-editor-root.doco-text-editor .ProseMirror h2,
+.doco-editor-root.doco-text-editor .ProseMirror h3,
+.doco-editor-root.doco-text-editor .ProseMirror h4 {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
 }
 
 .doco-text-editor-surface {
@@ -58,6 +91,196 @@
 .doco-text-editor-error {
   margin-left: 12px;
   color: var(--danger, #b53333);
+}
+
+/* BlockHandle 的菜单通过 Portal 挂到 body，不能依赖宿主页面或 Tailwind Preflight。 */
+.doco-block-handle-trigger {
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #87867f;
+  background: transparent;
+  font: inherit;
+}
+
+.doco-block-handle-trigger:hover {
+  color: #4d4c48;
+  background: #f0eee6;
+}
+
+.doco-block-handle-trigger:focus-visible {
+  box-shadow: 0 0 0 2px #3898ec;
+}
+
+.doco-block-menu,
+.doco-block-menu * {
+  box-sizing: border-box;
+}
+
+.doco-block-menu {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  color: #4d4c48;
+  background: #faf9f5;
+  border: 1px solid #e8e6dc;
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(209, 207, 197, 0.35), 0 12px 32px rgba(20, 20, 19, 0.12);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.35;
+}
+
+.doco-block-menu button {
+  appearance: none;
+  min-height: 32px;
+  margin: 0;
+  border: 0;
+  color: #5e5d59;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.doco-block-menu button:hover,
+.doco-block-menu button[data-focused="true"] {
+  color: #141413;
+  background: #f0eee6;
+}
+
+.doco-block-menu button:focus-visible {
+  outline: 2px solid #3898ec;
+  outline-offset: -2px;
+}
+
+.doco-block-menu button svg {
+  flex: 0 0 auto;
+  color: #87867f;
+}
+
+.doco-block-menu button kbd {
+  color: #87867f;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.doco-block-menu .doco-block-menu-delete,
+.doco-block-menu .doco-block-menu-delete svg,
+.doco-block-menu .doco-block-menu-delete kbd {
+  color: #b53333;
+}
+
+.doco-block-menu .doco-block-menu-delete:hover,
+.doco-block-menu .doco-block-menu-delete[data-focused="true"] {
+  color: #b53333;
+  background: #f9ece7;
+}
+
+.doco-block-convert-menu {
+  border-left: 1px solid #e8e6dc;
+}
+
+/* Slash 命令菜单同样挂在 body，必须自带完整且不污染宿主的基础样式。 */
+.doco-command-menu,
+.doco-command-menu * {
+  box-sizing: border-box;
+}
+
+.doco-command-menu {
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 24px));
+  padding: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #4d4c48;
+  background: #faf9f5;
+  border: 1px solid #e8e6dc;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(209, 207, 197, 0.35), 0 12px 32px rgba(20, 20, 19, 0.12);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  scrollbar-color: #d1cfc5 transparent;
+  scrollbar-width: thin;
+}
+
+.doco-command-menu-heading {
+  padding: 7px 10px 6px;
+  color: #87867f;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.doco-command-menu-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 7px 9px;
+  border: 0;
+  color: #4d4c48;
+  background: transparent;
+  border-radius: 8px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doco-command-menu-item:hover,
+.doco-command-menu-item[aria-selected="true"] {
+  color: #141413;
+  background: #f0eee6;
+}
+
+.doco-command-menu-item:focus-visible {
+  outline: 2px solid #3898ec;
+  outline-offset: -2px;
+}
+
+.doco-command-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  flex: 0 0 32px;
+  color: #5e5d59;
+  background: #fdfcf8;
+  border: 1px solid #e8e6dc;
+  border-radius: 8px;
+}
+
+.doco-command-menu-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.doco-command-menu-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.doco-command-menu-title {
+  overflow: hidden;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doco-command-menu-description {
+  overflow: hidden;
+  color: #87867f;
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {
@@ -144,17 +367,43 @@
     li {
       display: flex;
       align-items: flex-start;
+      gap: 0.625rem;
+      margin: 0;
 
       >label {
         flex: 0 0 auto;
-        margin-right: 0.5rem;
+        display: flex;
+        align-items: center;
+        margin: 0.3rem 0 0;
         user-select: none;
-        margin-top: 0.2rem;
+
+        >input[type="checkbox"] {
+          width: 1rem;
+          height: 1rem;
+          margin: 0;
+          accent-color: var(--accent);
+          cursor: pointer;
+        }
       }
 
       >div {
         flex: 1 1 auto;
+        min-width: 0;
+
+        >p {
+          margin: 0;
+        }
       }
+    }
+
+    li + li {
+      margin-top: 0.25rem;
+    }
+
+    li[data-checked="true"] > div {
+      color: var(--text-muted);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
     }
   }
 

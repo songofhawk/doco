@@ -108,7 +108,11 @@ export function createDocoEditorExtensions({
         TableCell,
         SlashCommand.configure({
             suggestion: {
-                items: ({ query }: { query: string }) => getSuggestionItems({ query, uploadImage }),
+                items: ({ query }: { query: string }) => getSuggestionItems({
+                    query,
+                    uploadImage,
+                    plantUMLAvailable: Boolean(renderPlantUML),
+                }),
                 render: renderItems,
             },
         }),

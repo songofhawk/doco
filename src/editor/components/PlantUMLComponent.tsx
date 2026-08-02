@@ -125,7 +125,7 @@ export const PlantUMLComponent = (props: NodeViewProps) => {
                             ) : error ? (
                                 <div className="text-red-500 text-sm whitespace-pre-wrap">{error}</div>
                             ) : (
-                                <div dangerouslySetInnerHTML={{ __html: svgUrl }} />
+                                <div className="plantuml-block__diagram" dangerouslySetInnerHTML={{ __html: svgUrl }} />
                             )}
                         </div>
                     </div>
@@ -139,7 +139,7 @@ export const PlantUMLComponent = (props: NodeViewProps) => {
                         ) : error ? (
                             <div className="text-red-400 text-sm">解析异常: 双击以编辑修复。</div>
                         ) : svgUrl ? (
-                            <div dangerouslySetInnerHTML={{ __html: svgUrl }} />
+                            <div className="plantuml-block__diagram" dangerouslySetInnerHTML={{ __html: svgUrl }} />
                         ) : (
                             <div className="text-gray-400 text-sm italic">双击编辑图表</div>
                         )}
@@ -188,7 +188,7 @@ export const PlantUMLComponent = (props: NodeViewProps) => {
                         ) : error ? (
                             <div className="text-red-500 text-sm bg-white p-4 rounded">{error}</div>
                         ) : (
-                            <div dangerouslySetInnerHTML={{ __html: svgUrl }} />
+                            <div className="plantuml-block__diagram" dangerouslySetInnerHTML={{ __html: svgUrl }} />
                         )}
                     </div>
                 </div>,
