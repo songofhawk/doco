@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:editor-demo": "vite --config vite.editor-demo.config.ts --open /editor-demo.html",
     "build": "vite build",
+    "build:editor": "vite build --config vite.editor.config.ts",
+    "build:editor-demo": "vite build --config vite.editor-demo.config.ts",
     "build:server": "vite build --mode server-production",
     "lint": "eslint .",
     "preview": "vite preview",

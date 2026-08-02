@@ -13,7 +13,8 @@ import { actionTooltip, shortcutLabel, type EditorShortcutId } from '../editorSh
 
 const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut?: EditorShortcutId; onClick: () => void; focused?: boolean }) => (
     <button
-        className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+        type="button"
+        className="doco-block-menu-item flex items-center px-3 py-1.5 rounded-md transition-colors w-full text-left"
         onClick={onClick}
         data-focused={focused || undefined}
         aria-label={actionTooltip(label, shortcut)}
@@ -30,7 +31,8 @@ const MenuItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: Luc
 
 const ConvertItem = ({ icon: Icon, label, shortcut, onClick, focused }: { icon: LucideIcon; label: string; shortcut: EditorShortcutId; onClick: () => void; focused?: boolean }) => (
     <button
-        className={`flex items-center px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${focused ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+        type="button"
+        className="doco-block-menu-item flex items-center px-3 py-1.5 rounded-md transition-colors w-full text-left"
         onClick={onClick}
         data-focused={focused || undefined}
         aria-label={actionTooltip(label, shortcut)}
@@ -573,7 +575,8 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
             <Popover.Root open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) setShowConvertMenu(false) }}>
                 <Popover.Trigger asChild>
                     <button
-                        className="w-8 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing outline-none"
+                        type="button"
+                        className="doco-block-handle-trigger w-8 h-6 flex items-center justify-center rounded cursor-grab active:cursor-grabbing outline-none"
                         title="块操作"
                         aria-label="打开块操作菜单"
                     >
@@ -582,9 +585,10 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                 </Popover.Trigger>
                 <Popover.Portal>
                     <Popover.Content
-                        className="bg-white rounded-lg shadow-xl border border-gray-100 p-1 flex z-50 origin-top-left outline-none text-sm"
+                        className="doco-block-menu p-1 flex z-50 origin-top-left outline-none text-sm"
                         sideOffset={5}
                         align="start"
+                        collisionPadding={12}
                         onOpenAutoFocus={e => e.preventDefault()}
                         onCloseAutoFocus={e => e.preventDefault()}
                     >
@@ -597,7 +601,9 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                         >
                             {/* 块类型转换 */}
                             <button
-                                className={`flex items-center justify-between px-3 py-1.5 text-gray-600 rounded-md transition-colors w-full text-left ${fi === 0 ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                                type="button"
+                                className="doco-block-menu-item flex items-center justify-between px-3 py-1.5 rounded-md transition-colors w-full text-left"
+                                data-focused={fi === 0 || undefined}
                                 onMouseEnter={() => { setShowConvertMenu(true) }}
                                 onFocus={() => setFocusIndex(0)}
                                 aria-label="打开块类型转换菜单"
@@ -637,7 +643,9 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
 
                             {/* 删除 */}
                             <button
-                                className={`flex items-center px-3 py-1.5 text-red-600 rounded-md transition-colors w-full text-left ${fi === 9 + o ? 'bg-red-50' : 'hover:bg-red-50'}`}
+                                type="button"
+                                className="doco-block-menu-item doco-block-menu-delete flex items-center px-3 py-1.5 rounded-md transition-colors w-full text-left"
+                                data-focused={fi === 9 + o || undefined}
                                 onClick={handleDelete}
                                 aria-label={actionTooltip('删除', 'delete')}
                             >
@@ -653,7 +661,7 @@ export const BlockHandle = ({ editor }: { editor: Editor }) => {
                         {showConvertMenu && (
                             <div
                                 ref={convertMenuRef}
-                                className="w-48 flex flex-col border-l border-gray-100 pl-1 outline-none"
+                                className="doco-block-convert-menu w-48 flex flex-col pl-1 outline-none"
                                 tabIndex={-1}
                                 onKeyDown={handleConvertKeyDown}
                                 onMouseLeave={() => setShowConvertMenu(false)}

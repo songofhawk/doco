@@ -1,11 +1,39 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import PlantUMLComponent from './PlantUMLComponent'
+import type { PlantUMLRenderer } from '../plantUML'
 
-export const PlantUMLBlock = Node.create({
+export type PlantUMLBlockOptions = {
+    renderer: PlantUMLRenderer | null
+}
+
+type MarkdownState = {
+    write: (value: string) => void
+    text: (value: string, escape?: boolean) => void
+    ensureNewLine: () => void
+    closeBlock: (node: unknown) => void
+}
+type MarkdownToken = { info: string; content: string }
+type FenceRenderer = (
+    tokens: MarkdownToken[],
+    index: number,
+    options: unknown,
+    environment: unknown,
+    self: unknown,
+) => string
+type MarkdownItLike = {
+    renderer: { rules: { fence: FenceRenderer } }
+    utils: { escapeHtml: (value: string) => string }
+}
+
+export const PlantUMLBlock = Node.create<PlantUMLBlockOptions>({
     name: 'plantUMLBlock',
     group: 'block',
     atom: true,
+
+    addOptions() {
+        return { renderer: null }
+    },
 
     addAttributes() {
         return {
@@ -38,7 +66,7 @@ export const PlantUMLBlock = Node.create({
     addStorage() {
         return {
             markdown: {
-                serialize(state: any, node: any) {
+                serialize(state: MarkdownState, node: { attrs: { code: string } }) {
                     state.write('```plantuml\n')
                     state.text(node.attrs.code, false)
                     state.ensureNewLine()
@@ -46,9 +74,9 @@ export const PlantUMLBlock = Node.create({
                     state.closeBlock(node)
                 },
                 parse: {
-                    setup(markdownit: any) {
+                    setup(markdownit: MarkdownItLike) {
                         const fence = markdownit.renderer.rules.fence
-                        markdownit.renderer.rules.fence = (tokens: any, idx: number, options: any, env: any, self: any) => {
+                        markdownit.renderer.rules.fence = (tokens, idx, options, env, self) => {
                             const token = tokens[idx]
                             if (token.info.trim() === 'plantuml') {
                                 return `<div data-type="plantuml" data-code="${markdownit.utils.escapeHtml(token.content.replace(/\n$/, ''))}"></div>`

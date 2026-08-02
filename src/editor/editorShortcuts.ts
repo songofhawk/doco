@@ -47,7 +47,8 @@ export const EDITOR_SHORTCUTS: Record<EditorShortcutId, string> = {
 
 const isApplePlatform = () => {
     if (typeof navigator === 'undefined') return false
-    const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent
+    const userAgentData = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+    const platform = userAgentData?.platform || navigator.platform || navigator.userAgent
     return /Mac|iPhone|iPad|iPod/i.test(platform)
 }
 

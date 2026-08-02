@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NodeViewWrapper, NodeViewProps } from '@tiptap/react'
 import { AlignLeft, AlignCenter, AlignRight, Trash2 } from 'lucide-react'
-import { API_BASE } from '../../auth'
+import type { ResizableImageOptions } from './ResizableImage'
 
-export const ImageComponent = ({ node, updateAttributes, selected, deleteNode, editor }: NodeViewProps) => {
+export const ImageComponent = ({ node, updateAttributes, selected, extension }: NodeViewProps) => {
     const { src, alt, width, align, attachmentId } = node.attrs as any
-    const displaySrc = attachmentId ? `${API_BASE}/attachments/${attachmentId}` : src
+    const options = extension.options as ResizableImageOptions
+    const displaySrc = options.resolveSrc(src, attachmentId)
     const imgRef = useRef<HTMLImageElement>(null)
     const [resizing, setResizing] = useState(false)
     const startX = useRef(0)

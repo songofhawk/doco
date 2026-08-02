@@ -140,7 +140,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
     const copySelectionAsMarkdown = () => {
         const { from, to } = editor.state.selection
         const text = editor.state.doc.textBetween(from, to, '\n')
-        const markdownStorage = editor.storage.markdown as MarkdownStorage | undefined
+        const markdownStorage = (editor.storage as unknown as { markdown?: MarkdownStorage }).markdown
         const markdown = markdownStorage?.getMarkdown?.() || text
         const firstLine = text.split('\n')[0]?.slice(0, 20)
         const matched = firstLine
@@ -206,7 +206,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
             <TiptapBubbleMenu
                 editor={editor}
                 shouldShow={shouldShowBubbleMenu}
-                className="flex overflow-visible border border-[var(--border-subtle)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] bg-[var(--surface-elevated)] z-50"
+                className="doco-editor-floating-ui flex overflow-visible border border-[var(--border-subtle)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] bg-[var(--surface-elevated)] z-50"
             >
                 <div ref={toolbarRef} className="flex px-1 items-center outline-none">
                     {!isImage && !isUnsupportedBlock && (
@@ -229,7 +229,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                         align="start"
                                         onOpenAutoFocus={event => event.preventDefault()}
                                         onCloseAutoFocus={event => event.preventDefault()}
-                                        className="z-[60] w-56 max-h-[360px] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                        className="doco-editor-floating-ui z-[60] w-56 max-h-[360px] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                                     >
                                         {blockTypeItems.map(item => (
                                             <Fragment key={item.shortcut}>
@@ -265,7 +265,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                 align="end"
                                 onOpenAutoFocus={event => event.preventDefault()}
                                 onCloseAutoFocus={event => event.preventDefault()}
-                                className="z-[60] w-48 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                className="doco-editor-floating-ui z-[60] w-48 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                             >
                                 <MenuAction icon={AlignLeft} label="左对齐" shortcut="alignLeft" active={editor.isActive({ textAlign: 'left' })} onClick={() => { editor.chain().focus().setTextAlign('left').run(); setAlignOpen(false); refocusEditorAfterMenuClose() }} />
                                 <MenuAction icon={AlignCenter} label="居中对齐" shortcut="alignCenter" active={editor.isActive({ textAlign: 'center' })} onClick={() => { editor.chain().focus().setTextAlign('center').run(); setAlignOpen(false); refocusEditorAfterMenuClose() }} />
@@ -289,7 +289,7 @@ export const FloatingToolbar = ({ editor }: { editor: Editor }) => {
                                     align="end"
                                     onOpenAutoFocus={event => event.preventDefault()}
                                     onCloseAutoFocus={event => event.preventDefault()}
-                                    className="z-[60] w-60 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
+                                    className="doco-editor-floating-ui z-[60] w-60 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-1.5 text-sm shadow-[0_4px_24px_rgba(0,0,0,0.10)] outline-none"
                                 >
                                     <MenuAction icon={Scissors} label="剪切" shortcut="cut" onClick={() => nativeClipboardAction('cut')} />
                                     <MenuAction icon={Copy} label="复制" shortcut="copy" onClick={() => nativeClipboardAction('copy')} />
