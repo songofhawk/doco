@@ -2,9 +2,27 @@
 
 > 📖 [中文版](README.zh-CN.md)
 
-An open-source rich-text collaborative editor that puts your data back in your hands — real-time sync, knowledge base management, text-to-diagram, spreadsheets, and multi-format export.
+**The document space where humans and AI agents write together.** An open-source rich-text
+collaborative editor that puts your data back in your hands — and treats your AI agents with
+the same care: block-level stable addressing, optimistic concurrency control, and a 29-tool
+MCP server, so agents read and write your knowledge base as safely as a careful human editor.
+
+- **Hosted:** [doco.showme.talk](https://doco.showme.talk/) — free during beta
+- **Connect your agent:** `claude mcp add doco -- npx -y --package doco-agent-cli doco mcp`
+- **CLI:** `npm i -g doco-agent-cli && doco login`
+- **npm:** [doco-agent-cli](https://www.npmjs.com/package/doco-agent-cli) · **API docs:** [doco.showme.talk/api-docs](https://doco.showme.talk/api-docs)
 
 ![](docs/assets/readme/product-editor.png)
+
+## Why agents are safe here
+
+| Capability | What it means |
+|---|---|
+| Block-level stable addressing | Every paragraph has a `block_<ULID>` id — position-independent, survives drags and folds |
+| Optimistic concurrency | Reads return a `sha256` version; writes require `If-Match`; on 409 the agent re-reads, merges, retries — blind overwrites are impossible |
+| Markdown round-trip | Export with `?annotate=anchors`; write the whole document back and block ids are preserved |
+| Human–agent co-editing | Agent writes flow through the same Yjs document — changes appear live in the browser |
+| Transactions & idempotency | Batch operations commit atomically; `Idempotency-Key` makes retries side-effect-free |
 
 ## Features
 
@@ -61,11 +79,17 @@ Built on the Yjs CRDT algorithm:
 | WeChat Official Account | — | ✅ (with theme preview) |
 | Images (in-document) | ✅ (paste / drag-drop) | ✅ (bundled in ZIP) |
 
-### API
+### API · MCP · CLI
 
-A full REST API (OpenAPI 3.1 spec, Bearer Token auth, ETag versioning). Turn your docs into programmable assets — script your own backups, let an agent organize your knowledge base, pipe docs from your publishing workflow to your blog.
+Three channels, one contract:
 
-Built-in API documentation page, ready to use out of the box.
+- **REST API**: OpenAPI 3.1 spec, Bearer Token auth, ETag versioning, cursor pagination, idempotency keys
+- **MCP server**: `doco mcp` (ships inside `doco-agent-cli`) — 29 tools plus `doco://` resources
+- **doco CLI**: `login / whoami / docs / blocks / edit / mcp`, global `--json`, writes internalize ETag/If-Match
+
+Turn your docs into programmable assets — script your own backups, let an agent organize your
+knowledge base, pipe docs from your publishing workflow to your blog. Built-in API
+documentation page, ready to use out of the box.
 
 ## Tech Stack
 
