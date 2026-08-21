@@ -23,7 +23,7 @@ The marketplace bundles the Doco MCP server and the safe read → version → pr
 operating protocol. Tokens remain in Claude Code's local configuration and are never included
 in the plugin repository.
 
-![](docs/assets/readme/product-editor.png)
+![Doco editor showing a live block-level Agent update in an English demo document](docs/assets/readme/product-editor-en.png)
 
 ## Why agents are safe here
 
