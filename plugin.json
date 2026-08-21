@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "doco",
+  "version": "0.1.3",
+  "description": "Connect AI agents to Doco, a collaborative document workspace with stable block IDs, optimistic concurrency, Markdown round-trip, and MCP tools.",
+  "author": {
+    "name": "songofhawk",
+    "url": "https://github.com/songofhawk"
+  },
+  "homepage": "https://doco.page",
+  "repository": "https://github.com/songofhawk/doco",
+  "license": "MIT",
+  "keywords": [
+    "doco",
+    "mcp",
+    "knowledge-base",
+    "claude-code",
+    "cursor",
+    "collaborative-editing"
+  ]
+}
