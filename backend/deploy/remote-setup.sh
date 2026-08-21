@@ -3,7 +3,7 @@
 # 前提：代码已 rsync 到 /opt/doco/backend（见 deploy-from-local.sh）
 set -euo pipefail
 
-NODE_MIN_MAJOR=20
+NODE_MIN_MAJOR=22
 
 node_major() {
   node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0
@@ -59,15 +59,15 @@ install_node_from_packages() {
 
   case "$PKG_MANAGER" in
     apt)
-      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
       apt-get install -y -qq nodejs >/dev/null
       ;;
     dnf)
-      curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+      curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
       dnf install -y -q nodejs >/dev/null
       ;;
     yum)
-      curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+      curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
       yum install -y -q nodejs >/dev/null
       ;;
   esac

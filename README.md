@@ -119,7 +119,7 @@ documentation page, ready to use out of the box.
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 22
 - pnpm
 
 ### Install & Run

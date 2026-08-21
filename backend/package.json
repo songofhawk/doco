@@ -2,6 +2,9 @@
   "name": "doco-backend-node",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env.local --watch server.js",
     "start": "node --env-file-if-exists=.env.local server.js",
