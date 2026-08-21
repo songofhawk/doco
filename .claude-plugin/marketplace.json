@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "doco",
+  "owner": {
+    "name": "songofhawk"
+  },
+  "metadata": {
+    "description": "Doco tools for Claude Code: safe, version-protected knowledge-base operations.",
+    "version": "0.1.3"
+  },
+  "plugins": [
+    {
+      "name": "doco",
+      "source": "./plugins/doco",
+      "description": "Connect Claude Code to Doco's 29-tool MCP server and its safe document-operation protocol.",
+      "version": "0.1.3",
+      "category": "Knowledge Management",
+      "tags": ["mcp", "knowledge-management", "documents", "claude-code"]
+    }
+  ]
+}

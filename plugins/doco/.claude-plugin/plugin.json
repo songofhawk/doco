@@ -1,0 +1,13 @@
+{
+  "name": "doco",
+  "description": "Connect Claude Code to Doco's collaborative document workspace through a safe 29-tool MCP server.",
+  "version": "0.1.3",
+  "author": {
+    "name": "songofhawk",
+    "url": "https://github.com/songofhawk"
+  },
+  "homepage": "https://doco.page",
+  "repository": "https://github.com/songofhawk/doco",
+  "license": "MIT",
+  "keywords": ["mcp", "knowledge-management", "documents", "claude-code"]
+}

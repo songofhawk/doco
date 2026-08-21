@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "doco": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--package",
+        "doco-agent-cli",
+        "doco",
+        "mcp"
+      ]
+    }
+  }
+}
