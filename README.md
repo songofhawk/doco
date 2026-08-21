@@ -12,6 +12,17 @@ MCP server, so agents read and write your knowledge base as safely as a careful 
 - **CLI:** `npm i -g doco-agent-cli && doco login`
 - **npm:** [doco-agent-cli](https://www.npmjs.com/package/doco-agent-cli) · **API docs:** [doco.page/api-docs](https://doco.page/api-docs/)
 
+### Claude Code Plugin Marketplace
+
+```text
+/plugin marketplace add songofhawk/doco
+/plugin install doco@doco
+```
+
+The marketplace bundles the Doco MCP server and the safe read → version → protected-write
+operating protocol. Tokens remain in Claude Code's local configuration and are never included
+in the plugin repository.
+
 ![](docs/assets/readme/product-editor.png)
 
 ## Why agents are safe here
