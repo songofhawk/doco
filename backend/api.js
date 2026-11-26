@@ -12,7 +12,9 @@ import {
   clearSessionCookie,
   createSession,
   deleteSessionFromCookieHeader,
+  loginWithPassword,
   requestEmailLoginCode,
+  registerWithPassword,
   requireAuth,
   setSessionCookie,
   updateUserAppearance,
@@ -111,6 +113,28 @@ api.post('/auth/logout', (req, res) => {
   deleteSessionFromCookieHeader(req.headers.cookie || '');
   clearSessionCookie(res, req);
   res.json({ status: 'ok' });
+});
+
+api.post('/auth/password/register', (req, res) => {
+  try {
+    const user = registerWithPassword(req.body?.email, req.body?.password);
+    const session = createSession(user.id);
+    setSessionCookie(res, session.token, session.expiresAt, req);
+    res.json({ user });
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ error: error.message || '注册失败', code: error.code });
+  }
+});
+
+api.post('/auth/password/login', (req, res) => {
+  try {
+    const user = loginWithPassword(req.body?.email, req.body?.password);
+    const session = createSession(user.id);
+    setSessionCookie(res, session.token, session.expiresAt, req);
+    res.json({ user });
+  } catch (error) {
+    res.status(error.statusCode || 401).json({ error: error.message || '登录失败', code: error.code });
+  }
 });
 
 api.use(requireAuth);

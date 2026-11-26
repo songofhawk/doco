@@ -40,3 +40,10 @@
 .read-the-docs {
   color: #888;
 }
+
+/* 密码登录面板 */
+.lp-login-password { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.lp-login-switch { display: flex; gap: 8px; margin-bottom: 4px; }
+.lp-login-switch button { flex: 1; padding: 8px 10px; border: 1px solid currentColor; background: transparent; cursor: pointer; border-radius: 6px; opacity: .55; font-size: 13px; }
+.lp-login-switch button.is-active { opacity: 1; font-weight: 600; }
+.lp-login-error { color: #c0392b; font-size: 13px; margin: 0; }

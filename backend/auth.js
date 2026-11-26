@@ -9,6 +9,7 @@ import {
 import { OAuth2Client } from 'google-auth-library';
 import { db } from './database.js';
 import { sendLoginCodeEmail } from './email.js';
+import { hashPassword, verifyPassword } from './password-hash.js';
 
 export const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'doco_session';
 
@@ -454,4 +455,38 @@ export function requireAuth(req, res, next) {
   }
   req.user = user;
   next();
+}
+
+
+export function registerWithPassword(emailValue, passwordValue) {
+  const email = normalizeEmail(emailValue);
+  const password = typeof passwordValue === 'string' ? passwordValue : '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw authError('邮箱格式不正确', 400, 'INVALID_EMAIL');
+  if (password.length < 8) throw authError('密码至少 8 位', 400, 'PASSWORD_TOO_SHORT');
+  const timestamp = now();
+  let user = db.prepare('SELECT * FROM users WHERE normalized_email = ?').get(email);
+  if (user && user.password_hash) throw authError('该邮箱已注册，请直接登录', 409, 'EMAIL_ALREADY_REGISTERED');
+  if (user) {
+    db.prepare('UPDATE users SET password_hash = ?, email_verified_at = COALESCE(email_verified_at, ?), updated_at = ? WHERE id = ?')
+      .run(hashPassword(password), timestamp, timestamp, user.id);
+  } else {
+    const id = randomUUID();
+    db.prepare(`INSERT INTO users (id, email, normalized_email, email_verified_at, name, avatar_url, created_at, updated_at, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, email, email, timestamp, null, null, timestamp, timestamp, hashPassword(password));
+  }
+  user = db.prepare('SELECT * FROM users WHERE normalized_email = ?').get(email);
+  ensureDefaultWorkspace(user);
+  return publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(user.id));
+}
+
+export function loginWithPassword(emailValue, passwordValue) {
+  const email = normalizeEmail(emailValue);
+  const password = typeof passwordValue === 'string' ? passwordValue : '';
+  const user = db.prepare('SELECT * FROM users WHERE normalized_email = ?').get(email);
+  if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
+    throw authError('邮箱或密码不正确', 401, 'INVALID_CREDENTIALS');
+  }
+  ensureDefaultWorkspace(user);
+  return publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(user.id));
 }
