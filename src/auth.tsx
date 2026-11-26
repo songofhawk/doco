@@ -19,6 +19,8 @@ type AuthContextValue = {
   signInWithGoogleCredential(credential: string): Promise<void>
   requestEmailCode(email: string): Promise<{ expiresInSeconds: number; retryAfterSeconds: number }>
   signInWithEmailCode(email: string, code: string): Promise<void>
+  signUpWithPassword(email: string, password: string): Promise<void>
+  signInWithPassword(email: string, password: string): Promise<void>
   signOut(): Promise<void>
   updateAppearance(theme: AppearanceTheme): Promise<void>
   refresh(): Promise<void>
@@ -118,6 +120,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(data.user)
   }, [])
 
+  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+    const res = await apiFetch('/auth/password/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || '注册失败')
+    }
+    const data = await res.json()
+    setUser(data.user)
+  }, [])
+
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const res = await apiFetch('/auth/password/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || '登录失败')
+    }
+    const data = await res.json()
+    setUser(data.user)
+  }, [])
+
   const signOut = useCallback(async () => {
     await apiFetch('/auth/logout', { method: 'POST' }).catch(() => {})
     setUser(null)
@@ -144,6 +172,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signInWithGoogleCredential,
     requestEmailCode,
     signInWithEmailCode,
+    signUpWithPassword,
+    signInWithPassword,
     signOut,
     updateAppearance,
     refresh,
@@ -154,6 +184,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signInWithGoogleCredential,
     requestEmailCode,
     signInWithEmailCode,
+    signUpWithPassword,
+    signInWithPassword,
     signOut,
     updateAppearance,
     refresh,

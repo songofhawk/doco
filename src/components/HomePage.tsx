@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowUpRight, FileArchive, FileCode, FileDown, FileText, FileType, FileUp, LoaderCircle, Mail, Newspaper, X } from 'lucide-react'
 import { useAuth } from '../auth'
+import PasswordLogin from './PasswordLogin'
 import productEditorImage from '../assets/landing/product-editor.png'
 import syncAbstractImage from '../assets/landing/sync-abstract.webp'
 import { DocoWordmark } from './DocoLogo'
@@ -109,6 +110,8 @@ const LoginPanel = () => {
   return (
     <div className="lp-login-card">
       <h2>登录 Doco</h2>
+      <PasswordLogin />
+      <p className="lp-login-hint" style={{ textAlign: 'center', margin: '2px 0 10px' }}>或使用邮箱验证码</p>
       <p>使用邮箱或 Google 账号继续</p>
 
       <form onSubmit={emailStep === 'email' ? (event) => { event.preventDefault(); void sendEmailCode() } : verifyEmailCode}>

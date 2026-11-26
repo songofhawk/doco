@@ -258,6 +258,13 @@ const migrations = [
       CREATE INDEX idx_documents_created_by ON documents(created_by_user_id);
     `,
   },
+  {
+    version: 7,
+    name: 'password_login',
+    up: `
+      ALTER TABLE users ADD COLUMN password_hash TEXT;
+    `,
+  },
 ];
 
 function columnExists(db, table, column) {
